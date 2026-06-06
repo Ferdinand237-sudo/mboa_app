@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import 'logement_detail_screen.dart';
@@ -18,98 +19,15 @@ class _LogementScreenState extends State<LogementScreen> {
   List<String> _selectedEquipements = [];
   bool _showFiltres = false;
 
-  final List<Map<String, dynamic>> _logements = [
-    {
-      'id': '1',
-      'titre': 'Chambre meublée - Centre ville',
-      'prix': 20000,
-      'type': 'Chambre',
-      'distance': '650m du campus',
-      'distanceVal': 650,
-      'note': 4.7,
-      'avis': 23,
-      'boosted': true,
-      'verified': true,
-      'quartier': 'Mvog-Ada',
-      'emoji': '🏠',
-      'equipements': ['Wifi', 'Eau courante', 'Électricité', 'Meublé'],
-      'surface': 14,
-      'statut': 'disponible',
-      'proprietaire': 'Louise D.',
-    },
-    {
-      'id': '2',
-      'titre': 'Studio moderne - Quartier calme',
-      'prix': 35000,
-      'type': 'Studio',
-      'distance': '1.2km du campus',
-      'distanceVal': 1200,
-      'note': 4.5,
-      'avis': 15,
-      'boosted': false,
-      'verified': true,
-      'quartier': 'Nkol-Eton',
-      'emoji': '🏢',
-      'equipements': ['Wifi', 'Eau courante', 'Électricité', 'Meublé', 'Cuisine'],
-      'surface': 22,
-      'statut': 'disponible',
-      'proprietaire': 'Jean P.',
-    },
-    {
-      'id': '3',
-      'titre': 'Chambre simple - Proche marché',
-      'prix': 15000,
-      'type': 'Chambre',
-      'distance': '900m du campus',
-      'distanceVal': 900,
-      'note': 4.2,
-      'avis': 8,
-      'boosted': false,
-      'verified': false,
-      'quartier': 'Mvog-Mbi',
-      'emoji': '🏡',
-      'equipements': ['Eau courante', 'Électricité'],
-      'surface': 10,
-      'statut': 'disponible',
-      'proprietaire': 'Marie S.',
-    },
-    {
-      'id': '4',
-      'titre': 'Appartement 2 pièces lumineux',
-      'prix': 55000,
-      'type': 'Appartement',
-      'distance': '2km du campus',
-      'distanceVal': 2000,
-      'note': 4.9,
-      'avis': 41,
-      'boosted': true,
-      'verified': true,
-      'quartier': 'Centre',
-      'emoji': '🏗️',
-      'equipements': ['Wifi', 'Eau courante', 'Électricité', 'Meublé', 'Cuisine', 'Salon'],
-      'surface': 38,
-      'statut': 'disponible',
-      'proprietaire': 'Thomas K.',
-    },
-    {
-      'id': '5',
-      'titre': 'Chambre meublée - Près de l\'IUT',
-      'prix': 18000,
-      'type': 'Chambre',
-      'distance': '300m du campus',
-      'distanceVal': 300,
-      'note': 4.6,
-      'avis': 19,
-      'boosted': false,
-      'verified': true,
-      'quartier': 'Elig-Essono',
-      'emoji': '🏘',
-      'equipements': ['Eau courante', 'Électricité', 'Meublé'],
-      'surface': 12,
-      'statut': 'disponible',
-      'proprietaire': 'Sophie B.',
-    },
-  ];
+  final _supabase = Supabase.instance.client;
+  List<Map<String, dynamic>> _logements = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _chargerLogements();
+  }
 
   List<Map<String, dynamic>> get _filtered {
     return _logements.where((l) {
@@ -133,6 +51,26 @@ class _LogementScreenState extends State<LogementScreen> {
         if (!a['verified'] && b['verified']) return 1;
         return (b['note'] as double).compareTo(a['note'] as double);
       });
+  }
+
+  Future<void> _chargerLogements() async {
+    try {
+      final data = await _supabase
+          .from('logements')
+          .select('*, proprietaire:users!proprietaire_id(nom, verified)')
+          .eq('statut', 'disponible')
+          .order('boosted', ascending: false)
+          .order('date_publication', ascending: false)
+          .limit(100);
+      if (mounted) {
+        setState(() {
+          _logements = List<Map<String, dynamic>>.from(data);
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   String _formatPrix(int prix) {
@@ -336,7 +274,7 @@ class _LogementScreenState extends State<LogementScreen> {
                         activeTrackColor: MboaColors.primary,
                         inactiveTrackColor: MboaColors.border,
                         thumbColor: MboaColors.primary,
-                        overlayColor: MboaColors.primary.withOpacity(0.1),
+                        overlayColor: MboaColors.primary.withValues(alpha: 0.1),
                         trackHeight: 4,
                       ),
                       child: Slider(
@@ -456,16 +394,18 @@ class _LogementScreenState extends State<LogementScreen> {
 
             // ── Liste ────────────────────────────────────────
             Expanded(
-              child: filtered.isEmpty
-                  ? _buildEmpty()
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 14),
-                      itemBuilder: (context, index) {
-                        return _buildLogementTile(filtered[index]);
-                      },
-                    ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : (filtered.isEmpty
+                      ? _buildEmpty()
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 14),
+                          itemBuilder: (context, index) {
+                            return _buildLogementTile(filtered[index]);
+                          },
+                        )),
             ),
           ],
         ),
@@ -487,7 +427,7 @@ class _LogementScreenState extends State<LogementScreen> {
           borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -677,9 +617,9 @@ class _LogementScreenState extends State<LogementScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,

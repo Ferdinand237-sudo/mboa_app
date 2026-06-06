@@ -180,11 +180,11 @@ class _LogementDetailScreenState extends State<LogementDetailScreen> {
                                       horizontal: 12, vertical: 7),
                                   decoration: BoxDecoration(
                                     color: MboaColors.primary
-                                        .withOpacity(0.08),
+                                        .withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
                                       color: MboaColors.primary
-                                          .withOpacity(0.2),
+                                          .withValues(alpha: 0.2),
                                     ),
                                   ),
                                   child: Text(
@@ -211,7 +211,7 @@ class _LogementDetailScreenState extends State<LogementDetailScreen> {
                               BorderRadius.circular(MboaSizes.radiusLg),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                             ),
                           ],
@@ -231,7 +231,7 @@ class _LogementDetailScreenState extends State<LogementDetailScreen> {
                                         height: 36,
                                         decoration: BoxDecoration(
                                           color: Color(p['color'])
-                                              .withOpacity(0.1),
+                                              .withValues(alpha: 0.1),
                                           borderRadius:
                                               BorderRadius.circular(10),
                                         ),
@@ -258,7 +258,7 @@ class _LogementDetailScreenState extends State<LogementDetailScreen> {
                                             horizontal: 10, vertical: 4),
                                         decoration: BoxDecoration(
                                           color: Color(p['color'])
-                                              .withOpacity(0.1),
+                                              .withValues(alpha: 0.1),
                                           borderRadius:
                                               BorderRadius.circular(20),
                                         ),
@@ -306,7 +306,7 @@ class _LogementDetailScreenState extends State<LogementDetailScreen> {
                               BorderRadius.circular(MboaSizes.radiusLg),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                             ),
                           ],
@@ -413,7 +413,7 @@ class _LogementDetailScreenState extends State<LogementDetailScreen> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 20,
                     offset: const Offset(0, -4),
                   ),
@@ -455,11 +455,11 @@ class _LogementDetailScreenState extends State<LogementDetailScreen> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 8,
                     ),
                   ],
@@ -480,11 +480,11 @@ class _LogementDetailScreenState extends State<LogementDetailScreen> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 8,
                     ),
                   ],
@@ -534,7 +534,7 @@ class _LogementDetailScreenState extends State<LogementDetailScreen> {
               padding: const EdgeInsets.symmetric(
                   horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -569,7 +569,7 @@ class _LogementDetailScreenState extends State<LogementDetailScreen> {
         borderRadius: BorderRadius.circular(MboaSizes.radiusMd),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
           ),
         ],
@@ -583,7 +583,7 @@ class _LogementDetailScreenState extends State<LogementDetailScreen> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: MboaColors.primaryLight.withOpacity(0.3),
+                  color: MboaColors.primaryLight.withValues(alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -664,7 +664,7 @@ class _LogementDetailScreenState extends State<LogementDetailScreen> {
         border: Border.all(color: MboaColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 6,
           ),
         ],
@@ -692,7 +692,7 @@ class _LogementDetailScreenState extends State<LogementDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.9),
+        color: color.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(

@@ -105,7 +105,7 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: MboaColors.verified.withOpacity(0.1),
+                  color: MboaColors.verified.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
@@ -185,7 +185,7 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -211,7 +211,7 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
                       style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 13,
-                        color: Colors.white.withOpacity(0.85),
+                        color: Colors.white.withValues(alpha: 0.85),
                       ),
                     ),
                   ],
@@ -231,10 +231,10 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: MboaColors.primary.withOpacity(0.08),
+                          color: MboaColors.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(MboaSizes.radiusMd),
                           border: Border.all(
-                            color: MboaColors.primary.withOpacity(0.2),
+                            color: MboaColors.primary.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Row(
@@ -324,7 +324,7 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? MboaColors.secondary.withOpacity(0.08)
+                                  ? MboaColors.secondary.withValues(alpha: 0.08)
                                   : Colors.white,
                               borderRadius:
                                   BorderRadius.circular(MboaSizes.radiusMd),

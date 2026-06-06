@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import 'article_detail_screen.dart';
 
@@ -15,104 +16,9 @@ class _MarketScreenState extends State<MarketScreen> {
   String _selectedEtat = 'Tous';
   bool _showFiltres = false;
 
-  final List<Map<String, dynamic>> _articles = [
-    {
-      'id': '1',
-      'titre': 'Lit 2 places + matelas',
-      'prix': 18000,
-      'etat': 'Bon état',
-      'categorie': 'Literie',
-      'emoji': '🛏',
-      'vendeur': 'Rodrigue K.',
-      'vendeurNote': 4.8,
-      'boosted': true,
-      'negociable': true,
-    },
-    {
-      'id': '2',
-      'titre': 'Table de travail + chaise',
-      'prix': 8500,
-      'etat': 'Très bon état',
-      'categorie': 'Mobilier',
-      'emoji': '🪑',
-      'vendeur': 'Aminata D.',
-      'vendeurNote': 4.6,
-      'boosted': false,
-      'negociable': false,
-    },
-    {
-      'id': '3',
-      'titre': 'Plaque à gaz + bonbonne',
-      'prix': 12000,
-      'etat': 'Bon état',
-      'categorie': 'Cuisine',
-      'emoji': '🍳',
-      'vendeur': 'Eric B.',
-      'vendeurNote': 4.3,
-      'boosted': false,
-      'negociable': true,
-    },
-    {
-      'id': '4',
-      'titre': 'Armoire 3 portes',
-      'prix': 22000,
-      'etat': 'Correct',
-      'categorie': 'Mobilier',
-      'emoji': '🗄️',
-      'vendeur': 'Meublé Express',
-      'vendeurNote': 4.7,
-      'boosted': true,
-      'negociable': false,
-    },
-    {
-      'id': '5',
-      'titre': 'Ventilateur de bureau',
-      'prix': 5000,
-      'etat': 'Neuf',
-      'categorie': 'Électronique',
-      'emoji': '💨',
-      'vendeur': 'Linda M.',
-      'vendeurNote': 5.0,
-      'boosted': false,
-      'negociable': false,
-    },
-    {
-      'id': '6',
-      'titre': 'Mini-frigo 50L',
-      'prix': 35000,
-      'etat': 'Très bon état',
-      'categorie': 'Électronique',
-      'emoji': '❄️',
-      'vendeur': 'Tech Store',
-      'vendeurNote': 4.5,
-      'boosted': false,
-      'negociable': true,
-    },
-    {
-      'id': '7',
-      'titre': 'Matelas mousse 90x190',
-      'prix': 9000,
-      'etat': 'Bon état',
-      'categorie': 'Literie',
-      'emoji': '🛌',
-      'vendeur': 'Paul A.',
-      'vendeurNote': 4.1,
-      'boosted': false,
-      'negociable': true,
-    },
-    {
-      'id': '8',
-      'titre': 'Bibliothèque 5 étagères',
-      'prix': 14000,
-      'etat': 'Très bon état',
-      'categorie': 'Mobilier',
-      'emoji': '📚',
-      'vendeur': 'Marie T.',
-      'vendeurNote': 4.4,
-      'boosted': false,
-      'negociable': false,
-    },
-  ];
+  final _supabase = Supabase.instance.client;
+  List<Map<String, dynamic>> _articles = [];
+  bool _isLoading = true;
 
   final List<Map<String, String>> _categories = [
     {'label': 'Tous', 'icon': '🛍'},
@@ -141,6 +47,32 @@ class _MarketScreenState extends State<MarketScreen> {
         return (b['vendeurNote'] as double)
             .compareTo(a['vendeurNote'] as double);
       });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _chargerArticles();
+  }
+
+  Future<void> _chargerArticles() async {
+    try {
+      final data = await _supabase
+          .from('articles')
+          .select('*, vendeur:users!vendeur_id(nom, verified)')
+          .eq('statut', 'disponible')
+          .order('boosted', ascending: false)
+          .order('date_publication', ascending: false)
+          .limit(200);
+      if (mounted) {
+        setState(() {
+          _articles = List<Map<String, dynamic>>.from(data);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   String _formatPrix(int prix) {
@@ -419,22 +351,24 @@ class _MarketScreenState extends State<MarketScreen> {
 
             // ── Grille ───────────────────────────────────────
             Expanded(
-              child: filtered.isEmpty
-                  ? _buildEmpty()
-                  : GridView.builder(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 0.78,
-                      ),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, index) {
-                        return _buildArticleCard(filtered[index]);
-                      },
-                    ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : (filtered.isEmpty
+                      ? _buildEmpty()
+                      : GridView.builder(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 0.78,
+                          ),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                            return _buildArticleCard(filtered[index]);
+                          },
+                        )),
             ),
           ],
         ),
@@ -456,7 +390,7 @@ class _MarketScreenState extends State<MarketScreen> {
           borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -479,8 +413,8 @@ class _MarketScreenState extends State<MarketScreen> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          MboaColors.secondary.withOpacity(0.25),
-                          MboaColors.accent.withOpacity(0.15),
+                          MboaColors.secondary.withValues(alpha: 0.25),
+                          MboaColors.accent.withValues(alpha: 0.15),
                         ],
                       ),
                     ),
@@ -612,7 +546,7 @@ class _MarketScreenState extends State<MarketScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.9),
+        color: color.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(

@@ -7,6 +7,7 @@ import '../features/auth/screens/register_screen.dart';
 import '../features/auth/screens/demande_vendeur_screen.dart';
 import '../features/home/screens/main_screen.dart';
 import '../features/auth/screens/register_etudiant_screen.dart';
+import '../features/admin/screens/admin_screen.dart';
 
 // ── Noms des routes ───────────────────────────────────────────
 class AppRoutes {
@@ -16,6 +17,7 @@ class AppRoutes {
   static const String demandeVendeur = '/demande-vendeur';
   static const String main           = '/main';
   static const String registerEtudiant  = '/register/etudiant';
+  static const String admin = '/admin';
 }
 
 // ── Provider du router ────────────────────────────────────────
@@ -64,6 +66,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.registerEtudiant,
         builder: (context, state) => const RegisterEtudiantScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.admin,
+        builder: (context, state) => const AdminScreen(),
       ),
     ],
   );

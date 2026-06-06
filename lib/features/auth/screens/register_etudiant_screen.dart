@@ -129,7 +129,7 @@ class _RegisterEtudiantScreenState extends State<RegisterEtudiantScreen> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -166,7 +166,7 @@ class _RegisterEtudiantScreenState extends State<RegisterEtudiantScreen> {
                       style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 13,
-                        color: Colors.white.withOpacity(0.75),
+                        color: Colors.white.withValues(alpha: 0.75),
                       ),
                     ),
                   ],
@@ -459,7 +459,7 @@ class _RegisterEtudiantScreenState extends State<RegisterEtudiantScreen> {
           height: 28,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isActive ? Colors.white : Colors.white.withOpacity(0.3),
+            color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.3),
           ),
           child: Center(
             child: Text(
@@ -479,7 +479,7 @@ class _RegisterEtudiantScreenState extends State<RegisterEtudiantScreen> {
           style: TextStyle(
             fontFamily: 'Poppins',
             fontSize: 10,
-            color: isActive ? Colors.white : Colors.white.withOpacity(0.5),
+            color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.5),
             fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
@@ -492,7 +492,7 @@ class _RegisterEtudiantScreenState extends State<RegisterEtudiantScreen> {
       child: Container(
         height: 1.5,
         margin: const EdgeInsets.only(bottom: 20),
-        color: Colors.white.withOpacity(0.3),
+        color: Colors.white.withValues(alpha: 0.3),
       ),
     );
   }

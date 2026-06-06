@@ -108,7 +108,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
               child: Container(
                 margin: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -135,10 +135,10 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
                             width: 90,
                             height: 90,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.5),
+                                color: Colors.white.withValues(alpha: 0.5),
                                 width: 3,
                               ),
                             ),
@@ -196,7 +196,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
                         style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 13,
-                          color: Colors.white.withOpacity(0.75),
+                          color: Colors.white.withValues(alpha: 0.75),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -207,7 +207,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
                         padding: const EdgeInsets.symmetric(
                             vertical: 12, horizontal: 8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
+                          color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Row(
@@ -259,7 +259,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
                       BorderRadius.circular(MboaSizes.radiusLg),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 10,
                     ),
                   ],
@@ -273,8 +273,8 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            MboaColors.secondary.withOpacity(0.3),
-                            MboaColors.accent.withOpacity(0.2),
+                            MboaColors.secondary.withValues(alpha: 0.3),
+                            MboaColors.accent.withValues(alpha: 0.2),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(12),
@@ -310,10 +310,10 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: MboaColors.primary.withOpacity(0.06),
+                        color: MboaColors.primary.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: MboaColors.primary.withOpacity(0.15),
+                          color: MboaColors.primary.withValues(alpha: 0.15),
                         ),
                       ),
                       child: Row(
@@ -322,7 +322,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: MboaColors.primary.withOpacity(0.1),
+                              color: MboaColors.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Center(
@@ -404,7 +404,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 20,
               offset: const Offset(0, -4),
             ),
@@ -460,7 +460,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
               borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
+                  color: Colors.black.withValues(alpha: 0.06),
                   blurRadius: 10,
                 ),
               ],
@@ -479,8 +479,8 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          MboaColors.secondary.withOpacity(0.25),
-                          MboaColors.accent.withOpacity(0.15),
+                          MboaColors.secondary.withValues(alpha: 0.25),
+                          MboaColors.accent.withValues(alpha: 0.15),
                         ],
                       ),
                     ),
@@ -544,7 +544,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
               borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                 ),
               ],
@@ -595,7 +595,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
             borderRadius: BorderRadius.circular(MboaSizes.radiusMd),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
               ),
             ],
@@ -609,7 +609,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: MboaColors.primaryLight.withOpacity(0.3),
+                      color: MboaColors.primaryLight.withValues(alpha: 0.3),
                       shape: BoxShape.circle,
                     ),
                     child: Center(
@@ -689,7 +689,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
           style: TextStyle(
             fontFamily: 'Poppins',
             fontSize: 10,
-            color: color.withOpacity(0.75),
+            color: color.withValues(alpha: 0.75),
           ),
         ),
       ],
@@ -700,7 +700,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
     return Container(
       width: 1,
       height: 30,
-      color: Colors.white.withOpacity(0.2),
+      color: Colors.white.withValues(alpha: 0.2),
     );
   }
 }

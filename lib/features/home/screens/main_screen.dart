@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../home/screens/home_screen.dart';
 import '../../logement/screens/logement_screen.dart';
@@ -6,6 +8,7 @@ import '../../market/screens/market_screen.dart';
 import '../../chat/screens/chat_screen.dart';
 import '../../profil/screens/profil_screen.dart';
 import '../../logement/screens/publier_screen.dart';
+import '../../../app/router.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -16,13 +19,45 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  String _userRole = 'visiteur';
+  bool _isLoading = true;
 
-  // ── Simulation du rôle utilisateur ───────────────────────
-  // Sera remplacé par Supabase Auth
-  // 'visiteur' | 'inscrit' | 'vendeur'
-  final String _userRole = 'inscrit';
+  @override
+  void initState() {
+    super.initState();
+    _chargerRole();
+  }
 
-  // ── Navigation Visiteur (non inscrit & inscrit) ───────────
+  Future<void> _chargerRole() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+    try {
+      final data = await Supabase.instance.client
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+      final role = data['role'] ?? 'visiteur';
+
+      // Rediriger l'admin vers son interface
+      if (role == 'admin' && mounted) {
+        context.go(AppRoutes.admin);
+        return;
+      }
+
+      setState(() {
+        _userRole = role;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // ── Navigation Visiteur ───────────────────────────────────
   List<Widget> get _screensVisiteur => [
     const HomeScreen(),
     const LogementScreen(),
@@ -39,7 +74,7 @@ class _MainScreenState extends State<MainScreen> {
     _NavItem(icon: Icons.person_rounded, label: 'Profil'),
   ];
 
-  // ── Navigation Vendeur (Mode Pro) ─────────────────────────
+  // ── Navigation Vendeur ────────────────────────────────────
   List<Widget> get _screensVendeur => [
     const HomeScreen(),
     const LogementScreen(),
@@ -66,6 +101,17 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: MboaColors.background,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: MboaColors.primary,
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
@@ -81,7 +127,7 @@ class _MainScreenState extends State<MainScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -95,7 +141,7 @@ class _MainScreenState extends State<MainScreen> {
               final item = _navItems[index];
               final isActive = _currentIndex == index;
 
-              // Bouton Publier spécial (centré et mis en évidence)
+              // Bouton Publier spécial pour vendeur
               if (_isVendeur && index == 2) {
                 return Expanded(
                   child: GestureDetector(
@@ -114,7 +160,7 @@ class _MainScreenState extends State<MainScreen> {
                             boxShadow: [
                               BoxShadow(
                                 color: MboaColors.primary
-                                    .withOpacity(0.3),
+                                    .withValues(alpha: 0.3),
                                 blurRadius: 12,
                                 offset: const Offset(0, 4),
                               ),
@@ -160,7 +206,7 @@ class _MainScreenState extends State<MainScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: isActive
-                              ? MboaColors.primary.withOpacity(0.12)
+                              ? MboaColors.primary.withValues(alpha: 0.12)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(20),
                         ),

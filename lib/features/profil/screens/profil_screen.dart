@@ -132,7 +132,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(
@@ -152,10 +152,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     width: 84,
                     height: 84,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                         width: 3,
                       ),
                     ),
@@ -191,7 +191,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     style: TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 13,
-                      color: Colors.white.withOpacity(0.75),
+                      color: Colors.white.withValues(alpha: 0.75),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -209,7 +209,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                         const SizedBox(width: 8),
                       _buildHeaderBadge(
                         '📅 Depuis $_dateInscription',
-                        Colors.white.withOpacity(0.3),
+                        Colors.white.withValues(alpha: 0.3),
                       ),
                     ],
                   ),
@@ -220,7 +220,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     margin: const EdgeInsets.symmetric(horizontal: 20),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
@@ -347,10 +347,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: MboaColors.primary.withOpacity(0.06),
+                  color: MboaColors.primary.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
                   border: Border.all(
-                    color: MboaColors.primary.withOpacity(0.15),
+                    color: MboaColors.primary.withValues(alpha: 0.15),
                   ),
                 ),
                 child: Row(
@@ -399,10 +399,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(
-                  color: MboaColors.danger.withOpacity(0.08),
+                  color: MboaColors.danger.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
                   border: Border.all(
-                    color: MboaColors.danger.withOpacity(0.2),
+                    color: MboaColors.danger.withValues(alpha: 0.2),
                   ),
                 ),
                 child: const Row(
@@ -444,7 +444,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  color: MboaColors.primary.withOpacity(0.1),
+                  color: MboaColors.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
@@ -509,7 +509,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
         borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -563,7 +563,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
+                color: color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: color, size: 18),
@@ -596,7 +596,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
-                  color: MboaColors.primary.withOpacity(0.1),
+                  color: MboaColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -640,7 +640,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
           style: TextStyle(
             fontFamily: 'Poppins',
             fontSize: 11,
-            color: Colors.white.withOpacity(0.75),
+            color: Colors.white.withValues(alpha: 0.75),
           ),
         ),
       ],
@@ -651,7 +651,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
     return Container(
       width: 1,
       height: 40,
-      color: Colors.white.withOpacity(0.2),
+      color: Colors.white.withValues(alpha: 0.2),
     );
   }
 

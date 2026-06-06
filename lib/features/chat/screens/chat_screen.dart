@@ -83,7 +83,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: MboaColors.primary.withOpacity(0.1),
+                      color: MboaColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -134,7 +134,7 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: Container(
         color: hasUnread
-            ? MboaColors.primary.withOpacity(0.03)
+            ? MboaColors.primary.withValues(alpha: 0.03)
             : Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
@@ -486,7 +486,7 @@ class _ConversationScreenState extends State<_ConversationScreen> {
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: MboaColors.primary.withOpacity(0.08),
+              color: MboaColors.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -638,7 +638,7 @@ class _ConversationScreenState extends State<_ConversationScreen> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -668,7 +668,7 @@ class _ConversationScreenState extends State<_ConversationScreen> {
                           fontFamily: 'Poppins',
                           fontSize: 10,
                           color: isMoi
-                              ? Colors.white.withOpacity(0.7)
+                              ? Colors.white.withValues(alpha: 0.7)
                               : MboaColors.textMuted,
                         ),
                       ),
@@ -681,7 +681,7 @@ class _ConversationScreenState extends State<_ConversationScreen> {
                           size: 13,
                           color: msg['lu']
                               ? Colors.white
-                              : Colors.white.withOpacity(0.6),
+                              : Colors.white.withValues(alpha: 0.6),
                         ),
                       ],
                     ],

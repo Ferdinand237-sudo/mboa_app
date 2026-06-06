@@ -62,10 +62,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       width: 110,
                       height: 110,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(28),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
+                          color: Colors.white.withValues(alpha: 0.3),
                           width: 2,
                         ),
                       ),
@@ -97,7 +97,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         fontFamily: 'Poppins',
                         fontSize: 13,
                         fontWeight: FontWeight.w400,
-                        color: Colors.white.withOpacity(0.75),
+                        color: Colors.white.withValues(alpha: 0.75),
                       ),
                     ),
                   ],
@@ -124,7 +124,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 count: _slides.length,
                 effect: ExpandingDotsEffect(
                   activeDotColor: Colors.white,
-                  dotColor: Colors.white.withOpacity(0.4),
+                  dotColor: Colors.white.withValues(alpha: 0.4),
                   dotHeight: 8,
                   dotWidth: 8,
                   expansionFactor: 3,
@@ -167,7 +167,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: BorderSide(
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                             width: 1.5,
                           ),
                           shape: RoundedRectangleBorder(
@@ -191,7 +191,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           fontFamily: 'Poppins',
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.7),
+                          color: Colors.white.withValues(alpha: 0.7),
                         ),
                       ),
                     ),
@@ -223,7 +223,7 @@ class _SlideWidget extends StatelessWidget {
             width: 90,
             height: 90,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(24),
             ),
             child: Center(
@@ -251,7 +251,7 @@ class _SlideWidget extends StatelessWidget {
               fontFamily: 'Poppins',
               fontSize: 13,
               fontWeight: FontWeight.w400,
-              color: Colors.white.withOpacity(0.75),
+              color: Colors.white.withValues(alpha: 0.75),
               height: 1.5,
             ),
             textAlign: TextAlign.center,

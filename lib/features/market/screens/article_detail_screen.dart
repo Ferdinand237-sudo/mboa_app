@@ -84,10 +84,10 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: _etatColor.withOpacity(0.12),
+                              color: _etatColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: _etatColor.withOpacity(0.3),
+                                color: _etatColor.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Text(
@@ -111,7 +111,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: MboaColors.secondary.withOpacity(0.12),
+                              color: MboaColors.secondary.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -130,7 +130,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: MboaColors.primary.withOpacity(0.08),
+                                color: MboaColors.primary.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: const Text(
@@ -192,7 +192,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 14, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: Colors.white.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: const Text(
@@ -221,7 +221,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                               BorderRadius.circular(MboaSizes.radiusMd),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 8,
                             ),
                           ],
@@ -266,7 +266,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                                 MboaSizes.radiusLg),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
+                                color: Colors.black.withValues(alpha: 0.05),
                                 blurRadius: 10,
                               ),
                             ],
@@ -357,7 +357,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                               BorderRadius.circular(MboaSizes.radiusLg),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 8,
                             ),
                           ],
@@ -414,7 +414,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 20,
                     offset: const Offset(0, -4),
                   ),
@@ -454,11 +454,11 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 8,
                     ),
                   ],
@@ -479,11 +479,11 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 8,
                     ),
                   ],
@@ -518,8 +518,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      MboaColors.secondary.withOpacity(0.4),
-                      MboaColors.accent.withOpacity(0.3),
+                      MboaColors.secondary.withValues(alpha: 0.4),
+                      MboaColors.accent.withValues(alpha: 0.3),
                     ],
                   ),
                 ),
@@ -539,7 +539,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
               padding: const EdgeInsets.symmetric(
                   horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -561,7 +561,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: MboaColors.boost.withOpacity(0.9),
+                  color: MboaColors.boost.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(

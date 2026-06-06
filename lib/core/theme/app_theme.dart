@@ -341,7 +341,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
         ),
         margin: EdgeInsets.zero,
-        shadowColor: Colors.black.withOpacity(0.08),
+        shadowColor: Colors.black.withValues(alpha: 0.08),
       ),
 
       // Divider
@@ -375,7 +375,7 @@ class AppTheme {
       // Chip
       chipTheme: ChipThemeData(
         backgroundColor: MboaColors.background,
-        selectedColor: MboaColors.primary.withOpacity(0.15),
+        selectedColor: MboaColors.primary.withValues(alpha: 0.15),
         labelStyle: MboaTextStyles.badge.copyWith(color: MboaColors.text),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(MboaSizes.radiusFull),
@@ -428,7 +428,7 @@ class AppTheme {
         }),
         trackColor: MaterialStateProperty.resolveWith((states) {
           if (states.contains(MaterialState.selected)) {
-            return MboaColors.primary.withOpacity(0.3);
+            return MboaColors.primary.withValues(alpha: 0.3);
           }
           return MboaColors.border;
         }),

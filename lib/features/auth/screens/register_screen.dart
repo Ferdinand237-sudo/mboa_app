@@ -56,7 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -73,7 +73,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: ClipRRect(
@@ -115,7 +115,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 13,
-                        color: Colors.white.withOpacity(0.75),
+                        color: Colors.white.withValues(alpha: 0.75),
                       ),
                     ),
                   ],
@@ -157,7 +157,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? type.couleur.withOpacity(0.08)
+                                ? type.couleur.withValues(alpha: 0.08)
                                 : Colors.white,
                             borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
                             border: Border.all(
@@ -166,7 +166,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
+                                color: Colors.black.withValues(alpha: 0.04),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -178,7 +178,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 width: 52,
                                 height: 52,
                                 decoration: BoxDecoration(
-                                  color: type.couleur.withOpacity(0.12),
+                                  color: type.couleur.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: Center(

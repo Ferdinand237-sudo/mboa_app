@@ -172,7 +172,7 @@ class _FormLogementState extends State<_FormLogement> {
                       width: 100,
                       decoration: BoxDecoration(
                         color: hasPhoto
-                            ? MboaColors.primary.withOpacity(0.1)
+                            ? MboaColors.primary.withValues(alpha: 0.1)
                             : MboaColors.background,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
@@ -545,7 +545,7 @@ class _FormArticleState extends State<_FormArticle> {
                       width: 100,
                       decoration: BoxDecoration(
                         color: hasPhoto
-                            ? MboaColors.secondary.withOpacity(0.1)
+                            ? MboaColors.secondary.withValues(alpha: 0.1)
                             : MboaColors.background,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
