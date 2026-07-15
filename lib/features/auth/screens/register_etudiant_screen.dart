@@ -98,6 +98,12 @@ class _RegisterEtudiantScreenState extends State<RegisterEtudiantScreen> {
     if (message.contains('Password should be at least')) {
       return 'Mot de passe trop court (min. 6 caractères)';
     }
+    if (message.contains('rate limit')) {
+      return 'Trop de tentatives d\'inscription. Réessayez dans quelques minutes.';
+    }
+    if (message.contains('invalid') || message.contains('Invalid')) {
+      return 'Adresse email refusée par le serveur. Essayez une autre adresse.';
+    }
     return 'Une erreur est survenue. Réessayez.';
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../app/router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -12,12 +13,31 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const _prefsRememberedEmailKey = 'remembered_email';
+
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _rememberMe = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _chargerEmailMemorise();
+  }
+
+  Future<void> _chargerEmailMemorise() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString(_prefsRememberedEmailKey);
+    if (email != null && mounted) {
+      setState(() {
+        _emailController.text = email;
+        _rememberMe = true;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -37,6 +57,15 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
+      final prefs = await SharedPreferences.getInstance();
+      if (_rememberMe) {
+        await prefs.setString(
+            _prefsRememberedEmailKey, _emailController.text.trim());
+      } else {
+        await prefs.remove(_prefsRememberedEmailKey);
+      }
+
       if (mounted) context.go(AppRoutes.main);
     } on AuthException catch (e) {
       if (mounted) {
