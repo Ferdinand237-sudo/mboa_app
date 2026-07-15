@@ -4,6 +4,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../logement/screens/logement_detail_screen.dart';
 import '../../market/screens/article_detail_screen.dart';
+import '../../map/screens/map_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -283,13 +284,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       children: [
                         _buildCategoryCard(
-                            '🏠', 'Logement', MboaColors.primary),
+                            '🏠', 'Logement', MboaColors.primary, null),
                         const SizedBox(width: 12),
                         _buildCategoryCard(
-                            '🛒', 'Market', MboaColors.secondary),
+                            '🛒', 'Market', MboaColors.secondary, null),
                         const SizedBox(width: 12),
                         _buildCategoryCard(
-                            '🗺️', 'Carte', MboaColors.accent),
+                          '🗺️',
+                          'Carte',
+                          MboaColors.accent,
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const MapScreen(),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 28),
@@ -387,46 +397,49 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoryCard(
-      String emoji, String label, Color color) {
+      String emoji, String label, Color color, VoidCallback? onTap) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
               ),
-              child: Center(
-                child:
-                    Text(emoji, style: const TextStyle(fontSize: 24)),
+            ],
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child:
+                      Text(emoji, style: const TextStyle(fontSize: 24)),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: MboaColors.text,
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: MboaColors.text,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

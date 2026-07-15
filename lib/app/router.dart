@@ -8,10 +8,12 @@ import '../features/auth/screens/demande_vendeur_screen.dart';
 import '../features/home/screens/main_screen.dart';
 import '../features/auth/screens/register_etudiant_screen.dart';
 import '../features/admin/screens/admin_screen.dart';
+import '../features/splash/screens/splash_screen.dart';
 
 // ── Noms des routes ───────────────────────────────────────────
 class AppRoutes {
-  static const String onboarding     = '/';
+  static const String splash         = '/';
+  static const String onboarding     = '/onboarding';
   static const String login          = '/login';
   static const String register       = '/register';
   static const String demandeVendeur = '/demande-vendeur';
@@ -23,7 +25,7 @@ class AppRoutes {
 // ── Provider du router ────────────────────────────────────────
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: AppRoutes.onboarding,
+    initialLocation: AppRoutes.splash,
     redirect: (context, state) {
       final session = Supabase.instance.client.auth.currentSession;
       final isLoggedIn = session != null;
@@ -43,6 +45,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(
+        path: AppRoutes.splash,
+        builder: (context, state) => const SplashScreen(),
+      ),
       GoRoute(
         path: AppRoutes.onboarding,
         builder: (context, state) => const OnboardingScreen(),

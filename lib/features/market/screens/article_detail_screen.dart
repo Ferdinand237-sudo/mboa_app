@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../profil/screens/profil_vendeur_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../chat/screens/chat_screen.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   final Map<String, dynamic> article;
@@ -26,6 +28,152 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         ' FCFA';
   }
 
+  String _getArticleDescription(Map<String, dynamic> a) {
+    final description = a['description']?.toString().trim();
+    return description != null && description.isNotEmpty
+        ? description
+        : 'Aucune description disponible.';
+  }
+
+  String _getArticleLocation(Map<String, dynamic> a) {
+    final quartier = a['quartier']?.toString().trim();
+    final ville = a['ville']?.toString().trim();
+    final adresse = a['adresse_approx']?.toString().trim();
+
+    if (quartier != null && quartier.isNotEmpty && ville != null && ville.isNotEmpty) {
+      return '$quartier, $ville';
+    }
+    if (adresse != null && adresse.isNotEmpty) {
+      return adresse;
+    }
+    if (quartier != null && quartier.isNotEmpty) {
+      return quartier;
+    }
+    if (ville != null && ville.isNotEmpty) {
+      return ville;
+    }
+    if (a['lat'] != null && a['lng'] != null) {
+      return '${a['lat']}, ${a['lng']}';
+    }
+    return 'Localisation inconnue';
+  }
+
+  String _formatPublicationDate(dynamic publishedAt) {
+    if (publishedAt == null) return 'Date inconnue';
+    try {
+      final date = publishedAt is String
+          ? DateTime.parse(publishedAt)
+          : publishedAt as DateTime;
+      final diff = DateTime.now().difference(date);
+      if (diff.inDays >= 1) {
+        return 'Il y a ${diff.inDays} jour${diff.inDays > 1 ? 's' : ''}';
+      }
+      if (diff.inHours >= 1) {
+        return 'Il y a ${diff.inHours} heure${diff.inHours > 1 ? 's' : ''}';
+      }
+      if (diff.inMinutes >= 1) {
+        return 'Il y a ${diff.inMinutes} minute${diff.inMinutes > 1 ? 's' : ''}';
+      }
+      return 'À l’instant';
+    } catch (_) {
+      return 'Date inconnue';
+    }
+  }
+
+  final _supabase = Supabase.instance.client;
+
+  Future<void> _ouvrirChat() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Connectez-vous pour envoyer un message'),
+          backgroundColor: MboaColors.primary,
+        ),
+      );
+      return;
+    }
+
+    final article = widget.article;
+    final vendeurId = article['vendeur_id'];
+
+    if (vendeurId == null || vendeurId == user.id) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vous ne pouvez pas vous contacter vous-même'),
+          backgroundColor: MboaColors.danger,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final existing = await _supabase
+          .from('conversations')
+          .select()
+          .contains('participants', [user.id, vendeurId])
+          .eq('annonce_id', article['id'])
+          .maybeSingle();
+
+      String conversationId;
+
+      if (existing != null) {
+        conversationId = existing['id'];
+      } else {
+        final response = await _supabase
+            .from('conversations')
+            .insert({
+              'participants': [user.id, vendeurId],
+              'annonce_id': article['id'],
+              'annonce_type': 'article',
+              'non_lu': {user.id: 0, vendeurId: 0},
+            })
+            .select('id')
+            .single();
+        conversationId = response['id'];
+      }
+
+      Map<String, dynamic> autreUser = {};
+      try {
+        autreUser = await _supabase
+            .from('users')
+            .select('nom, photo_url, verified')
+            .eq('id', vendeurId)
+            .single();
+      } catch (_) {
+        final vendeur = article['vendeur'];
+        if (vendeur is Map) {
+          autreUser = Map<String, dynamic>.from(vendeur);
+        }
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ConversationScreen(
+              conversationId: conversationId,
+              autreUser: autreUser,
+              autreId: vendeurId,
+              sujet: '🛒 ${article['titre'] ?? 'Article'}',
+              annonceId: article['id']?.toString(),
+              annonceType: 'article',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur : ${e.toString()}'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
   Color get _etatColor {
     switch (widget.article['etat']) {
       case 'Neuf':
@@ -42,10 +190,32 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final a = widget.article;
-    _emojisPhotos[0] = a['emoji'];
-    _emojisPhotos[1] = a['emoji'];
-    _emojisPhotos[2] = a['emoji'];
-    _emojisPhotos[3] = a['emoji'];
+    final emoji = a['emoji']?.toString() ?? '🛍';
+    final photos = a['photos'] is List
+        ? (a['photos'] as List).where((p) => p != null).map((p) => p.toString()).toList()
+        : <String>[];
+    final vendeurData = a['vendeur'];
+    final vendeurNom = vendeurData is Map
+        ? vendeurData['nom']?.toString() ?? 'Vendeur'
+        : vendeurData?.toString() ?? 'Vendeur';
+    final vendeurInitiales = vendeurNom
+        .split(' ')
+        .where((e) => e.isNotEmpty)
+        .map((e) => e[0])
+        .take(2)
+        .join();
+    final vendeurVerified = vendeurData is Map
+        ? vendeurData['verified'] == true
+        : false;
+    final vendeurNote = a['vendeurNote'] ??
+        (vendeurData is Map ? vendeurData['note_globale'] : 0);
+    final emojiValue = emoji;
+    if (photos.isEmpty) {
+      _emojisPhotos[0] = emojiValue;
+      _emojisPhotos[1] = emojiValue;
+      _emojisPhotos[2] = emojiValue;
+      _emojisPhotos[3] = emojiValue;
+    }
 
     return Scaffold(
       backgroundColor: MboaColors.background,
@@ -227,10 +397,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                           ],
                         ),
                         child: Text(
-                          'Article en ${a['etat'].toString().toLowerCase()}. '
-                          'Vendu car je quitte la ville après ma formation. '
-                          'Disponible immédiatement. Possibilité de livraison '
-                          'dans un rayon de 2km moyennant un supplément.',
+                          _getArticleDescription(a),
                           style: MboaTextStyles.body.copyWith(height: 1.6),
                         ),
                       ),
@@ -245,15 +412,10 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                           MaterialPageRoute(
                             builder: (_) => ProfilVendeurScreen(
                               vendeur: {
-                                'nom': widget.article['vendeur'],
-                                'initiales': widget.article['vendeur']
-                                    .toString()
-                                    .split(' ')
-                                    .map((e) => e[0])
-                                    .take(2)
-                                    .join(),
+                                'nom': vendeurNom,
+                                'initiales': vendeurInitiales,
                                 'type': 'Commerçant',
-                                'verified': true,
+                                'verified': vendeurVerified,
                               },
                             ),
                           ),
@@ -282,12 +444,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                                 ),
                                 child: Center(
                                   child: Text(
-                                    a['vendeur']
-                                        .toString()
-                                        .split(' ')
-                                        .map((e) => e[0])
-                                        .take(2)
-                                        .join(),
+                                    vendeurInitiales,
                                     style: const TextStyle(
                                       fontFamily: 'Poppins',
                                       fontSize: 18,
@@ -304,7 +461,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                                       CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      a['vendeur'],
+                                      vendeurNom,
                                       style: const TextStyle(
                                         fontFamily: 'Poppins',
                                         fontSize: 15,
@@ -319,7 +476,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                                             color: MboaColors.boost),
                                         const SizedBox(width: 3),
                                         Text(
-                                          '${a['vendeurNote']}',
+                                          '${vendeurNote ?? 0}',
                                           style: const TextStyle(
                                             fontFamily: 'Poppins',
                                             fontSize: 12,
@@ -365,13 +522,13 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                         child: Column(
                           children: [
                             _buildInfoRow('📦', 'Catégorie',
-                                a['categorie']),
+                                a['categorie']?.toString() ?? 'N/A'),
                             _buildInfoRow(
-                                '🏷️', 'État', a['etat']),
+                                '🏷️', 'État', a['etat']?.toString() ?? 'N/A'),
                             _buildInfoRow('📍', 'Localisation',
-                                'Sangmelima, Cameroun'),
-                            _buildInfoRow('📅', 'Publié le',
-                                'Il y a 2 jours',
+                                _getArticleLocation(a)),
+                            _buildInfoRow('📅', 'Publié',
+                                _formatPublicationDate(a['date_publication']),
                                 isLast: true),
                           ],
                         ),
@@ -433,9 +590,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.chat_bubble_rounded,
-                          size: 18),
+                      onPressed: () => _ouvrirChat(),
+                      icon: const Icon(Icons.chat_bubble_rounded, size: 18),
                       label: const Text('Contacter le vendeur'),
                     ),
                   ),
@@ -504,29 +660,46 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   }
 
   Widget _buildGalerie(Map<String, dynamic> a) {
+    final photos = a['photos'] is List
+        ? (a['photos'] as List).where((p) => p != null).map((p) => p.toString()).toList()
+        : <String>[];
+    final displayCount = photos.isNotEmpty ? photos.length : 1;
+
     return SizedBox(
       height: 260,
       child: Stack(
         children: [
           PageView.builder(
-            itemCount: _emojisPhotos.length,
+            itemCount: displayCount,
             onPageChanged: (i) => setState(() => _currentPhoto = i),
             itemBuilder: (context, index) {
+              if (photos.isEmpty) {
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        MboaColors.secondary.withValues(alpha: 0.4),
+                        MboaColors.accent.withValues(alpha: 0.3),
+                      ],
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _emojisPhotos[index],
+                      style: const TextStyle(fontSize: 100),
+                    ),
+                  ),
+                );
+              }
+
               return Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      MboaColors.secondary.withValues(alpha: 0.4),
-                      MboaColors.accent.withValues(alpha: 0.3),
-                    ],
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    _emojisPhotos[index],
-                    style: const TextStyle(fontSize: 100),
+                  color: Colors.black12,
+                  image: DecorationImage(
+                    image: NetworkImage(photos[index]),
+                    fit: BoxFit.cover,
                   ),
                 ),
               );
@@ -543,7 +716,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                '${_currentPhoto + 1} / ${_emojisPhotos.length}',
+                '${_currentPhoto + 1} / $displayCount',
                 style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 11,

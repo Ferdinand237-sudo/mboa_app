@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../app/router.dart';
 import 'logement_detail_screen.dart';
 
 class LogementScreen extends StatefulWidget {
@@ -12,73 +14,20 @@ class LogementScreen extends StatefulWidget {
 }
 
 class _LogementScreenState extends State<LogementScreen> {
+  final _supabase = Supabase.instance.client;
   final _searchController = TextEditingController();
+
+  List<Map<String, dynamic>> _logements = [];
+  bool _isLoading = true;
   String _selectedType = 'Tous';
   double _prixMax = 60000;
   String _selectedDistance = 'Toutes';
-  List<String> _selectedEquipements = [];
   bool _showFiltres = false;
-
-  final _supabase = Supabase.instance.client;
-  List<Map<String, dynamic>> _logements = [];
-  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _chargerLogements();
-  }
-
-  List<Map<String, dynamic>> get _filtered {
-    return _logements.where((l) {
-      final matchType = _selectedType == 'Tous' || l['type'] == _selectedType;
-      final matchPrix = l['prix'] <= _prixMax;
-      final matchSearch = _searchController.text.isEmpty ||
-          l['titre'].toLowerCase().contains(_searchController.text.toLowerCase()) ||
-          l['quartier'].toLowerCase().contains(_searchController.text.toLowerCase());
-      final matchDist = _selectedDistance == 'Toutes' ||
-          (_selectedDistance == '< 500m' && l['distanceVal'] < 500) ||
-          (_selectedDistance == '< 1km' && l['distanceVal'] < 1000) ||
-          (_selectedDistance == '< 2km' && l['distanceVal'] < 2000);
-      final matchEquip = _selectedEquipements.isEmpty ||
-          _selectedEquipements.every((e) => (l['equipements'] as List).contains(e));
-      return matchType && matchPrix && matchSearch && matchDist && matchEquip;
-    }).toList()
-      ..sort((a, b) {
-        if (a['boosted'] && !b['boosted']) return -1;
-        if (!a['boosted'] && b['boosted']) return 1;
-        if (a['verified'] && !b['verified']) return -1;
-        if (!a['verified'] && b['verified']) return 1;
-        return (b['note'] as double).compareTo(a['note'] as double);
-      });
-  }
-
-  Future<void> _chargerLogements() async {
-    try {
-      final data = await _supabase
-          .from('logements')
-          .select('*, proprietaire:users!proprietaire_id(nom, verified)')
-          .eq('statut', 'disponible')
-          .order('boosted', ascending: false)
-          .order('date_publication', ascending: false)
-          .limit(100);
-      if (mounted) {
-        setState(() {
-          _logements = List<Map<String, dynamic>>.from(data);
-          _isLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  String _formatPrix(int prix) {
-    return prix.toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (m) => '${m[1]} ',
-        ) +
-        ' FCFA';
   }
 
   @override
@@ -87,22 +36,76 @@ class _LogementScreenState extends State<LogementScreen> {
     super.dispose();
   }
 
+  Future<void> _chargerLogements() async {
+    setState(() => _isLoading = true);
+    try {
+      var query = _supabase
+          .from('logements')
+          .select('*, proprietaire:users!proprietaire_id(nom, photo_url, verified)')
+          .eq('statut', 'disponible');
+
+      if (_selectedType != 'Tous') {
+        query = query.eq('type', _selectedType);
+      }
+
+      query = query.lte('prix', _prixMax);
+
+      if (_searchController.text.isNotEmpty) {
+        query = query.or(
+          'titre.ilike.%${_searchController.text}%,quartier.ilike.%${_searchController.text}%',
+        );
+      }
+
+      final data = await query
+          .order('boosted', ascending: false)
+          .order('note_globale', ascending: false)
+          .order('date_publication', ascending: false);
+
+      if (mounted) {
+        setState(() {
+          _logements = List<Map<String, dynamic>>.from(data);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  bool get _isLoggedIn => _supabase.auth.currentUser != null;
+
+  List<Map<String, dynamic>> get _displayedLogements => _isLoggedIn
+      ? _logements
+      : _logements.take(AppConstants.pageSizeVisiteur).toList();
+
+  bool get _showLimitBanner =>
+      !_isLoggedIn && _logements.length > AppConstants.pageSizeVisiteur;
+
+  String _formatPrix(dynamic prix) {
+    final p = (prix ?? 0) as int;
+    return p
+            .toString()
+            .replaceAllMapped(
+              RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+              (m) => '${m[1]} ',
+            ) +
+        ' FCFA';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final filtered = _filtered;
     return Scaffold(
       backgroundColor: MboaColors.background,
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header fixe ──────────────────────────────────
+            // ── Header fixe ──────────────────────────
             Container(
               color: Colors.white,
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Titre
                   const Text(
                     '🏘 Logement',
                     style: TextStyle(
@@ -122,41 +125,57 @@ class _LogementScreenState extends State<LogementScreen> {
                           height: 46,
                           decoration: BoxDecoration(
                             color: MboaColors.background,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: MboaColors.border),
+                            borderRadius:
+                                BorderRadius.circular(12),
+                            border: Border.all(
+                                color: MboaColors.border),
                           ),
                           child: Row(
                             children: [
                               const SizedBox(width: 12),
-                              const Icon(Icons.search_rounded,
-                                  color: MboaColors.textMuted, size: 20),
+                              const Icon(
+                                  Icons.search_rounded,
+                                  color: MboaColors.textMuted,
+                                  size: 20),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: TextField(
-                                  controller: _searchController,
-                                  onChanged: (_) => setState(() {}),
-                                  decoration: const InputDecoration(
-                                    hintText: 'Quartier, type...',
+                                  controller:
+                                      _searchController,
+                                  onChanged: (_) =>
+                                      _chargerLogements(),
+                                  decoration:
+                                      const InputDecoration(
+                                    hintText:
+                                        'Quartier, type...',
                                     border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
+                                    enabledBorder:
+                                        InputBorder.none,
+                                    focusedBorder:
+                                        InputBorder.none,
                                     filled: false,
                                     isDense: true,
-                                    contentPadding: EdgeInsets.zero,
+                                    contentPadding:
+                                        EdgeInsets.zero,
                                   ),
                                   style: MboaTextStyles.body,
                                 ),
                               ),
-                              if (_searchController.text.isNotEmpty)
+                              if (_searchController
+                                  .text.isNotEmpty)
                                 GestureDetector(
                                   onTap: () {
                                     _searchController.clear();
-                                    setState(() {});
+                                    _chargerLogements();
                                   },
                                   child: const Padding(
-                                    padding: EdgeInsets.all(10),
-                                    child: Icon(Icons.close_rounded,
-                                        size: 18, color: MboaColors.textMuted),
+                                    padding:
+                                        EdgeInsets.all(10),
+                                    child: Icon(
+                                        Icons.close_rounded,
+                                        size: 18,
+                                        color: MboaColors
+                                            .textMuted),
                                   ),
                                 ),
                             ],
@@ -164,18 +183,21 @@ class _LogementScreenState extends State<LogementScreen> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      // Bouton filtre
                       GestureDetector(
-                        onTap: () => setState(() => _showFiltres = !_showFiltres),
+                        onTap: () => setState(
+                            () => _showFiltres =
+                                !_showFiltres),
                         child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
+                          duration: const Duration(
+                              milliseconds: 200),
                           width: 46,
                           height: 46,
                           decoration: BoxDecoration(
                             color: _showFiltres
                                 ? MboaColors.primary
                                 : MboaColors.background,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius:
+                                BorderRadius.circular(12),
                             border: Border.all(
                               color: _showFiltres
                                   ? MboaColors.primary
@@ -195,26 +217,40 @@ class _LogementScreenState extends State<LogementScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Filtres types (chips horizontaux)
+                  // Filtres types
                   SizedBox(
                     height: 34,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
-                      children: ['Tous', 'Chambre', 'Studio', 'Appartement']
-                          .map((type) {
-                        final isSelected = _selectedType == type;
+                      children: [
+                        'Tous',
+                        'Chambre',
+                        'Studio',
+                        'Appartement'
+                      ].map((type) {
+                        final isSelected =
+                            _selectedType == type;
                         return GestureDetector(
-                          onTap: () => setState(() => _selectedType = type),
+                          onTap: () {
+                            setState(
+                                () => _selectedType = type);
+                            _chargerLogements();
+                          },
                           child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 6),
+                            duration: const Duration(
+                                milliseconds: 200),
+                            margin: const EdgeInsets.only(
+                                right: 8),
+                            padding: const EdgeInsets
+                                .symmetric(
+                                horizontal: 16,
+                                vertical: 6),
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? MboaColors.primary
                                   : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius:
+                                  BorderRadius.circular(20),
                               border: Border.all(
                                 color: isSelected
                                     ? MboaColors.primary
@@ -239,15 +275,14 @@ class _LogementScreenState extends State<LogementScreen> {
                     ),
                   ),
 
-                  // Panel filtres avancés
+                  // Filtres avancés
                   if (_showFiltres) ...[
                     const SizedBox(height: 14),
                     const Divider(height: 1),
                     const SizedBox(height: 14),
-
-                    // Prix max
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
                           'Budget maximum',
@@ -274,7 +309,8 @@ class _LogementScreenState extends State<LogementScreen> {
                         activeTrackColor: MboaColors.primary,
                         inactiveTrackColor: MboaColors.border,
                         thumbColor: MboaColors.primary,
-                        overlayColor: MboaColors.primary.withValues(alpha: 0.1),
+                        overlayColor: MboaColors.primary
+                            .withValues(alpha: 0.1),
                         trackHeight: 4,
                       ),
                       child: Slider(
@@ -282,73 +318,21 @@ class _LogementScreenState extends State<LogementScreen> {
                         min: AppConstants.prixMin,
                         max: AppConstants.prixMax,
                         divisions: 39,
-                        onChanged: (v) => setState(() => _prixMax = v),
+                        onChanged: (v) {
+                          setState(() => _prixMax = v);
+                          _chargerLogements();
+                        },
                       ),
                     ),
-
-                    // Distance
-                    const Text(
-                      'Distance du campus',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: MboaColors.text,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 32,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: ['Toutes', '< 500m', '< 1km', '< 2km']
-                            .map((d) {
-                          final isSelected = _selectedDistance == d;
-                          return GestureDetector(
-                            onTap: () =>
-                                setState(() => _selectedDistance = d),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.only(right: 8),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? MboaColors.primaryLight
-                                    : Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? MboaColors.primaryLight
-                                      : MboaColors.border,
-                                ),
-                              ),
-                              child: Text(
-                                d,
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: isSelected
-                                      ? Colors.white
-                                      : MboaColors.text,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Reset
+                    const SizedBox(height: 6),
                     GestureDetector(
                       onTap: () => setState(() {
                         _selectedType = 'Tous';
                         _prixMax = 60000;
                         _selectedDistance = 'Toutes';
-                        _selectedEquipements = [];
                         _showFiltres = false;
+                        _searchController.clear();
+                        _chargerLogements();
                       }),
                       child: const Text(
                         'Réinitialiser les filtres',
@@ -365,18 +349,22 @@ class _LogementScreenState extends State<LogementScreen> {
               ),
             ),
 
-            // ── Résultats ────────────────────────────────────
+            // ── Résultats ────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              padding:
+                  const EdgeInsets.fromLTRB(20, 12, 20, 0),
               child: Row(
                 children: [
                   Text(
-                    '${filtered.length} logement${filtered.length > 1 ? 's' : ''} trouvé${filtered.length > 1 ? 's' : ''}',
+                    _isLoading
+                        ? 'Chargement...'
+                        : '${_logements.length} logement${_logements.length > 1 ? 's' : ''} trouvé${_logements.length > 1 ? 's' : ''}',
                     style: MboaTextStyles.muted,
                   ),
                   const Spacer(),
                   const Icon(Icons.sort_rounded,
-                      size: 16, color: MboaColors.textMuted),
+                      size: 16,
+                      color: MboaColors.textMuted),
                   const SizedBox(width: 4),
                   const Text(
                     'Pertinence',
@@ -392,20 +380,35 @@ class _LogementScreenState extends State<LogementScreen> {
             ),
             const SizedBox(height: 10),
 
-            // ── Liste ────────────────────────────────────────
+            // ── Liste ────────────────────────────────
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : (filtered.isEmpty
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          color: MboaColors.primary),
+                    )
+                  : _logements.isEmpty
                       ? _buildEmpty()
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 14),
-                          itemBuilder: (context, index) {
-                            return _buildLogementTile(filtered[index]);
-                          },
-                        )),
+                      : RefreshIndicator(
+                          color: MboaColors.primary,
+                          onRefresh: _chargerLogements,
+                          child: ListView.separated(
+                            padding: const EdgeInsets
+                                .fromLTRB(20, 0, 20, 20),
+                            itemCount: _displayedLogements.length +
+                                (_showLimitBanner ? 1 : 0),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 14),
+                            itemBuilder: (context, index) {
+                              if (index >=
+                                  _displayedLogements.length) {
+                                return _buildLimitBanner();
+                              }
+                              return _buildLogementTile(
+                                  _displayedLogements[index]);
+                            },
+                          ),
+                        ),
             ),
           ],
         ),
@@ -414,17 +417,35 @@ class _LogementScreenState extends State<LogementScreen> {
   }
 
   Widget _buildLogementTile(Map<String, dynamic> l) {
+    final isLoggedIn =
+        _supabase.auth.currentUser != null;
+    final proprietaire = l['proprietaire'];
+
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => LogementDetailScreen(logement: l),
-        ),
-      ),
+      onTap: () {
+        if (!isLoggedIn) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Connectez-vous pour voir les détails'),
+              backgroundColor: MboaColors.primary,
+            ),
+          );
+          return;
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                LogementDetailScreen(logement: l),
+          ),
+        );
+      },
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
+          borderRadius:
+              BorderRadius.circular(MboaSizes.radiusLg),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.06),
@@ -438,8 +459,10 @@ class _LogementScreenState extends State<LogementScreen> {
             // Image
             ClipRRect(
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(MboaSizes.radiusLg),
-                bottomLeft: Radius.circular(MboaSizes.radiusLg),
+                topLeft:
+                    Radius.circular(MboaSizes.radiusLg),
+                bottomLeft:
+                    Radius.circular(MboaSizes.radiusLg),
               ),
               child: Stack(
                 children: [
@@ -449,16 +472,30 @@ class _LogementScreenState extends State<LogementScreen> {
                     decoration: const BoxDecoration(
                       gradient: MboaColors.cardGradient,
                     ),
-                    child: Center(
-                      child: Text(l['emoji'],
-                          style: const TextStyle(fontSize: 44)),
-                    ),
+                    child: l['photos'] != null &&
+                            (l['photos'] as List).isNotEmpty
+                        ? Image.network(
+                            l['photos'][0],
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                const Center(
+                              child: Text('🏠',
+                                  style: TextStyle(
+                                      fontSize: 44)),
+                            ),
+                          )
+                        : const Center(
+                            child: Text('🏠',
+                                style: TextStyle(
+                                    fontSize: 44)),
+                          ),
                   ),
-                  if (l['boosted'])
+                  if (l['boosted'] == true)
                     Positioned(
                       top: 8,
                       left: 8,
-                      child: _buildBadge('🔥', MboaColors.boost),
+                      child: _buildBadge(
+                          '🔥', MboaColors.boost),
                     ),
                 ],
               ),
@@ -469,22 +506,27 @@ class _LogementScreenState extends State<LogementScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
-                    // Badges
                     Row(
                       children: [
-                        if (l['verified'])
-                          _buildBadge('✅ Vérifié', MboaColors.verified),
-                        if (l['boosted']) const SizedBox(width: 4),
-                        if (l['boosted'])
-                          _buildBadge('🔥 Boost', MboaColors.boost),
+                        if (l['boosted'] == true)
+                          _buildBadge(
+                              '🔥 Boost', MboaColors.boost),
+                        if (l['boosted'] == true)
+                          const SizedBox(width: 4),
+                        if (proprietaire?['verified'] ==
+                            true)
+                          _buildBadge('✅ Vérifié',
+                              MboaColors.verified),
                       ],
                     ),
-                    const SizedBox(height: 6),
-
+                    if (l['boosted'] == true ||
+                        proprietaire?['verified'] == true)
+                      const SizedBox(height: 6),
                     Text(
-                      l['titre'],
+                      l['titre'] ?? '',
                       style: const TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 13,
@@ -495,20 +537,20 @@ class _LogementScreenState extends State<LogementScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-
                     Row(
                       children: [
-                        const Icon(Icons.location_on_rounded,
-                            size: 12, color: MboaColors.textMuted),
+                        const Icon(
+                            Icons.location_on_rounded,
+                            size: 12,
+                            color: MboaColors.textMuted),
                         const SizedBox(width: 2),
                         Text(
-                          l['distance'],
+                          l['quartier'] ?? 'Sangmelima',
                           style: MboaTextStyles.caption,
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
-
                     Text(
                       _formatPrix(l['prix']),
                       style: const TextStyle(
@@ -519,14 +561,14 @@ class _LogementScreenState extends State<LogementScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-
                     Row(
                       children: [
                         const Icon(Icons.star_rounded,
-                            size: 13, color: MboaColors.boost),
+                            size: 13,
+                            color: MboaColors.boost),
                         const SizedBox(width: 3),
                         Text(
-                          '${l['note']}',
+                          '${l['note_globale'] ?? 0}',
                           style: const TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 11,
@@ -535,7 +577,7 @@ class _LogementScreenState extends State<LogementScreen> {
                           ),
                         ),
                         Text(
-                          '  ·  ${l['surface']}m²',
+                          '  ·  ${l['surface'] ?? '?'}m²',
                           style: MboaTextStyles.caption,
                         ),
                       ],
@@ -545,14 +587,69 @@ class _LogementScreenState extends State<LogementScreen> {
               ),
             ),
 
-            // Flèche
             const Padding(
               padding: EdgeInsets.only(right: 12),
-              child: Icon(Icons.arrow_forward_ios_rounded,
-                  size: 14, color: MboaColors.textMuted),
+              child: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: MboaColors.textMuted),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildLimitBanner() {
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [MboaColors.primaryDark, MboaColors.primary],
+        ),
+        borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
+      ),
+      child: Column(
+        children: [
+          const Text('🔒', style: TextStyle(fontSize: 32)),
+          const SizedBox(height: 10),
+          const Text(
+            'Connectez-vous pour voir plus',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Créez un compte gratuit pour découvrir tous les logements disponibles à Sangmelima',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 12,
+              color: Colors.white.withValues(alpha: 0.85),
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: MboaColors.primary,
+              ),
+              onPressed: () => context.push(AppRoutes.register),
+              child: const Text('Créer un compte'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -562,7 +659,8 @@ class _LogementScreenState extends State<LogementScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text('🔍', style: TextStyle(fontSize: 60)),
+          const Text('🔍',
+              style: TextStyle(fontSize: 60)),
           const SizedBox(height: 16),
           const Text(
             'Aucun logement trouvé',
@@ -588,11 +686,12 @@ class _LogementScreenState extends State<LogementScreen> {
               _selectedType = 'Tous';
               _prixMax = 60000;
               _selectedDistance = 'Toutes';
-              _selectedEquipements = [];
               _searchController.clear();
+              _chargerLogements();
             }),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
                 color: MboaColors.primary,
                 borderRadius: BorderRadius.circular(20),
@@ -615,11 +714,13 @@ class _LogementScreenState extends State<LogementScreen> {
 
   Widget _buildBadge(String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+          horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(
+            color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,

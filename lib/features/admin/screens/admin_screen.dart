@@ -6,6 +6,7 @@ import '../../../app/router.dart';
 import 'admin_users_screen.dart';
 import 'admin_annonces_screen.dart';
 import 'admin_signalements_screen.dart';
+import 'admin_demandes_screen.dart';
 // import 'admin_demandes_screen.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -23,6 +24,7 @@ class _AdminScreenState extends State<AdminScreen> {
     _AdminNavItem(icon: Icons.people_rounded, label: 'Utilisateurs'),
     _AdminNavItem(icon: Icons.list_alt_rounded, label: 'Annonces'),
     _AdminNavItem(icon: Icons.flag_rounded, label: 'Signalements'),
+    _AdminNavItem(icon: Icons.mail_rounded, label: 'Demandes'),
   ];
 
   final List<Widget> _screens = [
@@ -30,6 +32,7 @@ class _AdminScreenState extends State<AdminScreen> {
     const AdminUsersScreen(),
     const AdminAnnoncesScreen(),
     const AdminSignalementsScreen(),
+    const AdminDemandesScreen(),
   ];
 
   @override
@@ -286,7 +289,12 @@ class _DashboardTabState extends State<_DashboardTab> {
                           desc:
                               '${_stats['demandes']} demande(s) en attente d\'approbation',
                           color: MboaColors.secondary,
-                          onTap: () {},
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AdminDemandesScreen(),
+                            ),
+                          ),
                         ),
                       if ((_stats['signalements'] ?? 0) > 0)
                         _buildAlertCard(

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../app/router.dart';
+import 'favoris_screen.dart';
 
 class ProfilScreen extends StatefulWidget {
   const ProfilScreen({super.key});
@@ -15,11 +16,27 @@ class _ProfilScreenState extends State<ProfilScreen> {
   final _supabase = Supabase.instance.client;
   Map<String, dynamic>? _user;
   bool _isLoading = true;
+  int _nbFavoris = 0;
 
   @override
   void initState() {
     super.initState();
     _chargerProfil();
+    _chargerNbFavoris();
+  }
+
+  Future<void> _chargerNbFavoris() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final data = await _supabase
+          .from('favoris')
+          .select('id')
+          .eq('user_id', user.id);
+      if (mounted) {
+        setState(() => _nbFavoris = List.from(data).length);
+      }
+    } catch (_) {}
   }
 
   Future<void> _chargerProfil() async {
@@ -226,7 +243,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _buildStat('0', 'Favoris', '❤️'),
+                        _buildStat('$_nbFavoris', 'Favoris', '❤️'),
                         _buildStatDivider(),
                         _buildStat('0', 'Alertes', '🔔'),
                         _buildStatDivider(),
@@ -250,8 +267,16 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 icon: Icons.favorite_rounded,
                 color: MboaColors.danger,
                 label: 'Mes favoris',
-                badge: '0',
-                onTap: () {},
+                badge: '$_nbFavoris',
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const FavorisScreen(),
+                    ),
+                  );
+                  _chargerNbFavoris();
+                },
               ),
               _buildMenuItem(
                 icon: Icons.notifications_rounded,

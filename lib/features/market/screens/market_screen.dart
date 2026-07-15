@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../app/router.dart';
 import 'article_detail_screen.dart';
 
 class MarketScreen extends StatefulWidget {
@@ -11,14 +14,85 @@ class MarketScreen extends StatefulWidget {
 }
 
 class _MarketScreenState extends State<MarketScreen> {
+  final _supabase = Supabase.instance.client;
   final _searchController = TextEditingController();
+
+  List<Map<String, dynamic>> _articles = [];
+  bool _isLoading = true;
   String _selectedCategorie = 'Tous';
   String _selectedEtat = 'Tous';
   bool _showFiltres = false;
 
-  final _supabase = Supabase.instance.client;
-  List<Map<String, dynamic>> _articles = [];
-  bool _isLoading = true;
+  @override
+  void initState() {
+    super.initState();
+    _chargerArticles();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _chargerArticles() async {
+    setState(() => _isLoading = true);
+    try {
+      var query = _supabase
+          .from('articles')
+          .select(
+              '*, vendeur:users!vendeur_id(nom, photo_url, verified, note_globale)')
+          .eq('statut', 'disponible');
+
+      if (_selectedCategorie != 'Tous') {
+        query = query.eq('categorie', _selectedCategorie);
+      }
+
+      if (_selectedEtat != 'Tous') {
+        query = query.eq('etat', _selectedEtat);
+      }
+
+      if (_searchController.text.isNotEmpty) {
+        query = query.or(
+          'titre.ilike.%${_searchController.text}%,description.ilike.%${_searchController.text}%',
+        );
+      }
+
+      final data = await query
+          .order('boosted', ascending: false)
+          .order('date_publication', ascending: false);
+
+      if (mounted) {
+        setState(() {
+          _articles =
+              List<Map<String, dynamic>>.from(data);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _formatPrix(dynamic prix) {
+    final p = (prix ?? 0) as int;
+    return p
+            .toString()
+            .replaceAllMapped(
+              RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+              (m) => '${m[1]} ',
+            ) +
+        ' FCFA';
+  }
+
+  bool get _isLoggedIn => _supabase.auth.currentUser != null;
+
+  List<Map<String, dynamic>> get _displayedArticles => _isLoggedIn
+      ? _articles
+      : _articles.take(AppConstants.pageSizeVisiteur).toList();
+
+  bool get _showLimitBanner =>
+      !_isLoggedIn && _articles.length > AppConstants.pageSizeVisiteur;
 
   final List<Map<String, String>> _categories = [
     {'label': 'Tous', 'icon': '🛍'},
@@ -29,80 +103,18 @@ class _MarketScreenState extends State<MarketScreen> {
     {'label': 'Divers', 'icon': '📦'},
   ];
 
-  List<Map<String, dynamic>> get _filtered {
-    return _articles.where((a) {
-      final matchCat = _selectedCategorie == 'Tous' ||
-          a['categorie'] == _selectedCategorie;
-      final matchEtat =
-          _selectedEtat == 'Tous' || a['etat'] == _selectedEtat;
-      final matchSearch = _searchController.text.isEmpty ||
-          a['titre']
-              .toLowerCase()
-              .contains(_searchController.text.toLowerCase());
-      return matchCat && matchEtat && matchSearch;
-    }).toList()
-      ..sort((a, b) {
-        if (a['boosted'] && !b['boosted']) return -1;
-        if (!a['boosted'] && b['boosted']) return 1;
-        return (b['vendeurNote'] as double)
-            .compareTo(a['vendeurNote'] as double);
-      });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _chargerArticles();
-  }
-
-  Future<void> _chargerArticles() async {
-    try {
-      final data = await _supabase
-          .from('articles')
-          .select('*, vendeur:users!vendeur_id(nom, verified)')
-          .eq('statut', 'disponible')
-          .order('boosted', ascending: false)
-          .order('date_publication', ascending: false)
-          .limit(200);
-      if (mounted) {
-        setState(() {
-          _articles = List<Map<String, dynamic>>.from(data);
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  String _formatPrix(int prix) {
-    return prix
-            .toString()
-            .replaceAllMapped(
-              RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-              (m) => '${m[1]} ',
-            ) +
-        ' FCFA';
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final filtered = _filtered;
     return Scaffold(
       backgroundColor: MboaColors.background,
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header ───────────────────────────────────────
+            // ── Header ───────────────────────────────
             Container(
               color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              padding:
+                  const EdgeInsets.fromLTRB(20, 16, 20, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -125,42 +137,57 @@ class _MarketScreenState extends State<MarketScreen> {
                           height: 46,
                           decoration: BoxDecoration(
                             color: MboaColors.background,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: MboaColors.border),
+                            borderRadius:
+                                BorderRadius.circular(12),
+                            border: Border.all(
+                                color: MboaColors.border),
                           ),
                           child: Row(
                             children: [
                               const SizedBox(width: 12),
-                              const Icon(Icons.search_rounded,
-                                  color: MboaColors.textMuted, size: 20),
+                              const Icon(
+                                  Icons.search_rounded,
+                                  color: MboaColors.textMuted,
+                                  size: 20),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: TextField(
-                                  controller: _searchController,
-                                  onChanged: (_) => setState(() {}),
-                                  decoration: const InputDecoration(
-                                    hintText: 'Lit, table, frigo...',
+                                  controller:
+                                      _searchController,
+                                  onChanged: (_) =>
+                                      _chargerArticles(),
+                                  decoration:
+                                      const InputDecoration(
+                                    hintText:
+                                        'Lit, table, frigo...',
                                     border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
+                                    enabledBorder:
+                                        InputBorder.none,
+                                    focusedBorder:
+                                        InputBorder.none,
                                     filled: false,
                                     isDense: true,
-                                    contentPadding: EdgeInsets.zero,
+                                    contentPadding:
+                                        EdgeInsets.zero,
                                   ),
                                   style: MboaTextStyles.body,
                                 ),
                               ),
-                              if (_searchController.text.isNotEmpty)
+                              if (_searchController
+                                  .text.isNotEmpty)
                                 GestureDetector(
                                   onTap: () {
                                     _searchController.clear();
-                                    setState(() {});
+                                    _chargerArticles();
                                   },
                                   child: const Padding(
-                                    padding: EdgeInsets.all(10),
-                                    child: Icon(Icons.close_rounded,
+                                    padding:
+                                        EdgeInsets.all(10),
+                                    child: Icon(
+                                        Icons.close_rounded,
                                         size: 18,
-                                        color: MboaColors.textMuted),
+                                        color: MboaColors
+                                            .textMuted),
                                   ),
                                 ),
                             ],
@@ -169,17 +196,20 @@ class _MarketScreenState extends State<MarketScreen> {
                       ),
                       const SizedBox(width: 10),
                       GestureDetector(
-                        onTap: () =>
-                            setState(() => _showFiltres = !_showFiltres),
+                        onTap: () => setState(
+                            () => _showFiltres =
+                                !_showFiltres),
                         child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
+                          duration: const Duration(
+                              milliseconds: 200),
                           width: 46,
                           height: 46,
                           decoration: BoxDecoration(
                             color: _showFiltres
                                 ? MboaColors.secondary
                                 : MboaColors.background,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius:
+                                BorderRadius.circular(12),
                             border: Border.all(
                               color: _showFiltres
                                   ? MboaColors.secondary
@@ -206,20 +236,30 @@ class _MarketScreenState extends State<MarketScreen> {
                       scrollDirection: Axis.horizontal,
                       children: _categories.map((cat) {
                         final isSelected =
-                            _selectedCategorie == cat['label'];
+                            _selectedCategorie ==
+                                cat['label'];
                         return GestureDetector(
-                          onTap: () => setState(
-                              () => _selectedCategorie = cat['label']!),
+                          onTap: () {
+                            setState(() =>
+                                _selectedCategorie =
+                                    cat['label']!);
+                            _chargerArticles();
+                          },
                           child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 6),
+                            duration: const Duration(
+                                milliseconds: 200),
+                            margin: const EdgeInsets.only(
+                                right: 8),
+                            padding: const EdgeInsets
+                                .symmetric(
+                                horizontal: 14,
+                                vertical: 6),
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? MboaColors.secondary
                                   : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius:
+                                  BorderRadius.circular(20),
                               border: Border.all(
                                 color: isSelected
                                     ? MboaColors.secondary
@@ -230,14 +270,16 @@ class _MarketScreenState extends State<MarketScreen> {
                             child: Row(
                               children: [
                                 Text(cat['icon']!,
-                                    style: const TextStyle(fontSize: 14)),
+                                    style: const TextStyle(
+                                        fontSize: 14)),
                                 const SizedBox(width: 6),
                                 Text(
                                   cat['label']!,
                                   style: TextStyle(
                                     fontFamily: 'Poppins',
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight:
+                                        FontWeight.w600,
                                     color: isSelected
                                         ? Colors.white
                                         : MboaColors.text,
@@ -275,22 +317,31 @@ class _MarketScreenState extends State<MarketScreen> {
                           'Neuf',
                           'Très bon état',
                           'Bon état',
-                          'Correct'
+                          'Correct',
                         ].map((etat) {
-                          final isSelected = _selectedEtat == etat;
+                          final isSelected =
+                              _selectedEtat == etat;
                           return GestureDetector(
-                            onTap: () =>
-                                setState(() => _selectedEtat = etat),
+                            onTap: () {
+                              setState(() =>
+                                  _selectedEtat = etat);
+                              _chargerArticles();
+                            },
                             child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.only(right: 8),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 4),
+                              duration: const Duration(
+                                  milliseconds: 200),
+                              margin: const EdgeInsets.only(
+                                  right: 8),
+                              padding:
+                                  const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 4),
                               decoration: BoxDecoration(
                                 color: isSelected
                                     ? MboaColors.accent
                                     : Colors.white,
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius:
+                                    BorderRadius.circular(20),
                                 border: Border.all(
                                   color: isSelected
                                       ? MboaColors.accent
@@ -320,6 +371,7 @@ class _MarketScreenState extends State<MarketScreen> {
                         _selectedEtat = 'Tous';
                         _showFiltres = false;
                         _searchController.clear();
+                        _chargerArticles();
                       }),
                       child: const Text(
                         'Réinitialiser les filtres',
@@ -336,39 +388,69 @@ class _MarketScreenState extends State<MarketScreen> {
               ),
             ),
 
-            // ── Résultats ────────────────────────────────────
+            // ── Résultats ────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+              padding:
+                  const EdgeInsets.fromLTRB(20, 12, 20, 8),
               child: Row(
                 children: [
                   Text(
-                    '${filtered.length} article${filtered.length > 1 ? 's' : ''} trouvé${filtered.length > 1 ? 's' : ''}',
+                    _isLoading
+                        ? 'Chargement...'
+                        : '${_articles.length} article${_articles.length > 1 ? 's' : ''} trouvé${_articles.length > 1 ? 's' : ''}',
                     style: MboaTextStyles.muted,
                   ),
                 ],
               ),
             ),
 
-            // ── Grille ───────────────────────────────────────
+            // ── Grille ───────────────────────────────
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : (filtered.isEmpty
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          color: MboaColors.secondary),
+                    )
+                  : _articles.isEmpty
                       ? _buildEmpty()
-                      : GridView.builder(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: 0.78,
+                      : RefreshIndicator(
+                          color: MboaColors.secondary,
+                          onRefresh: _chargerArticles,
+                          child: CustomScrollView(
+                            slivers: [
+                              SliverPadding(
+                                padding: const EdgeInsets
+                                    .fromLTRB(20, 0, 20, 20),
+                                sliver: SliverGrid(
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                    childAspectRatio: 0.78,
+                                  ),
+                                  delegate:
+                                      SliverChildBuilderDelegate(
+                                    (context, index) =>
+                                        _buildArticleCard(
+                                            _displayedArticles[
+                                                index]),
+                                    childCount:
+                                        _displayedArticles.length,
+                                  ),
+                                ),
+                              ),
+                              if (_showLimitBanner)
+                                SliverPadding(
+                                  padding: const EdgeInsets
+                                      .fromLTRB(20, 0, 20, 20),
+                                  sliver: SliverToBoxAdapter(
+                                    child: _buildLimitBanner(),
+                                  ),
+                                ),
+                            ],
                           ),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, index) {
-                            return _buildArticleCard(filtered[index]);
-                          },
-                        )),
+                        ),
             ),
           ],
         ),
@@ -377,6 +459,7 @@ class _MarketScreenState extends State<MarketScreen> {
   }
 
   Widget _buildArticleCard(Map<String, dynamic> a) {
+    final vendeur = a['vendeur'];
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -387,7 +470,8 @@ class _MarketScreenState extends State<MarketScreen> {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
+          borderRadius:
+              BorderRadius.circular(MboaSizes.radiusLg),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.06),
@@ -402,8 +486,10 @@ class _MarketScreenState extends State<MarketScreen> {
             // Image
             ClipRRect(
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(MboaSizes.radiusLg),
-                topRight: Radius.circular(MboaSizes.radiusLg),
+                topLeft:
+                    Radius.circular(MboaSizes.radiusLg),
+                topRight:
+                    Radius.circular(MboaSizes.radiusLg),
               ),
               child: Stack(
                 children: [
@@ -413,27 +499,44 @@ class _MarketScreenState extends State<MarketScreen> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          MboaColors.secondary.withValues(alpha: 0.25),
-                          MboaColors.accent.withValues(alpha: 0.15),
+                          MboaColors.secondary
+                              .withValues(alpha: 0.25),
+                          MboaColors.accent
+                              .withValues(alpha: 0.15),
                         ],
                       ),
                     ),
-                    child: Center(
-                      child: Text(a['emoji'],
-                          style: const TextStyle(fontSize: 44)),
-                    ),
+                    child: a['photos'] != null &&
+                            (a['photos'] as List).isNotEmpty
+                        ? Image.network(
+                            a['photos'][0],
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                const Center(
+                              child: Text('📦',
+                                  style: TextStyle(
+                                      fontSize: 44)),
+                            ),
+                          )
+                        : const Center(
+                            child: Text('📦',
+                                style: TextStyle(
+                                    fontSize: 44)),
+                          ),
                   ),
-                  if (a['boosted'])
+                  if (a['boosted'] == true)
                     Positioned(
                       top: 8,
                       left: 8,
-                      child: _buildBadge('🔥 Boost', MboaColors.boost),
+                      child: _buildBadge(
+                          '🔥 Boost', MboaColors.boost),
                     ),
-                  if (a['negociable'])
+                  if (a['negociable'] == true)
                     Positioned(
                       top: 8,
                       right: 8,
-                      child: _buildBadge('💬 Négociable', MboaColors.primary),
+                      child: _buildBadge(
+                          '💬', MboaColors.primary),
                     ),
                 ],
               ),
@@ -442,12 +545,14 @@ class _MarketScreenState extends State<MarketScreen> {
             // Infos
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                padding:
+                    const EdgeInsets.fromLTRB(10, 8, 10, 8),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
                     Text(
-                      a['titre'],
+                      a['titre'] ?? '',
                       style: const TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 12,
@@ -463,10 +568,11 @@ class _MarketScreenState extends State<MarketScreen> {
                           horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(
                         color: MboaColors.background,
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius:
+                            BorderRadius.circular(6),
                       ),
                       child: Text(
-                        a['etat'],
+                        a['etat'] ?? '',
                         style: const TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 9,
@@ -486,49 +592,80 @@ class _MarketScreenState extends State<MarketScreen> {
                       ),
                     ),
                     const Spacer(),
-                    // Vendeur + bouton contact
                     Row(
                       children: [
                         const Icon(Icons.person_rounded,
-                            size: 11, color: MboaColors.textMuted),
+                            size: 11,
+                            color: MboaColors.textMuted),
                         const SizedBox(width: 3),
                         Expanded(
                           child: Text(
-                            a['vendeur'],
+                            vendeur?['nom'] ?? 'Vendeur',
                             style: MboaTextStyles.caption,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (vendeur?['verified'] == true)
+                          const Icon(
+                            Icons.verified_rounded,
+                            size: 12,
+                            color: MboaColors.verified,
+                          ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    SizedBox(
-                      width: double.infinity,
-                      child: GestureDetector(
-                        onTap: () {},
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 7),
-                          decoration: BoxDecoration(
-                            color: MboaColors.primary,
-                            borderRadius: BorderRadius.circular(10),
+                    GestureDetector(
+                      onTap: () {
+                        if (_supabase.auth.currentUser ==
+                            null) {
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Connectez-vous pour contacter le vendeur'),
+                              backgroundColor:
+                                  MboaColors.primary,
+                            ),
+                          );
+                          return;
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ArticleDetailScreen(
+                                    article: a),
                           ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.chat_bubble_rounded,
-                                  size: 12, color: Colors.white),
-                              SizedBox(width: 5),
-                              Text(
-                                'Contacter',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
+                        );
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 7),
+                        decoration: BoxDecoration(
+                          color: MboaColors.primary,
+                          borderRadius:
+                              BorderRadius.circular(10),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment:
+                              MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                                Icons.chat_bubble_rounded,
+                                size: 12,
+                                color: Colors.white),
+                            SizedBox(width: 5),
+                            Text(
+                              'Contacter',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -544,7 +681,8 @@ class _MarketScreenState extends State<MarketScreen> {
 
   Widget _buildBadge(String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+          horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(20),
@@ -561,12 +699,69 @@ class _MarketScreenState extends State<MarketScreen> {
     );
   }
 
+  Widget _buildLimitBanner() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            MboaColors.accent,
+            MboaColors.secondary,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
+      ),
+      child: Column(
+        children: [
+          const Text('🔒', style: TextStyle(fontSize: 32)),
+          const SizedBox(height: 10),
+          const Text(
+            'Connectez-vous pour voir plus',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Créez un compte gratuit pour découvrir tous les articles du Market',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 12,
+              color: Colors.white.withValues(alpha: 0.85),
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: MboaColors.accent,
+              ),
+              onPressed: () => context.push(AppRoutes.register),
+              child: const Text('Créer un compte'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmpty() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text('🔍', style: TextStyle(fontSize: 60)),
+          const Text('🔍',
+              style: TextStyle(fontSize: 60)),
           const SizedBox(height: 16),
           const Text(
             'Aucun article trouvé',
@@ -584,6 +779,32 @@ class _MarketScreenState extends State<MarketScreen> {
               fontFamily: 'Poppins',
               fontSize: 13,
               color: MboaColors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: () => setState(() {
+              _selectedCategorie = 'Tous';
+              _selectedEtat = 'Tous';
+              _searchController.clear();
+              _chargerArticles();
+            }),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: MboaColors.secondary,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'Réinitialiser les filtres',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
         ],

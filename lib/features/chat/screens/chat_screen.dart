@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -9,66 +10,125 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final List<Map<String, dynamic>> _conversations = [
-    {
-      'id': '1',
-      'nom': 'Jean-Paul M.',
-      'initiales': 'JP',
-      'dernierMsg': 'La chambre est toujours disponible !',
-      'heure': '10:23',
-      'nonLu': 2,
-      'verified': true,
-      'sujet': 'Chambre meublée - Centre ville',
-      'emoji': '🏠',
-    },
-    {
-      'id': '2',
-      'nom': 'Meublé Express',
-      'initiales': 'ME',
-      'dernierMsg': 'Oui on livre à domicile 😊',
-      'heure': 'Hier',
-      'nonLu': 0,
-      'verified': true,
-      'sujet': 'Armoire 3 portes',
-      'emoji': '🗄️',
-    },
-    {
-      'id': '3',
-      'nom': 'Marie T.',
-      'initiales': 'MT',
-      'dernierMsg': 'Vous pouvez visiter demain à 14h',
-      'heure': 'Hier',
-      'nonLu': 1,
-      'verified': false,
-      'sujet': 'Studio moderne - Nkol-Eton',
-      'emoji': '🏢',
-    },
-    {
-      'id': '4',
-      'nom': 'Aminata D.',
-      'initiales': 'AD',
-      'dernierMsg': 'D\'accord je vous attends !',
-      'heure': 'Lun',
-      'nonLu': 0,
-      'verified': false,
-      'sujet': 'Table de travail + chaise',
-      'emoji': '🪑',
-    },
-  ];
+  final _supabase = Supabase.instance.client;
+  List<Map<String, dynamic>> _conversations = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _chargerConversations();
+  }
+
+  Future<void> _chargerConversations() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final data = await _supabase
+          .from('conversations')
+          .select('*')
+          .contains('participants', [user.id])
+          .order('dernier_message_date', ascending: false);
+
+      if (data.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _conversations = [];
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      // Extraire tous les IDs des autres participants pour une seule requête groupée
+      final idsParticipants = data.map((conv) {
+        final parts = List<String>.from(conv['participants']);
+        return parts.firstWhere((id) => id != user.id, orElse: () => user.id);
+      }).toSet().toList();
+
+      // Récupérer tous les profils en une seule fois (Optimisation N+1)
+      final usersData = await _supabase
+          .from('users')
+          .select('id, nom, photo_url, verified')
+          .filter('id', 'in', idsParticipants);
+
+      final mapUsers = {for (var u in usersData) u['id']: u};
+
+      final enriched = <Map<String, dynamic>>[];
+      for (final conv in data) {
+        final autreId = List<String>.from(conv['participants'])
+            .firstWhere((id) => id != user.id, orElse: () => user.id);
+        
+        enriched.add({
+          ...conv,
+          'autre_user': mapUsers[autreId] ?? {'nom': 'Utilisateur'},
+          'autre_id': autreId,
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _conversations = enriched;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _formatHeure(String? dateStr) {
+    if (dateStr == null) return '';
+    try {
+      final date = DateTime.parse(dateStr).toLocal();
+      final now = DateTime.now();
+      final diff = now.difference(date);
+      if (diff.inDays == 0) {
+        return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      } else if (diff.inDays == 1) {
+        return 'Hier';
+      } else if (diff.inDays < 7) {
+        const jours = [
+          '', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'
+        ];
+        return jours[date.weekday];
+      }
+      return '${date.day}/${date.month}';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _getInitiales(String nom) {
+    final parts = nom.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    if (nom.isNotEmpty) return nom[0].toUpperCase();
+    return 'U';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final user = _supabase.auth.currentUser;
+
     return Scaffold(
       backgroundColor: MboaColors.background,
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header ───────────────────────────────────────
+            // ── Header ───────────────────────────────
             Container(
               color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+              padding:
+                  const EdgeInsets.fromLTRB(20, 16, 20, 16),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment:
+                    MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
                     '💬 Messages',
@@ -79,43 +139,61 @@ class _ChatScreenState extends State<ChatScreen> {
                       color: MboaColors.text,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: MboaColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${_conversations.where((c) => c['nonLu'] > 0).length} non lus',
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: MboaColors.primary,
+                  if (_conversations.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: MboaColors.primary
+                            .withValues(alpha: 0.1),
+                        borderRadius:
+                            BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${_conversations.length} conversation${_conversations.length > 1 ? 's' : ''}',
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: MboaColors.primary,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
 
-            // ── Liste conversations ───────────────────────────
+            // ── Contenu ──────────────────────────────
             Expanded(
-              child: _conversations.isEmpty
-                  ? _buildEmpty()
-                  : ListView.separated(
-                      itemCount: _conversations.length,
-                      separatorBuilder: (_, __) => const Divider(
-                        height: 1,
-                        indent: 80,
-                        endIndent: 20,
-                      ),
-                      itemBuilder: (context, index) {
-                        return _buildConversationTile(
-                            _conversations[index]);
-                      },
-                    ),
+              child: user == null
+                  ? _buildNotConnected()
+                  : _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                              color: MboaColors.primary),
+                        )
+                      : _conversations.isEmpty
+                          ? _buildEmpty()
+                          : RefreshIndicator(
+                              color: MboaColors.primary,
+                              onRefresh:
+                                  _chargerConversations,
+                              child: ListView.separated(
+                                itemCount:
+                                    _conversations.length,
+                                separatorBuilder: (_, __) =>
+                                    const Divider(
+                                  height: 1,
+                                  indent: 80,
+                                  endIndent: 20,
+                                ),
+                                itemBuilder:
+                                    (context, index) =>
+                                        _buildConversationTile(
+                                  _conversations[index],
+                                ),
+                              ),
+                            ),
             ),
           ],
         ),
@@ -123,20 +201,44 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildConversationTile(Map<String, dynamic> conv) {
-    final hasUnread = conv['nonLu'] > 0;
+  Widget _buildConversationTile(
+      Map<String, dynamic> conv) {
+    final autreUser = conv['autre_user']
+        as Map<String, dynamic>? ?? {};
+    final nom = autreUser['nom'] ?? 'Utilisateur';
+    final isVerified =
+        autreUser['verified'] == true;
+    final nonLu = conv['non_lu'];
+    final userId =
+        _supabase.auth.currentUser?.id ?? '';
+    int nbNonLu = 0;
+    if (nonLu is Map) {
+      nbNonLu = (nonLu[userId] ?? 0) as int;
+    }
+
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => _ConversationScreen(conversation: conv),
-        ),
-      ),
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ConversationScreen(
+              conversationId: conv['id'],
+              autreUser: autreUser,
+              autreId: conv['autre_id'],
+              sujet: conv['annonce_type'] == 'logement'
+                  ? '🏠 Logement'
+                  : '🛒 Article',
+            ),
+          ),
+        );
+        _chargerConversations();
+      },
       child: Container(
-        color: hasUnread
+        color: nbNonLu > 0
             ? MboaColors.primary.withValues(alpha: 0.03)
             : Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        padding: const EdgeInsets.symmetric(
+            horizontal: 20, vertical: 14),
         child: Row(
           children: [
             // Avatar
@@ -145,23 +247,22 @@ class _ChatScreenState extends State<ChatScreen> {
                 Container(
                   width: 52,
                   height: 52,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: MboaColors.primary,
                     shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: Text(
-                      conv['initiales'],
+                      _getInitiales(nom),
                       style: const TextStyle(
                         fontFamily: 'Poppins',
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
                     ),
                   ),
                 ),
-                // Icône annonce
                 Positioned(
                   bottom: 0,
                   right: 0,
@@ -172,13 +273,12 @@ class _ChatScreenState extends State<ChatScreen> {
                       color: Colors.white,
                       shape: BoxShape.circle,
                       border: Border.all(
-                          color: MboaColors.border, width: 1),
+                          color: MboaColors.border),
                     ),
-                    child: Center(
-                      child: Text(
-                        conv['emoji'],
-                        style: const TextStyle(fontSize: 10),
-                      ),
+                    child: const Center(
+                      child: Text('💬',
+                          style:
+                              TextStyle(fontSize: 10)),
                     ),
                   ),
                 ),
@@ -186,28 +286,30 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             const SizedBox(width: 14),
 
-            // Contenu
+            // Infos
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment:
+                        MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
                         children: [
                           Text(
-                            conv['nom'],
+                            nom,
                             style: TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 14,
-                              fontWeight: hasUnread
+                              fontWeight: nbNonLu > 0
                                   ? FontWeight.w700
                                   : FontWeight.w600,
                               color: MboaColors.text,
                             ),
                           ),
-                          if (conv['verified']) ...[
+                          if (isVerified) ...[
                             const SizedBox(width: 4),
                             const Icon(
                               Icons.verified_rounded,
@@ -218,14 +320,15 @@ class _ChatScreenState extends State<ChatScreen> {
                         ],
                       ),
                       Text(
-                        conv['heure'],
+                        _formatHeure(
+                            conv['dernier_message_date']),
                         style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 11,
-                          color: hasUnread
+                          color: nbNonLu > 0
                               ? MboaColors.primary
                               : MboaColors.textMuted,
-                          fontWeight: hasUnread
+                          fontWeight: nbNonLu > 0
                               ? FontWeight.w600
                               : FontWeight.w400,
                         ),
@@ -233,29 +336,21 @@ class _ChatScreenState extends State<ChatScreen> {
                     ],
                   ),
                   const SizedBox(height: 3),
-                  Text(
-                    conv['sujet'],
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 11,
-                      color: MboaColors.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment:
+                        MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
                         child: Text(
-                          conv['dernierMsg'],
+                          conv['dernier_message'] ??
+                              'Conversation démarrée',
                           style: TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 12,
-                            color: hasUnread
+                            color: nbNonLu > 0
                                 ? MboaColors.text
                                 : MboaColors.textMuted,
-                            fontWeight: hasUnread
+                            fontWeight: nbNonLu > 0
                                 ? FontWeight.w500
                                 : FontWeight.w400,
                           ),
@@ -263,7 +358,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (hasUnread) ...[
+                      if (nbNonLu > 0) ...[
                         const SizedBox(width: 8),
                         Container(
                           width: 22,
@@ -274,7 +369,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                           child: Center(
                             child: Text(
-                              '${conv['nonLu']}',
+                              '$nbNonLu',
                               style: const TextStyle(
                                 fontFamily: 'Poppins',
                                 fontSize: 11,
@@ -296,12 +391,49 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildNotConnected() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('💬',
+                style: TextStyle(fontSize: 60)),
+            const SizedBox(height: 16),
+            const Text(
+              'Vos conversations',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: MboaColors.text,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Connectez-vous pour envoyer des messages aux vendeurs et propriétaires',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 13,
+                color: MboaColors.textMuted,
+                height: 1.6,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmpty() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text('💬', style: TextStyle(fontSize: 60)),
+          const Text('💬',
+              style: TextStyle(fontSize: 60)),
           const SizedBox(height: 16),
           const Text(
             'Aucun message',
@@ -314,12 +446,14 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Tes conversations apparaîtront ici',
+            'Contacte un vendeur depuis une annonce\npour démarrer une conversation',
             style: TextStyle(
               fontFamily: 'Poppins',
               fontSize: 13,
               color: MboaColors.textMuted,
+              height: 1.5,
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -328,71 +462,116 @@ class _ChatScreenState extends State<ChatScreen> {
 }
 
 // ════════════════════════════════════════════════════════════
-// ÉCRAN DE CONVERSATION
+// ÉCRAN DE CONVERSATION TEMPS RÉEL
 // ════════════════════════════════════════════════════════════
-class _ConversationScreen extends StatefulWidget {
-  final Map<String, dynamic> conversation;
-  const _ConversationScreen({required this.conversation});
+class ConversationScreen extends StatefulWidget {
+  final String conversationId;
+  final Map<String, dynamic> autreUser;
+  final String autreId;
+  final String sujet;
+  final String? annonceId;
+  final String? annonceType;
+
+  const ConversationScreen({
+    super.key,
+    required this.conversationId,
+    required this.autreUser,
+    required this.autreId,
+    required this.sujet,
+    this.annonceId,
+    this.annonceType,
+  });
 
   @override
-  State<_ConversationScreen> createState() => _ConversationScreenState();
+  State<ConversationScreen> createState() =>
+      ConversationScreenState();
 }
 
-class _ConversationScreenState extends State<_ConversationScreen> {
+class ConversationScreenState extends State<ConversationScreen> {
+  final _supabase = Supabase.instance.client;
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  List<Map<String, dynamic>> _messages = [];
+  bool _isLoading = true;
 
-  final List<Map<String, dynamic>> _messages = [
-    {
-      'texte': 'Bonjour ! La chambre est-elle toujours disponible ?',
-      'moi': false,
-      'heure': '10:15',
-      'lu': true,
-    },
-    {
-      'texte': 'Oui toujours disponible ! Vous pouvez visiter quand vous voulez.',
-      'moi': true,
-      'heure': '10:18',
-      'lu': true,
-    },
-    {
-      'texte': 'Super ! Quel est le montant de la caution ?',
-      'moi': false,
-      'heure': '10:20',
-      'lu': true,
-    },
-    {
-      'texte': 'La caution est d\'un mois de loyer soit 20 000 FCFA.',
-      'moi': true,
-      'heure': '10:21',
-      'lu': true,
-    },
-    {
-      'texte': 'La chambre est toujours disponible !',
-      'moi': true,
-      'heure': '10:23',
-      'lu': false,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _chargerMessages();
+    _ecouterMessages();
+    _marquerLus();
+  }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _supabase.removeChannel(
+      _supabase.channel('conv_${widget.conversationId}'),
+    );
     super.dispose();
   }
 
-  void _sendMessage() {
-    if (_messageController.text.trim().isEmpty) return;
-    setState(() {
-      _messages.add({
-        'texte': _messageController.text.trim(),
-        'moi': false,
-        'heure': 'Maintenant',
-        'lu': false,
-      });
-      _messageController.clear();
-    });
+  Future<void> _chargerMessages() async {
+    try {
+      final data = await _supabase
+          .from('messages')
+          .select()
+          .eq('conversation_id', widget.conversationId)
+          .order('date_envoi');
+
+      if (mounted) {
+        setState(() {
+          _messages =
+              List<Map<String, dynamic>>.from(data);
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+ void _ecouterMessages() {
+    _supabase
+        .channel('conv_${widget.conversationId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'messages',
+          callback: (payload) {
+            final newRecord = payload.newRecord;
+            if (newRecord['conversation_id'] ==
+                widget.conversationId) {
+              if (mounted) {
+                setState(() {
+                  _messages.add(
+                      Map<String, dynamic>.from(newRecord));
+                });
+                _scrollToBottom();
+                _marquerLus();
+              }
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  Future<void> _marquerLus() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      await _supabase
+          .from('messages')
+          .update({'lu': true})
+          .eq('conversation_id',
+              widget.conversationId)
+          .neq('expediteur_id', userId);
+    } catch (_) {}
+  }
+
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -404,19 +583,224 @@ class _ConversationScreenState extends State<_ConversationScreen> {
     });
   }
 
+  Future<void> _envoyerMessage() async {
+    final texte = _messageController.text.trim();
+    if (texte.isEmpty) return;
+
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _messageController.clear();
+
+    try {
+      await _supabase.from('messages').insert({
+        'conversation_id': widget.conversationId,
+        'expediteur_id': userId,
+        'texte': texte,
+      });
+
+      await _supabase
+          .from('conversations')
+          .update({
+            'dernier_message': texte,
+            'dernier_message_date':
+                DateTime.now().toIso8601String(),
+          })
+          .eq('id', widget.conversationId);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur d\'envoi'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  String _getInitiales(String nom) {
+    final parts = nom.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    if (nom.isNotEmpty) return nom[0].toUpperCase();
+    return 'U';
+  }
+
+  String _formatHeure(String? dateStr) {
+    if (dateStr == null) return '';
+    try {
+      final date = DateTime.parse(dateStr).toLocal();
+      return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Future<void> _ouvrirFormulaireAvis() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    int noteSelectionnee = 5;
+    final commentaireController = TextEditingController();
+
+    final envoye = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
+          ),
+          title: const Text(
+            '⭐ Laisser un avis',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: MboaColors.text,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Votre expérience avec ${widget.autreUser['nom'] ?? 'cet utilisateur'}',
+                style: MboaTextStyles.bodySm,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (i) {
+                  final valeur = i + 1;
+                  return IconButton(
+                    onPressed: () => setDialogState(
+                        () => noteSelectionnee = valeur),
+                    icon: Icon(
+                      valeur <= noteSelectionnee
+                          ? Icons.star_rounded
+                          : Icons.star_border_rounded,
+                      color: MboaColors.boost,
+                      size: 32,
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: commentaireController,
+                maxLines: 3,
+                style: MboaTextStyles.bodySm,
+                decoration: InputDecoration(
+                  hintText: 'Votre commentaire (optionnel)',
+                  border: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(MboaSizes.radiusMd),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Envoyer'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (envoye != true) return;
+
+    try {
+      await _supabase.from('avis').insert({
+        'auteur_id': userId,
+        'cible_id': widget.autreId,
+        'annonce_id': widget.annonceId,
+        'note': noteSelectionnee,
+        'commentaire': commentaireController.text.trim(),
+        'valide': true,
+      });
+
+      await _recalculerNoteGlobale(widget.autreId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Merci pour votre avis !'),
+            backgroundColor: MboaColors.verified,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de l\'envoi de l\'avis'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _recalculerNoteGlobale(String cibleId) async {
+    final avisData = await _supabase
+        .from('avis')
+        .select('note')
+        .eq('cible_id', cibleId)
+        .eq('valide', true);
+
+    final notes = List<Map<String, dynamic>>.from(avisData);
+    if (notes.isEmpty) return;
+
+    final total = notes.fold<int>(
+        0, (sum, a) => sum + ((a['note'] ?? 0) as int));
+    final moyenne = total / notes.length;
+
+    await _supabase.from('users').update({
+      'note_globale': double.parse(moyenne.toStringAsFixed(1)),
+      'nb_avis': notes.length,
+    }).eq('id', cibleId);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final conv = widget.conversation;
+    final userId =
+        _supabase.auth.currentUser?.id ?? '';
+    final nom =
+        widget.autreUser['nom'] ?? 'Utilisateur';
+    final isVerified =
+        widget.autreUser['verified'] == true;
+
     return Scaffold(
       backgroundColor: MboaColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              size: 18, color: MboaColors.text),
+          icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 18,
+              color: MboaColors.text),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Laisser un avis',
+            onPressed: _ouvrirFormulaireAvis,
+            icon: const Icon(
+              Icons.star_rate_rounded,
+              color: MboaColors.boost,
+            ),
+          ),
+        ],
         title: Row(
           children: [
             Container(
@@ -428,7 +812,7 @@ class _ConversationScreenState extends State<_ConversationScreen> {
               ),
               child: Center(
                 child: Text(
-                  conv['initiales'],
+                  _getInitiales(nom),
                   style: const TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 13,
@@ -440,12 +824,13 @@ class _ConversationScreenState extends State<_ConversationScreen> {
             ),
             const SizedBox(width: 10),
             Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     Text(
-                      conv['nom'],
+                      nom,
                       style: const TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 14,
@@ -453,10 +838,12 @@ class _ConversationScreenState extends State<_ConversationScreen> {
                         color: MboaColors.text,
                       ),
                     ),
-                    if (conv['verified']) ...[
+                    if (isVerified) ...[
                       const SizedBox(width: 4),
-                      const Icon(Icons.verified_rounded,
-                          size: 14, color: MboaColors.verified),
+                      const Icon(
+                          Icons.verified_rounded,
+                          size: 14,
+                          color: MboaColors.verified),
                     ],
                   ],
                 ),
@@ -473,94 +860,105 @@ class _ConversationScreenState extends State<_ConversationScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert_rounded, color: MboaColors.text),
-            onPressed: () {},
-          ),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(36),
           child: Container(
             width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            margin: const EdgeInsets.fromLTRB(
+                16, 0, 16, 8),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: MboaColors.primary.withValues(alpha: 0.08),
+              color: MboaColors.primary
+                  .withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Row(
-              children: [
-                Text(
-                  conv['emoji'],
-                  style: const TextStyle(fontSize: 14),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    conv['sujet'],
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: MboaColors.primary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
+            child: Text(
+              widget.sujet,
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: MboaColors.primary,
+              ),
             ),
           ),
         ),
       ),
-
       body: Column(
         children: [
           // Messages
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                return _buildMessage(_messages[index]);
-              },
-            ),
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                        color: MboaColors.primary),
+                  )
+                : _messages.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Démarrez la conversation 👋',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 14,
+                            color: MboaColors.textMuted,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) =>
+                            _buildMessage(
+                                _messages[index],
+                                userId),
+                      ),
           ),
 
-          // Barre de saisie
+          // Barre saisie
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            padding: const EdgeInsets.fromLTRB(
+                16, 10, 16, 16),
             child: Row(
               children: [
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
                       color: MboaColors.background,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: MboaColors.border),
+                      borderRadius:
+                          BorderRadius.circular(24),
+                      border: Border.all(
+                          color: MboaColors.border),
                     ),
                     child: Row(
                       children: [
                         const SizedBox(width: 16),
                         Expanded(
                           child: TextField(
-                            controller: _messageController,
-                            decoration: const InputDecoration(
-                              hintText: 'Écrire un message...',
+                            controller:
+                                _messageController,
+                            decoration:
+                                const InputDecoration(
+                              hintText:
+                                  'Écrire un message...',
                               border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
+                              enabledBorder:
+                                  InputBorder.none,
+                              focusedBorder:
+                                  InputBorder.none,
                               filled: false,
                               isDense: true,
                               contentPadding:
-                                  EdgeInsets.symmetric(vertical: 12),
+                                  EdgeInsets.symmetric(
+                                      vertical: 12),
                             ),
                             style: MboaTextStyles.body,
                             maxLines: 4,
                             minLines: 1,
-                            onSubmitted: (_) => _sendMessage(),
+                            onSubmitted: (_) =>
+                                _envoyerMessage(),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -570,7 +968,7 @@ class _ConversationScreenState extends State<_ConversationScreen> {
                 ),
                 const SizedBox(width: 10),
                 GestureDetector(
-                  onTap: _sendMessage,
+                  onTap: _envoyerMessage,
                   child: Container(
                     width: 46,
                     height: 46,
@@ -593,13 +991,18 @@ class _ConversationScreenState extends State<_ConversationScreen> {
     );
   }
 
-  Widget _buildMessage(Map<String, dynamic> msg) {
-    final isMoi = msg['moi'] as bool;
+  Widget _buildMessage(
+      Map<String, dynamic> msg, String userId) {
+    final isMoi = msg['expediteur_id'] == userId;
+    final nom =
+        widget.autreUser['nom'] ?? 'U';
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment:
-            isMoi ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMoi
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMoi) ...[
@@ -612,7 +1015,7 @@ class _ConversationScreenState extends State<_ConversationScreen> {
               ),
               child: Center(
                 child: Text(
-                  widget.conversation['initiales'],
+                  _getInitiales(nom),
                   style: const TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 10,
@@ -629,16 +1032,21 @@ class _ConversationScreenState extends State<_ConversationScreen> {
               padding: const EdgeInsets.symmetric(
                   horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: isMoi ? MboaColors.primary : Colors.white,
+                color: isMoi
+                    ? MboaColors.primary
+                    : Colors.white,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isMoi ? 16 : 4),
-                  bottomRight: Radius.circular(isMoi ? 4 : 16),
+                  bottomLeft:
+                      Radius.circular(isMoi ? 16 : 4),
+                  bottomRight:
+                      Radius.circular(isMoi ? 4 : 16),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
+                    color: Colors.black
+                        .withValues(alpha: 0.06),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -650,11 +1058,13 @@ class _ConversationScreenState extends State<_ConversationScreen> {
                     : CrossAxisAlignment.start,
                 children: [
                   Text(
-                    msg['texte'],
+                    msg['texte'] ?? '',
                     style: TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 13,
-                      color: isMoi ? Colors.white : MboaColors.text,
+                      color: isMoi
+                          ? Colors.white
+                          : MboaColors.text,
                       height: 1.4,
                     ),
                   ),
@@ -663,25 +1073,28 @@ class _ConversationScreenState extends State<_ConversationScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        msg['heure'],
+                        _formatHeure(
+                            msg['date_envoi']),
                         style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 10,
                           color: isMoi
-                              ? Colors.white.withValues(alpha: 0.7)
+                              ? Colors.white
+                                  .withValues(alpha: 0.7)
                               : MboaColors.textMuted,
                         ),
                       ),
                       if (isMoi) ...[
                         const SizedBox(width: 4),
                         Icon(
-                          msg['lu']
+                          msg['lu'] == true
                               ? Icons.done_all_rounded
                               : Icons.done_rounded,
                           size: 13,
-                          color: msg['lu']
+                          color: msg['lu'] == true
                               ? Colors.white
-                              : Colors.white.withValues(alpha: 0.6),
+                              : Colors.white
+                                  .withValues(alpha: 0.6),
                         ),
                       ],
                     ],

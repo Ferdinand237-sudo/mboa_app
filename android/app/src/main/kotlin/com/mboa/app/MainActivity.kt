@@ -1,4 +1,4 @@
-package com.example.mboa_app
+package com.mboa.app
 
 import io.flutter.embedding.android.FlutterActivity
 

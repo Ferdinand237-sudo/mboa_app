@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'dart:io';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 
@@ -12,15 +16,11 @@ class PublierScreen extends StatefulWidget {
 class _PublierScreenState extends State<PublierScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  int _selectedTab = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      setState(() => _selectedTab = _tabController.index);
-    });
   }
 
   @override
@@ -36,7 +36,6 @@ class _PublierScreenState extends State<PublierScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header ───────────────────────────────────────
             Container(
               color: Colors.white,
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -77,8 +76,6 @@ class _PublierScreenState extends State<PublierScreen>
                 ],
               ),
             ),
-
-            // ── Contenu ──────────────────────────────────────
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -107,21 +104,22 @@ class _FormLogement extends StatefulWidget {
 
 class _FormLogementState extends State<_FormLogement> {
   final _formKey = GlobalKey<FormState>();
+  final _supabase = Supabase.instance.client;
+  final _picker = ImagePicker();
+
   final _titreController = TextEditingController();
   final _descController = TextEditingController();
   final _prixController = TextEditingController();
   final _surfaceController = TextEditingController();
   final _quartierController = TextEditingController();
+
   String _selectedType = 'Chambre';
   List<String> _selectedEquipements = [];
+  List<File> _photos = [];
   bool _isLoading = false;
-  int _nbPhotos = 0;
-
-  final List<String> _equipements = [
-    'Wifi', 'Eau courante', 'Électricité',
-    'Meublé', 'Cuisine', 'Salon',
-    'Sécurité', 'Parking',
-  ];
+  double? _lat;
+  double? _lng;
+  bool _isGettingLocation = false;
 
   @override
   void dispose() {
@@ -131,6 +129,190 @@ class _FormLogementState extends State<_FormLogement> {
     _surfaceController.dispose();
     _quartierController.dispose();
     super.dispose();
+  }
+
+  Future<void> _ajouterPhoto() async {
+    if (_photos.length >= AppConstants.maxPhotosLogement) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Maximum ${AppConstants.maxPhotosLogement} photos'),
+          backgroundColor: MboaColors.danger,
+        ),
+      );
+      return;
+    }
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 80,
+    );
+    if (picked != null) {
+      setState(() => _photos.add(File(picked.path)));
+    }
+  }
+
+  void _supprimerPhoto(int index) {
+    setState(() => _photos.removeAt(index));
+  }
+
+  Future<void> _obtenirPosition() async {
+    setState(() => _isGettingLocation = true);
+    try {
+      bool serviceActive = await Geolocator.isLocationServiceEnabled();
+      if (!serviceActive) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Activez la localisation de votre téléphone'),
+              backgroundColor: MboaColors.danger,
+            ),
+          );
+        }
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Permission de localisation refusée'),
+                backgroundColor: MboaColors.danger,
+              ),
+            );
+          }
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Autorisez la localisation dans les paramètres de l\'app'),
+              backgroundColor: MboaColors.danger,
+            ),
+          );
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition();
+      if (mounted) {
+        setState(() {
+          _lat = position.latitude;
+          _lng = position.longitude;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de localisation : ${e.toString()}'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isGettingLocation = false);
+    }
+  }
+
+  Future<List<String>> _uploadPhotos() async {
+    final userId = _supabase.auth.currentUser!.id;
+    final urls = <String>[];
+    for (final photo in _photos) {
+      final fileName =
+          '$userId/${DateTime.now().millisecondsSinceEpoch}_${urls.length}.jpg';
+      await _supabase.storage
+          .from(AppConstants.bucketLogements)
+          .upload(fileName, photo);
+      final url = _supabase.storage
+          .from(AppConstants.bucketLogements)
+          .getPublicUrl(fileName);
+      urls.add(url);
+    }
+    return urls;
+  }
+
+  Future<void> _publier() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_photos.length < AppConstants.minPhotosLogement) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Minimum ${AppConstants.minPhotosLogement} photos requises'),
+          backgroundColor: MboaColors.danger,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // Upload photos
+      final photoUrls = await _uploadPhotos();
+
+      // Insérer dans Supabase
+      await _supabase.from(AppConstants.tableLogements).insert({
+        'titre': _titreController.text.trim(),
+        'description': _descController.text.trim(),
+        'type': _selectedType,
+        'prix': int.parse(
+            _prixController.text.trim().replaceAll(' ', '')),
+        'surface': _surfaceController.text.isNotEmpty
+            ? double.parse(_surfaceController.text.trim())
+            : null,
+        'photos': photoUrls,
+        'equipements': _selectedEquipements,
+        'quartier': _quartierController.text.trim(),
+        'ville': AppConstants.defaultVille,
+        'lat': _lat,
+        'lng': _lng,
+        'proprietaire_id':
+            _supabase.auth.currentUser!.id,
+        'statut': AppConstants.statutDisponible,
+        'boosted': false,
+        'vues': 0,
+        'signalements': 0,
+        'note_globale': 0.0,
+        'nb_avis': 0,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Logement publié avec succès !'),
+            backgroundColor: MboaColors.primary,
+          ),
+        );
+        // Reset formulaire
+        _formKey.currentState!.reset();
+        setState(() {
+          _photos = [];
+          _selectedEquipements = [];
+          _selectedType = 'Chambre';
+          _lat = null;
+          _lng = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur : ${e.toString()}'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -144,103 +326,155 @@ class _FormLogementState extends State<_FormLogement> {
           children: [
             const SizedBox(height: 8),
 
-            // ── Photos ──────────────────────────────────
+            // ── Photos ──────────────────────────────
             _buildSectionTitle('📷 Photos du logement'),
             const SizedBox(height: 4),
-            Text(
-              'Minimum 3 photos obligatoires',
-              style: MboaTextStyles.caption.copyWith(
-                color: MboaColors.danger,
+            RichText(
+              text: TextSpan(
+                style: MboaTextStyles.caption,
+                children: [
+                  TextSpan(
+                    text:
+                        'Minimum ${AppConstants.minPhotosLogement} photos · ',
+                    style: const TextStyle(
+                        color: MboaColors.danger),
+                  ),
+                  TextSpan(
+                    text:
+                        '${_photos.length}/${AppConstants.maxPhotosLogement} ajoutées',
+                    style: const TextStyle(
+                        color: MboaColors.primary,
+                        fontWeight: FontWeight.w700),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 12),
             SizedBox(
               height: 100,
-              child: ListView.separated(
+              child: ListView(
                 scrollDirection: Axis.horizontal,
-                itemCount: 4,
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
-                itemBuilder: (context, index) {
-                  final hasPhoto = index < _nbPhotos;
-                  return GestureDetector(
-                    onTap: () {
-                      if (!hasPhoto && _nbPhotos == index) {
-                        setState(() => _nbPhotos++);
-                      }
-                    },
-                    child: Container(
-                      width: 100,
-                      decoration: BoxDecoration(
-                        color: hasPhoto
-                            ? MboaColors.primary.withValues(alpha: 0.1)
-                            : MboaColors.background,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: hasPhoto
-                              ? MboaColors.primary
-                              : MboaColors.border,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            hasPhoto
-                                ? Icons.check_circle_rounded
-                                : Icons.add_photo_alternate_outlined,
-                            color: hasPhoto
-                                ? MboaColors.primary
-                                : MboaColors.textMuted,
-                            size: 28,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            hasPhoto
-                                ? 'Photo ${index + 1}'
-                                : index == 0
-                                    ? 'Ajouter'
-                                    : '+ Photo',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: hasPhoto
-                                  ? MboaColors.primary
-                                  : MboaColors.textMuted,
+                children: [
+                  // Photos ajoutées
+                  ..._photos.asMap().entries.map((entry) {
+                    return Stack(
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          margin:
+                              const EdgeInsets.only(right: 10),
+                          decoration: BoxDecoration(
+                            borderRadius:
+                                BorderRadius.circular(12),
+                            image: DecorationImage(
+                              image: FileImage(entry.value),
+                              fit: BoxFit.cover,
                             ),
                           ),
-                        ],
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 14,
+                          child: GestureDetector(
+                            onTap: () =>
+                                _supprimerPhoto(entry.key),
+                            child: Container(
+                              width: 22,
+                              height: 22,
+                              decoration: const BoxDecoration(
+                                color: MboaColors.danger,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                  // Bouton ajouter
+                  if (_photos.length <
+                      AppConstants.maxPhotosLogement)
+                    GestureDetector(
+                      onTap: _ajouterPhoto,
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: MboaColors.primary
+                              .withValues(alpha: 0.06),
+                          borderRadius:
+                              BorderRadius.circular(12),
+                          border: Border.all(
+                            color: MboaColors.primary
+                                .withValues(alpha: 0.3),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment:
+                              MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons
+                                  .add_photo_alternate_outlined,
+                              color: MboaColors.primary,
+                              size: 28,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _photos.isEmpty
+                                  ? 'Ajouter'
+                                  : '+ Photo',
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: MboaColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  );
-                },
+                ],
               ),
             ),
             const SizedBox(height: 24),
 
-            // ── Type ────────────────────────────────────
+            // ── Type ────────────────────────────────
             _buildSectionTitle('Type de logement'),
             const SizedBox(height: 12),
             Row(
-              children: AppConstants.typesLogement.map((type) {
+              children:
+                  AppConstants.typesLogement.map((type) {
                 final isSelected = _selectedType == type;
                 return Expanded(
                   child: GestureDetector(
-                    onTap: () => setState(() => _selectedType = type),
+                    onTap: () =>
+                        setState(() => _selectedType = type),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
+                      duration:
+                          const Duration(milliseconds: 200),
                       margin: EdgeInsets.only(
-                        right: type != AppConstants.typesLogement.last
+                        right: type !=
+                                AppConstants.typesLogement.last
                             ? 10
                             : 0,
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12),
                       decoration: BoxDecoration(
                         color: isSelected
                             ? MboaColors.primary
                             : Colors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius:
+                            BorderRadius.circular(12),
                         border: Border.all(
                           color: isSelected
                               ? MboaColors.primary
@@ -267,26 +501,28 @@ class _FormLogementState extends State<_FormLogement> {
             ),
             const SizedBox(height: 20),
 
-            // ── Titre ───────────────────────────────────
+            // ── Titre ───────────────────────────────
             _buildSectionTitle('Titre de l\'annonce'),
             const SizedBox(height: 8),
             TextFormField(
               controller: _titreController,
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
-                hintText: 'Ex: Chambre meublée proche campus IUT',
+                hintText:
+                    'Ex: Chambre meublée proche campus IUT',
               ),
               validator: (v) =>
                   v == null || v.isEmpty ? 'Requis' : null,
             ),
             const SizedBox(height: 20),
 
-            // ── Prix & Surface ───────────────────────────
+            // ── Prix & Surface ───────────────────────
             Row(
               children: [
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
                       _buildSectionTitle('Prix / mois (FCFA)'),
                       const SizedBox(height: 8),
@@ -294,11 +530,17 @@ class _FormLogementState extends State<_FormLogement> {
                         controller: _prixController,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
-                          hintText: '20 000',
+                          hintText: '20000',
                           suffixText: 'FCFA',
                         ),
-                        validator: (v) =>
-                            v == null || v.isEmpty ? 'Requis' : null,
+                        validator: (v) {
+                          if (v == null || v.isEmpty)
+                            return 'Requis';
+                          if (int.tryParse(v
+                                  .replaceAll(' ', '')) ==
+                              null) return 'Invalide';
+                          return null;
+                        },
                       ),
                     ],
                   ),
@@ -306,7 +548,8 @@ class _FormLogementState extends State<_FormLogement> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
                       _buildSectionTitle('Surface (m²)'),
                       const SizedBox(height: 8),
@@ -325,7 +568,7 @@ class _FormLogementState extends State<_FormLogement> {
             ),
             const SizedBox(height: 20),
 
-            // ── Quartier ─────────────────────────────────
+            // ── Quartier ─────────────────────────────
             _buildSectionTitle('Quartier'),
             const SizedBox(height: 8),
             TextFormField(
@@ -340,7 +583,74 @@ class _FormLogementState extends State<_FormLogement> {
             ),
             const SizedBox(height: 20),
 
-            // ── Description ──────────────────────────────
+            // ── Position GPS ─────────────────────────
+            _buildSectionTitle('📍 Position GPS'),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius:
+                    BorderRadius.circular(MboaSizes.radiusLg),
+                border: Border.all(color: MboaColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_lat != null && _lng != null)
+                    Padding(
+                      padding:
+                          const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          const Icon(
+                              Icons.location_on_rounded,
+                              size: 16,
+                              color: MboaColors.primary),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}',
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: MboaColors.text,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _isGettingLocation
+                          ? null
+                          : _obtenirPosition,
+                      icon: _isGettingLocation
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: MboaColors.primary,
+                              ),
+                            )
+                          : const Icon(Icons.my_location_rounded,
+                              size: 18),
+                      label: Text(_lat != null
+                          ? 'Actualiser ma position'
+                          : 'Ma position'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Description ──────────────────────────
             _buildSectionTitle('Description'),
             const SizedBox(height: 8),
             TextFormField(
@@ -353,37 +663,42 @@ class _FormLogementState extends State<_FormLogement> {
               ),
               validator: (v) {
                 if (v == null || v.isEmpty) return 'Requis';
-                if (v.length < 20) return 'Minimum 20 caractères';
+                if (v.length < 20)
+                  return 'Minimum 20 caractères';
                 return null;
               },
             ),
             const SizedBox(height: 20),
 
-            // ── Équipements ──────────────────────────────
+            // ── Équipements ──────────────────────────
             _buildSectionTitle('Équipements disponibles'),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _equipements.map((eq) {
-                final isSelected = _selectedEquipements.contains(eq);
+              children: AppConstants.equipements.map((eq) {
+                final isSelected = _selectedEquipements
+                    .contains(eq['label']);
                 return GestureDetector(
                   onTap: () => setState(() {
                     if (isSelected) {
-                      _selectedEquipements.remove(eq);
+                      _selectedEquipements
+                          .remove(eq['label']);
                     } else {
-                      _selectedEquipements.add(eq);
+                      _selectedEquipements.add(eq['label']!);
                     }
                   }),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
+                    duration:
+                        const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? MboaColors.primary
                           : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius:
+                          BorderRadius.circular(20),
                       border: Border.all(
                         color: isSelected
                             ? MboaColors.primary
@@ -392,7 +707,9 @@ class _FormLogementState extends State<_FormLogement> {
                       ),
                     ),
                     child: Text(
-                      isSelected ? '✓  $eq' : eq,
+                      isSelected
+                          ? '✓  ${eq['label']}'
+                          : '${eq['icon']}  ${eq['label']}',
                       style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 12,
@@ -408,7 +725,7 @@ class _FormLogementState extends State<_FormLogement> {
             ),
             const SizedBox(height: 32),
 
-            // ── Bouton publier ───────────────────────────
+            // ── Bouton publier ───────────────────────
             SizedBox(
               width: double.infinity,
               height: MboaSizes.buttonHeight,
@@ -423,9 +740,11 @@ class _FormLogementState extends State<_FormLogement> {
                           strokeWidth: 2.5,
                         ),
                       )
-                    : const Icon(Icons.publish_rounded, size: 20),
-                label: Text(
-                    _isLoading ? 'Publication...' : 'Publier le logement'),
+                    : const Icon(Icons.publish_rounded,
+                        size: 20),
+                label: Text(_isLoading
+                    ? 'Publication en cours...'
+                    : 'Publier le logement'),
               ),
             ),
             const SizedBox(height: 20),
@@ -433,35 +752,6 @@ class _FormLogementState extends State<_FormLogement> {
         ),
       ),
     );
-  }
-
-  Future<void> _publier() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_nbPhotos < 3) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Minimum 3 photos requises'),
-          backgroundColor: MboaColors.danger,
-        ),
-      );
-      return;
-    }
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() => _isLoading = false);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Annonce publiée avec succès !'),
-          backgroundColor: MboaColors.primary,
-        ),
-      );
-      _formKey.currentState!.reset();
-      setState(() {
-        _nbPhotos = 0;
-        _selectedEquipements = [];
-      });
-    }
   }
 
   Widget _buildSectionTitle(String title) {
@@ -489,14 +779,18 @@ class _FormArticle extends StatefulWidget {
 
 class _FormArticleState extends State<_FormArticle> {
   final _formKey = GlobalKey<FormState>();
+  final _supabase = Supabase.instance.client;
+  final _picker = ImagePicker();
+
   final _titreController = TextEditingController();
   final _descController = TextEditingController();
   final _prixController = TextEditingController();
+
   String _selectedCategorie = 'Literie';
   String _selectedEtat = 'Bon état';
   bool _negociable = false;
+  List<File> _photos = [];
   bool _isLoading = false;
-  int _nbPhotos = 0;
 
   @override
   void dispose() {
@@ -504,6 +798,111 @@ class _FormArticleState extends State<_FormArticle> {
     _descController.dispose();
     _prixController.dispose();
     super.dispose();
+  }
+
+  Future<void> _ajouterPhoto() async {
+    if (_photos.length >= AppConstants.maxPhotosArticle) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Maximum ${AppConstants.maxPhotosArticle} photos'),
+          backgroundColor: MboaColors.danger,
+        ),
+      );
+      return;
+    }
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 80,
+    );
+    if (picked != null) {
+      setState(() => _photos.add(File(picked.path)));
+    }
+  }
+
+  void _supprimerPhoto(int index) {
+    setState(() => _photos.removeAt(index));
+  }
+
+  Future<List<String>> _uploadPhotos() async {
+    final userId = _supabase.auth.currentUser!.id;
+    final urls = <String>[];
+    for (final photo in _photos) {
+      final fileName =
+          '$userId/${DateTime.now().millisecondsSinceEpoch}_${urls.length}.jpg';
+      await _supabase.storage
+          .from(AppConstants.bucketArticles)
+          .upload(fileName, photo);
+      final url = _supabase.storage
+          .from(AppConstants.bucketArticles)
+          .getPublicUrl(fileName);
+      urls.add(url);
+    }
+    return urls;
+  }
+
+  Future<void> _publier() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_photos.length < AppConstants.minPhotosArticle) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Au moins 1 photo requise'),
+          backgroundColor: MboaColors.danger,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final photoUrls = await _uploadPhotos();
+
+      await _supabase.from(AppConstants.tableArticles).insert({
+        'titre': _titreController.text.trim(),
+        'description': _descController.text.trim(),
+        'categorie': _selectedCategorie,
+        'etat': _selectedEtat,
+        'prix': int.parse(
+            _prixController.text.trim().replaceAll(' ', '')),
+        'negociable': _negociable,
+        'photos': photoUrls,
+        'vendeur_id': _supabase.auth.currentUser!.id,
+        'statut': AppConstants.statutDisponible,
+        'boosted': false,
+        'vues': 0,
+        'signalements': 0,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Article publié avec succès !'),
+            backgroundColor: MboaColors.secondary,
+          ),
+        );
+        _formKey.currentState!.reset();
+        setState(() {
+          _photos = [];
+          _selectedCategorie = 'Literie';
+          _selectedEtat = 'Bon état';
+          _negociable = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur : ${e.toString()}'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -517,104 +916,151 @@ class _FormArticleState extends State<_FormArticle> {
           children: [
             const SizedBox(height: 8),
 
-            // ── Photos ──────────────────────────────────
+            // ── Photos ──────────────────────────────
             _buildSectionTitle('📷 Photos de l\'article'),
             const SizedBox(height: 4),
-            Text(
-              'Minimum 1 photo obligatoire',
-              style: MboaTextStyles.caption.copyWith(
-                color: MboaColors.danger,
+            RichText(
+              text: TextSpan(
+                style: MboaTextStyles.caption,
+                children: [
+                  const TextSpan(
+                    text: 'Minimum 1 photo · ',
+                    style:
+                        TextStyle(color: MboaColors.danger),
+                  ),
+                  TextSpan(
+                    text:
+                        '${_photos.length}/${AppConstants.maxPhotosArticle} ajoutées',
+                    style: const TextStyle(
+                        color: MboaColors.secondary,
+                        fontWeight: FontWeight.w700),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 12),
             SizedBox(
               height: 100,
-              child: ListView.separated(
+              child: ListView(
                 scrollDirection: Axis.horizontal,
-                itemCount: 3,
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
-                itemBuilder: (context, index) {
-                  final hasPhoto = index < _nbPhotos;
-                  return GestureDetector(
-                    onTap: () {
-                      if (!hasPhoto && _nbPhotos == index) {
-                        setState(() => _nbPhotos++);
-                      }
-                    },
-                    child: Container(
-                      width: 100,
-                      decoration: BoxDecoration(
-                        color: hasPhoto
-                            ? MboaColors.secondary.withValues(alpha: 0.1)
-                            : MboaColors.background,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: hasPhoto
-                              ? MboaColors.secondary
-                              : MboaColors.border,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            hasPhoto
-                                ? Icons.check_circle_rounded
-                                : Icons.add_photo_alternate_outlined,
-                            color: hasPhoto
-                                ? MboaColors.secondary
-                                : MboaColors.textMuted,
-                            size: 28,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            hasPhoto
-                                ? 'Photo ${index + 1}'
-                                : index == 0
-                                    ? 'Ajouter'
-                                    : '+ Photo',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: hasPhoto
-                                  ? MboaColors.secondary
-                                  : MboaColors.textMuted,
+                children: [
+                  ..._photos.asMap().entries.map((entry) {
+                    return Stack(
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          margin:
+                              const EdgeInsets.only(right: 10),
+                          decoration: BoxDecoration(
+                            borderRadius:
+                                BorderRadius.circular(12),
+                            image: DecorationImage(
+                              image: FileImage(entry.value),
+                              fit: BoxFit.cover,
                             ),
                           ),
-                        ],
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 14,
+                          child: GestureDetector(
+                            onTap: () =>
+                                _supprimerPhoto(entry.key),
+                            child: Container(
+                              width: 22,
+                              height: 22,
+                              decoration: const BoxDecoration(
+                                color: MboaColors.danger,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                  if (_photos.length <
+                      AppConstants.maxPhotosArticle)
+                    GestureDetector(
+                      onTap: _ajouterPhoto,
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: MboaColors.secondary
+                              .withValues(alpha: 0.06),
+                          borderRadius:
+                              BorderRadius.circular(12),
+                          border: Border.all(
+                            color: MboaColors.secondary
+                                .withValues(alpha: 0.3),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment:
+                              MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons
+                                  .add_photo_alternate_outlined,
+                              color: MboaColors.secondary,
+                              size: 28,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _photos.isEmpty
+                                  ? 'Ajouter'
+                                  : '+ Photo',
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: MboaColors.secondary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  );
-                },
+                ],
               ),
             ),
             const SizedBox(height: 24),
 
-            // ── Catégorie ────────────────────────────────
+            // ── Catégorie ────────────────────────────
             _buildSectionTitle('Catégorie'),
             const SizedBox(height: 12),
             SizedBox(
               height: 36,
               child: ListView(
                 scrollDirection: Axis.horizontal,
-                children: AppConstants.categoriesMarket.map((cat) {
+                children:
+                    AppConstants.categoriesMarket.map((cat) {
                   final isSelected =
                       _selectedCategorie == cat['label'];
                   return GestureDetector(
-                    onTap: () => setState(
-                        () => _selectedCategorie = cat['label']!),
+                    onTap: () => setState(() =>
+                        _selectedCategorie = cat['label']!),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.only(right: 8),
+                      duration:
+                          const Duration(milliseconds: 200),
+                      margin:
+                          const EdgeInsets.only(right: 8),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
                         color: isSelected
                             ? MboaColors.secondary
                             : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius:
+                            BorderRadius.circular(20),
                         border: Border.all(
                           color: isSelected
                               ? MboaColors.secondary
@@ -625,7 +1071,8 @@ class _FormArticleState extends State<_FormArticle> {
                       child: Row(
                         children: [
                           Text(cat['icon']!,
-                              style: const TextStyle(fontSize: 14)),
+                              style: const TextStyle(
+                                  fontSize: 14)),
                           const SizedBox(width: 6),
                           Text(
                             cat['label']!,
@@ -647,25 +1094,29 @@ class _FormArticleState extends State<_FormArticle> {
             ),
             const SizedBox(height: 20),
 
-            // ── État ─────────────────────────────────────
+            // ── État ─────────────────────────────────
             _buildSectionTitle('État de l\'article'),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: AppConstants.etatsArticle.map((etat) {
+              children:
+                  AppConstants.etatsArticle.map((etat) {
                 final isSelected = _selectedEtat == etat;
                 return GestureDetector(
-                  onTap: () => setState(() => _selectedEtat = etat),
+                  onTap: () =>
+                      setState(() => _selectedEtat = etat),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
+                    duration:
+                        const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? MboaColors.accent
                           : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius:
+                          BorderRadius.circular(20),
                       border: Border.all(
                         color: isSelected
                             ? MboaColors.accent
@@ -690,21 +1141,22 @@ class _FormArticleState extends State<_FormArticle> {
             ),
             const SizedBox(height: 20),
 
-            // ── Titre ───────────────────────────────────
+            // ── Titre ───────────────────────────────
             _buildSectionTitle('Titre de l\'article'),
             const SizedBox(height: 8),
             TextFormField(
               controller: _titreController,
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
-                hintText: 'Ex: Lit 2 places + matelas en bon état',
+                hintText:
+                    'Ex: Lit 2 places + matelas en bon état',
               ),
               validator: (v) =>
                   v == null || v.isEmpty ? 'Requis' : null,
             ),
             const SizedBox(height: 20),
 
-            // ── Prix ─────────────────────────────────────
+            // ── Prix ─────────────────────────────────
             _buildSectionTitle('Prix (FCFA)'),
             const SizedBox(height: 8),
             Row(
@@ -714,11 +1166,17 @@ class _FormArticleState extends State<_FormArticle> {
                     controller: _prixController,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      hintText: '15 000',
+                      hintText: '15000',
                       suffixText: 'FCFA',
                     ),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Requis' : null,
+                    validator: (v) {
+                      if (v == null || v.isEmpty)
+                        return 'Requis';
+                      if (int.tryParse(
+                              v.replaceAll(' ', '')) ==
+                          null) return 'Invalide';
+                      return null;
+                    },
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -745,7 +1203,7 @@ class _FormArticleState extends State<_FormArticle> {
             ),
             const SizedBox(height: 20),
 
-            // ── Description ──────────────────────────────
+            // ── Description ──────────────────────────
             _buildSectionTitle('Description'),
             const SizedBox(height: 8),
             TextFormField(
@@ -758,13 +1216,14 @@ class _FormArticleState extends State<_FormArticle> {
               ),
               validator: (v) {
                 if (v == null || v.isEmpty) return 'Requis';
-                if (v.length < 20) return 'Minimum 20 caractères';
+                if (v.length < 20)
+                  return 'Minimum 20 caractères';
                 return null;
               },
             ),
             const SizedBox(height: 32),
 
-            // ── Bouton publier ───────────────────────────
+            // ── Bouton publier ───────────────────────
             SizedBox(
               width: double.infinity,
               height: MboaSizes.buttonHeight,
@@ -782,9 +1241,11 @@ class _FormArticleState extends State<_FormArticle> {
                           strokeWidth: 2.5,
                         ),
                       )
-                    : const Icon(Icons.publish_rounded, size: 20),
-                label: Text(
-                    _isLoading ? 'Publication...' : 'Publier l\'article'),
+                    : const Icon(Icons.publish_rounded,
+                        size: 20),
+                label: Text(_isLoading
+                    ? 'Publication en cours...'
+                    : 'Publier l\'article'),
               ),
             ),
             const SizedBox(height: 20),
@@ -792,32 +1253,6 @@ class _FormArticleState extends State<_FormArticle> {
         ),
       ),
     );
-  }
-
-  Future<void> _publier() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_nbPhotos < 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Au moins 1 photo requise'),
-          backgroundColor: MboaColors.danger,
-        ),
-      );
-      return;
-    }
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() => _isLoading = false);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Article publié avec succès !'),
-          backgroundColor: MboaColors.secondary,
-        ),
-      );
-      _formKey.currentState!.reset();
-      setState(() => _nbPhotos = 0);
-    }
   }
 
   Widget _buildSectionTitle(String title) {

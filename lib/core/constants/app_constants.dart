@@ -8,8 +8,8 @@ class AppConstants {
 
   // ── Supabase ──────────────────────────────────────────────
   // Tu remplaceras ces valeurs après la config Supabase
-  static const String supabaseUrl     = 'https://ykurnvpdbkytwkqvrpxd.supabase.co';
-  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrdXJudnBkYmt5dHdrcXZycHhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2ODYxNTUsImV4cCI6MjA5NjI2MjE1NX0.eD-md24ccfqGAeLxQplNgm8PXRpyf75q3vFzquFBPrk';
+  static const String supabaseUrl     = 'https://vodmsndqahmxdsqpayrd.supabase.co';
+  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvZG1zbmRxYWhteGRzcXBheXJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwNjAzNTQsImV4cCI6MjA5OTYzNjM1NH0.6htojTsGc1EfSZygNrFq4I7tvv8k8vmhnATdofVEM6I';
 
   // ── Ville par défaut ──────────────────────────────────────
   static const String defaultVille   = 'Sangmelima';

@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Gradle / Kotlin build state (regenerated locally, not needed in VCS)
+/android/.gradle/
+/android/.kotlin/
+/android/app/build/
