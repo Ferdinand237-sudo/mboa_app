@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
@@ -20,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isLoadingGoogle = false;
   bool _rememberMe = false;
 
   @override
@@ -98,6 +100,27 @@ class _LoginScreenState extends State<LoginScreen> {
       return 'Veuillez confirmer votre email';
     }
     return 'Une erreur est survenue. Réessayez.';
+  }
+
+  Future<void> _connexionGoogle() async {
+    setState(() => _isLoadingGoogle = true);
+    try {
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'com.mboa.app://login-callback',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Impossible d\'ouvrir la connexion Google'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingGoogle = false);
+    }
   }
 
   @override
@@ -347,28 +370,35 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: double.infinity,
                         height: MboaSizes.buttonHeight,
                         child: OutlinedButton(
-                          onPressed: () {},
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text(
-                                'G',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  color: MboaColors.primary,
+                          onPressed:
+                              _isLoadingGoogle ? null : _connexionGoogle,
+                          child: _isLoadingGoogle
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    color: MboaColors.primary,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.center,
+                                  children: [
+                                    SvgPicture.asset(
+                                      'assets/icons/google_logo.svg',
+                                      width: 20,
+                                      height: 20,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      'Continuer avec Google',
+                                      style: MboaTextStyles.button.copyWith(
+                                        color: MboaColors.primary,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                'Continuer avec Google',
-                                style: MboaTextStyles.button.copyWith(
-                                  color: MboaColors.primary,
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
                       ),
                       const SizedBox(height: 32),

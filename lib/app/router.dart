@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -22,10 +24,31 @@ class AppRoutes {
   static const String admin = '/admin';
 }
 
+// ── Écoute les changements d'état d'authentification (utile pour la
+// redirection automatique après une connexion OAuth via navigateur) ──
+class GoRouterRefreshStream extends ChangeNotifier {
+  late final StreamSubscription<dynamic> _subscription;
+
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    _subscription = stream.listen((_) => notifyListeners());
+  }
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+}
+
 // ── Provider du router ────────────────────────────────────────
 final routerProvider = Provider<GoRouter>((ref) {
+  final refreshStream =
+      GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange);
+  ref.onDispose(refreshStream.dispose);
+
   return GoRouter(
     initialLocation: AppRoutes.splash,
+    refreshListenable: refreshStream,
     redirect: (context, state) {
       final session = Supabase.instance.client.auth.currentSession;
       final isLoggedIn = session != null;
