@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../logement/screens/logement_detail_screen.dart';
+import 'lieux_recherche_resultats_screen.dart';
 
 class MapScreen extends StatefulWidget {
   final Map<String, dynamic>? focusLogement;
@@ -21,7 +23,11 @@ class _MapScreenState extends State<MapScreen> {
   final _mapController = MapController();
 
   List<Map<String, dynamic>> _logements = [];
+  List<Map<String, dynamic>> _lieuxPublics = [];
   Map<String, dynamic>? _selectedLogement;
+  Map<String, dynamic>? _selectedLieu;
+  Position? _userPosition;
+  bool _isAdmin = false;
   bool _isLoading = true;
   String _selectedFilter = 'Tous';
 
@@ -38,65 +44,30 @@ class _MapScreenState extends State<MapScreen> {
           AppConstants.defaultLng,
         );
 
-  // Points d'intérêt fixes
-  final List<Map<String, dynamic>> _pointsInteret = [
-    {
-      'label': 'Campus IUT',
-      'icon': '🎓',
-      'lat': 2.9350,
-      'lng': 11.9820,
-      'color': 0xFF2D6A4F,
-    },
-    {
-      'label': 'Hôpital District',
-      'icon': '🏥',
-      'lat': 2.9280,
-      'lng': 11.9800,
-      'color': 0xFFEF4444,
-    },
-    {
-      'label': 'Grand Marché',
-      'icon': '🛒',
-      'lat': 2.9320,
-      'lng': 11.9860,
-      'color': 0xFFF4A261,
-    },
-    {
-      'label': 'Commissariat',
-      'icon': '🚔',
-      'lat': 2.9340,
-      'lng': 11.9840,
-      'color': 0xFF1A1A2E,
-    },
-    {
-      'label': 'Pharmacie',
-      'icon': '💊',
-      'lat': 2.9310,
-      'lng': 11.9830,
-      'color': 0xFF10B981,
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
-    _chargerLogements();
+    _chargerDonnees();
+    _chargerRole();
+    _localiserUtilisateur();
   }
 
-  Future<void> _chargerLogements() async {
+  Future<void> _chargerDonnees() async {
     try {
-      final data = await _supabase
-          .from('logements')
-          .select(
-              '*, proprietaire:users!proprietaire_id(nom, verified)')
-          .eq('statut', 'disponible')
-          .not('lat', 'is', null)
-          .not('lng', 'is', null);
+      final results = await Future.wait([
+        _supabase
+            .from('logements')
+            .select('*, proprietaire:users!proprietaire_id(nom, verified)')
+            .eq('statut', 'disponible')
+            .not('lat', 'is', null)
+            .not('lng', 'is', null),
+        _supabase.from('lieux_publics').select(),
+      ]);
 
       if (mounted) {
         setState(() {
-          _logements =
-              List<Map<String, dynamic>>.from(data);
+          _logements = List<Map<String, dynamic>>.from(results[0]);
+          _lieuxPublics = List<Map<String, dynamic>>.from(results[1]);
           _isLoading = false;
         });
 
@@ -114,11 +85,51 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  Future<void> _chargerRole() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final data = await _supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+      if (mounted) setState(() => _isAdmin = data['role'] == 'admin');
+    } catch (_) {}
+  }
+
+  Future<void> _localiserUtilisateur() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition();
+      if (mounted) setState(() => _userPosition = position);
+    } catch (_) {}
+  }
+
   List<Map<String, dynamic>> get _filteredLogements {
     if (_selectedFilter == 'Tous') return _logements;
+    if (_selectedFilter == '📍 Lieux') return [];
     return _logements
         .where((l) => l['type'] == _selectedFilter)
         .toList();
+  }
+
+  bool get _afficherLieux =>
+      _selectedFilter == 'Tous' || _selectedFilter == '📍 Lieux';
+
+  Map<String, dynamic> _categorieInfo(String categorie) {
+    return AppConstants.categoriesLieuxPublics.firstWhere(
+      (c) => c['valeur'] == categorie,
+      orElse: () => AppConstants.categoriesLieuxPublics.last,
+    );
   }
 
   String _formatPrix(dynamic prix) {
@@ -132,13 +143,182 @@ class _MapScreenState extends State<MapScreen> {
         ' F';
   }
 
-  Future<void> _ouvrirItineraire(
-      double lat, double lng) async {
+  String _formatDistanceUtilisateur(double lat, double lng) {
+    if (_userPosition == null) return '';
+    final metres = Geolocator.distanceBetween(
+        _userPosition!.latitude, _userPosition!.longitude, lat, lng);
+    return metres < 1000
+        ? '${metres.round()} m de vous'
+        : '${(metres / 1000).toStringAsFixed(1)} km de vous';
+  }
+
+  Future<void> _ouvrirItineraire(double lat, double lng) async {
+    final origine = _userPosition != null
+        ? '${_userPosition!.latitude},${_userPosition!.longitude}'
+        : '';
     final url = Uri.parse(
-        'https://www.openstreetmap.org/directions?from=&to=$lat,$lng');
+        'https://www.google.com/maps/dir/?api=1&origin=$origine&destination=$lat,$lng&travelmode=walking');
     if (await canLaunchUrl(url)) {
-      await launchUrl(url,
-          mode: LaunchMode.externalApplication);
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _ajouterLieuIci() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Activez la localisation pour ajouter un lieu'),
+              backgroundColor: MboaColors.danger,
+            ),
+          );
+        }
+        return;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Permission de localisation refusée'),
+              backgroundColor: MboaColors.danger,
+            ),
+          );
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
+
+      final nomController = TextEditingController();
+      String categorieChoisie = 'autre';
+
+      final confirme = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
+            ),
+            title: const Text(
+              '📍 Ajouter un lieu ici',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: MboaColors.text,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Position captée : ${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}',
+                  style: MboaTextStyles.caption,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nomController,
+                  decoration: InputDecoration(
+                    hintText: 'Nom du lieu (ex: Université Inter-États)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(MboaSizes.radiusMd),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: AppConstants.categoriesLieuxPublics.map((c) {
+                    final selected = categorieChoisie == c['valeur'];
+                    return GestureDetector(
+                      onTap: () => setDialogState(
+                          () => categorieChoisie = c['valeur']),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? Color(c['color']).withValues(alpha: 0.15)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: selected
+                                ? Color(c['color'])
+                                : MboaColors.border,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Text(
+                          '${c['icon']} ${c['label']}',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: selected
+                                ? Color(c['color'])
+                                : MboaColors.text,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: nomController.text.trim().isEmpty
+                    ? null
+                    : () => Navigator.pop(dialogContext, true),
+                child: const Text('Ajouter'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (confirme != true || nomController.text.trim().isEmpty) return;
+
+      await _supabase.from('lieux_publics').insert({
+        'nom': nomController.text.trim(),
+        'categorie': categorieChoisie,
+        'lat': position.latitude,
+        'lng': position.longitude,
+        'cree_par': _supabase.auth.currentUser?.id,
+      });
+
+      await _chargerDonnees();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Lieu ajouté avec succès'),
+            backgroundColor: MboaColors.primary,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur : ${e.toString()}'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
+      }
     }
   }
 
@@ -169,7 +349,7 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Sangmelima · ${_filteredLogements.length} logement${_filteredLogements.length > 1 ? 's' : ''}',
+                    'Sangmelima · ${_filteredLogements.length} logement${_filteredLogements.length > 1 ? 's' : ''} · ${_lieuxPublics.length} lieu${_lieuxPublics.length > 1 ? 'x' : ''}',
                     style: MboaTextStyles.muted,
                   ),
                   const SizedBox(height: 12),
@@ -184,7 +364,7 @@ class _MapScreenState extends State<MapScreen> {
                         'Chambre',
                         'Studio',
                         'Appartement',
-                        '📍 POI',
+                        '📍 Lieux',
                       ].map((f) {
                         final isSelected =
                             _selectedFilter == f;
@@ -247,10 +427,10 @@ class _MapScreenState extends State<MapScreen> {
                           options: MapOptions(
                             initialCenter: _center,
                             initialZoom: 14.5,
-                            onTap: (_, __) => setState(
-                                () =>
-                                    _selectedLogement =
-                                        null),
+                            onTap: (_, __) => setState(() {
+                              _selectedLogement = null;
+                              _selectedLieu = null;
+                            }),
                           ),
                           children: [
                             // Tuiles OpenStreetMap
@@ -261,8 +441,36 @@ class _MapScreenState extends State<MapScreen> {
                                   'com.mboa.app',
                             ),
 
+                            // Marqueur position utilisateur
+                            if (_userPosition != null)
+                              MarkerLayer(markers: [
+                                Marker(
+                                  point: LatLng(
+                                      _userPosition!.latitude,
+                                      _userPosition!.longitude),
+                                  width: 22,
+                                  height: 22,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: Colors.white,
+                                          width: 3),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.blue
+                                              .withValues(alpha: 0.4),
+                                          blurRadius: 8,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ]),
+
                             // Marqueurs logements
-                            if (_selectedFilter != '📍 POI')
+                            if (_selectedFilter != '📍 Lieux')
                               MarkerLayer(
                                 markers: _filteredLogements
                                     .where((l) =>
@@ -287,10 +495,10 @@ class _MapScreenState extends State<MapScreen> {
                                         ? 50
                                         : 40,
                                     child: GestureDetector(
-                                      onTap: () => setState(
-                                          () =>
-                                              _selectedLogement =
-                                                  l),
+                                      onTap: () => setState(() {
+                                        _selectedLogement = l;
+                                        _selectedLieu = null;
+                                      }),
                                       child:
                                           _buildLogementMarker(
                                               l, isSelected),
@@ -299,23 +507,28 @@ class _MapScreenState extends State<MapScreen> {
                                 }).toList(),
                               ),
 
-                            // Marqueurs POI
-                            if (_selectedFilter == '📍 POI' ||
-                                _selectedFilter == 'Tous')
+                            // Marqueurs lieux publics
+                            if (_afficherLieux)
                               MarkerLayer(
-                                markers: _pointsInteret
-                                    .map((poi) => Marker(
-                                          point: LatLng(
-                                            poi['lat'],
-                                            poi['lng'],
-                                          ),
-                                          width: 80,
-                                          height: 60,
-                                          child:
-                                              _buildPoiMarker(
-                                                  poi),
-                                        ))
-                                    .toList(),
+                                markers: _lieuxPublics.map((lieu) {
+                                  final cat = _categorieInfo(
+                                      lieu['categorie'] ?? 'autre');
+                                  return Marker(
+                                    point: LatLng(
+                                      (lieu['lat'] as num).toDouble(),
+                                      (lieu['lng'] as num).toDouble(),
+                                    ),
+                                    width: 80,
+                                    height: 60,
+                                    child: GestureDetector(
+                                      onTap: () => setState(() {
+                                        _selectedLieu = lieu;
+                                        _selectedLogement = null;
+                                      }),
+                                      child: _buildLieuMarker(lieu, cat),
+                                    ),
+                                  );
+                                }).toList(),
                               ),
                           ],
                         ),
@@ -323,9 +536,10 @@ class _MapScreenState extends State<MapScreen> {
                   // ── Boutons contrôle ──────────────
                   Positioned(
                     right: 16,
-                    bottom: _selectedLogement != null
-                        ? 220
-                        : 20,
+                    bottom:
+                        (_selectedLogement != null || _selectedLieu != null)
+                            ? 240
+                            : 20,
                     child: Column(
                       children: [
                         // Recentrer
@@ -366,49 +580,50 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ),
 
-                  // ── Légende ───────────────────────
-                  Positioned(
-                    left: 16,
-                    bottom: _selectedLogement != null
-                        ? 220
-                        : 20,
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius:
-                            BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black
-                                .withValues(alpha: 0.1),
-                            blurRadius: 8,
+                  // ── Bouton admin : ajouter un lieu ────
+                  if (_isAdmin)
+                    Positioned(
+                      left: 16,
+                      bottom:
+                          (_selectedLogement != null || _selectedLieu != null)
+                              ? 240
+                              : 20,
+                      child: GestureDetector(
+                        onTap: _ajouterLieuIci,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: MboaColors.primary,
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: MboaColors.primary
+                                    .withValues(alpha: 0.4),
+                                blurRadius: 10,
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                        children: [
-                          _buildLegende(
-                              '🏠', 'Logement',
-                              MboaColors.primary),
-                          const SizedBox(height: 6),
-                          _buildLegende(
-                              '🎓', 'Campus',
-                              MboaColors.primaryLight),
-                          const SizedBox(height: 6),
-                          _buildLegende(
-                              '🏥', 'Hôpital',
-                              MboaColors.danger),
-                          const SizedBox(height: 6),
-                          _buildLegende(
-                              '🛒', 'Marché',
-                              MboaColors.secondary),
-                        ],
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add_location_alt_rounded,
+                                  color: Colors.white, size: 18),
+                              SizedBox(width: 6),
+                              Text(
+                                'Ajouter un lieu ici',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
 
                   // ── Fiche logement sélectionné ────
                   if (_selectedLogement != null)
@@ -418,6 +633,15 @@ class _MapScreenState extends State<MapScreen> {
                       right: 0,
                       child: _buildLogementCard(
                           _selectedLogement!),
+                    ),
+
+                  // ── Fiche lieu public sélectionné ────
+                  if (_selectedLieu != null)
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: _buildLieuCard(_selectedLieu!),
                     ),
                 ],
               ),
@@ -475,24 +699,25 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _buildPoiMarker(Map<String, dynamic> poi) {
+  Widget _buildLieuMarker(
+      Map<String, dynamic> lieu, Map<String, dynamic> cat) {
     return Column(
       children: [
         Container(
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: Color(poi['color'])
+            color: Color(cat['color'])
                 .withValues(alpha: 0.15),
             shape: BoxShape.circle,
             border: Border.all(
-              color: Color(poi['color']),
+              color: Color(cat['color']),
               width: 2,
             ),
           ),
           child: Center(
             child: Text(
-              poi['icon'],
+              cat['icon'],
               style: const TextStyle(fontSize: 18),
             ),
           ),
@@ -511,16 +736,132 @@ class _MapScreenState extends State<MapScreen> {
             ],
           ),
           child: Text(
-            poi['label'],
+            lieu['nom'] ?? '',
             style: TextStyle(
               fontFamily: 'Poppins',
               fontSize: 9,
               fontWeight: FontWeight.w700,
-              color: Color(poi['color']),
+              color: Color(cat['color']),
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildLieuCard(Map<String, dynamic> lieu) {
+    final cat = _categorieInfo(lieu['categorie'] ?? 'autre');
+    final lat = (lieu['lat'] as num).toDouble();
+    final lng = (lieu['lng'] as num).toDouble();
+    final distance = _formatDistanceUtilisateur(lat, lng);
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(MboaSizes.radiusXl),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 14),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: MboaColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Color(cat['color']).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(cat['icon'],
+                      style: const TextStyle(fontSize: 24)),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      lieu['nom'] ?? '',
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: MboaColors.text,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      distance.isNotEmpty
+                          ? '${cat['label']} · $distance'
+                          : cat['label'],
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        color: Color(cat['color']),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _ouvrirItineraire(lat, lng),
+                  icon: const Icon(Icons.directions_rounded, size: 16),
+                  label: const Text('Itinéraire'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => LieuxRechercheResultatsScreen(
+                        lieuNom: lieu['nom'] ?? '',
+                        lat: lat,
+                        lng: lng,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.search_rounded, size: 16),
+                  label: const Text('Autour de ce lieu'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -721,27 +1062,6 @@ class _MapScreenState extends State<MapScreen> {
         child:
             Icon(icon, color: MboaColors.primary, size: 20),
       ),
-    );
-  }
-
-  Widget _buildLegende(
-      String emoji, String label, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(emoji,
-            style: const TextStyle(fontSize: 12)),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
-        ),
-      ],
     );
   }
 

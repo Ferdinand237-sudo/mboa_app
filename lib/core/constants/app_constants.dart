@@ -45,14 +45,19 @@ class AppConstants {
   static const int joursAvantExpiration  = 60;
   static const double tailleMaxImageMb   = 5.0;
 
-  // ── Points d'intérêt par défaut ───────────────────────────
-  static const List<Map<String, dynamic>> pointsInteret = [
-    {'label': 'Campus IUT',       'icon': '🎓', 'type': 'campus'},
-    {'label': 'Hôpital District', 'icon': '🏥', 'type': 'hopital'},
-    {'label': 'Grand Marché',     'icon': '🛒', 'type': 'marche'},
-    {'label': 'Commissariat',     'icon': '🚔', 'type': 'police'},
-    {'label': 'Pharmacie',        'icon': '💊', 'type': 'pharmacie'},
+  // ── Catégories de lieux publics (ajoutés par l'admin sur la carte) ──
+  static const List<Map<String, dynamic>> categoriesLieuxPublics = [
+    {'valeur': 'ecole',        'label': 'École',        'icon': '🎓', 'color': 0xFF2D6A4F},
+    {'valeur': 'eglise',       'label': 'Église',       'icon': '⛪', 'color': 0xFFF4A261},
+    {'valeur': 'hopital',      'label': 'Hôpital',      'icon': '🏥', 'color': 0xFFEF4444},
+    {'valeur': 'marche',       'label': 'Marché',       'icon': '🛒', 'color': 0xFFF4A261},
+    {'valeur': 'pharmacie',    'label': 'Pharmacie',    'icon': '💊', 'color': 0xFF10B981},
+    {'valeur': 'commissariat', 'label': 'Commissariat', 'icon': '🚔', 'color': 0xFF1A1A2E},
+    {'valeur': 'autre',        'label': 'Autre',        'icon': '📍', 'color': 0xFF6B7280},
   ];
+
+  // ── Rayons de recherche autour d'un lieu (km) ─────────────
+  static const List<double> rayonsRechercheKm = [0.5, 1, 1.5, 2, 3, 5];
 
   // ── Types de logement ─────────────────────────────────────
   static const List<String> typesLogement = [

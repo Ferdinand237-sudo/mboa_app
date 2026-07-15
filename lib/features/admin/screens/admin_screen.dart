@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../app/router.dart';
+import '../../map/screens/map_screen.dart';
 import 'admin_users_screen.dart';
 import 'admin_annonces_screen.dart';
 import 'admin_signalements_screen.dart';
@@ -321,12 +322,30 @@ class _DashboardTabState extends State<_DashboardTab> {
                     const SizedBox(height: 12),
 
                     _buildActionCard(
+                      icon: Icons.map_rounded,
+                      titre: 'Gérer la carte',
+                      desc:
+                          'Ajouter des lieux publics (écoles, hôpitaux, marchés...) visibles par tous',
+                      color: MboaColors.primary,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MapScreen(),
+                        ),
+                      ),
+                    ),
+                    _buildActionCard(
                       icon: Icons.person_add_rounded,
                       titre: 'Créer un compte vendeur',
                       desc:
                           'Approuver et créer un compte pour un commerçant ou propriétaire',
-                      color: MboaColors.primary,
-                      onTap: () {},
+                      color: MboaColors.secondary,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminDemandesScreen(),
+                        ),
+                      ),
                     ),
                     _buildActionCard(
                       icon: Icons.rocket_launch_rounded,
