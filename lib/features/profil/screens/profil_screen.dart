@@ -1,28 +1,72 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../app/router.dart';
+import 'edit_profil_screen.dart';
 import 'favoris_screen.dart';
 
 class ProfilScreen extends StatefulWidget {
-  const ProfilScreen({super.key});
+  final VoidCallback? onOuvrirMessages;
+
+  const ProfilScreen({super.key, this.onOuvrirMessages});
 
   @override
   State<ProfilScreen> createState() => _ProfilScreenState();
 }
 
 class _ProfilScreenState extends State<ProfilScreen> {
+  static const _prefsNotificationsKey = 'notifications_activees';
+
   final _supabase = Supabase.instance.client;
   Map<String, dynamic>? _user;
   bool _isLoading = true;
   int _nbFavoris = 0;
+  int _nbMessagesNonLus = 0;
+  bool _notificationsActivees = true;
 
   @override
   void initState() {
     super.initState();
     _chargerProfil();
     _chargerNbFavoris();
+    _chargerNbMessagesNonLus();
+    _chargerPreferenceNotifications();
+  }
+
+  Future<void> _chargerPreferenceNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() => _notificationsActivees =
+          prefs.getBool(_prefsNotificationsKey) ?? true);
+    }
+  }
+
+  Future<void> _basculerNotifications(bool valeur) async {
+    setState(() => _notificationsActivees = valeur);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefsNotificationsKey, valeur);
+  }
+
+  Future<void> _chargerNbMessagesNonLus() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final data = await _supabase
+          .from('conversations')
+          .select('non_lu')
+          .contains('participants', [user.id]);
+      int total = 0;
+      for (final conv in List<Map<String, dynamic>>.from(data)) {
+        final nonLu = conv['non_lu'];
+        if (nonLu is Map && nonLu[user.id] != null) {
+          total += (nonLu[user.id] as num).toInt();
+        }
+      }
+      if (mounted) setState(() => _nbMessagesNonLus = total);
+    } catch (_) {}
   }
 
   Future<void> _chargerNbFavoris() async {
@@ -71,6 +115,193 @@ class _ProfilScreenState extends State<ProfilScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _ouvrirModifierProfil() async {
+    if (_user == null) return;
+    final modifie = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditProfilScreen(user: _user!),
+      ),
+    );
+    if (modifie == true) {
+      _chargerProfil();
+    }
+  }
+
+  void _afficherBientotDisponible() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('🔔 Les alertes de recherche arrivent bientôt !'),
+        backgroundColor: MboaColors.primary,
+      ),
+    );
+  }
+
+  void _ouvrirChangerMotDePasse() {
+    final formKey = GlobalKey<FormState>();
+    final nouveauController = TextEditingController();
+    final confirmController = TextEditingController();
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(MboaSizes.radiusXl),
+          ),
+          title: const Text(
+            '🔒 Changer le mot de passe',
+            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
+          ),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nouveauController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Nouveau mot de passe',
+                  ),
+                  validator: (v) => v == null || v.length < 6
+                      ? 'Minimum 6 caractères'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: confirmController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirmer le mot de passe',
+                  ),
+                  validator: (v) => v != nouveauController.text
+                      ? 'Les mots de passe ne correspondent pas'
+                      : null,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDialogState(() => isSaving = true);
+                      try {
+                        await _supabase.auth.updateUser(
+                          UserAttributes(password: nouveauController.text),
+                        );
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('✅ Mot de passe mis à jour'),
+                              backgroundColor: MboaColors.primary,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setDialogState(() => isSaving = false);
+                        if (dialogContext.mounted) {
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            const SnackBar(
+                              content: Text('Erreur lors du changement de mot de passe'),
+                              backgroundColor: MboaColors.danger,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: const Text('Valider'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _ouvrirConfidentialite() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(MboaSizes.radiusXl),
+        ),
+        title: const Text(
+          '🛡 Confidentialité',
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
+        ),
+        content: const Text(
+          'Mboa protège tes données personnelles : ton numéro WhatsApp et ton '
+          'email ne sont visibles que par les vendeurs/propriétaires avec qui '
+          'tu échanges via le chat de l\'application. Aucune donnée n\'est '
+          'partagée avec des tiers.',
+          style: TextStyle(fontFamily: 'Poppins', color: MboaColors.textMuted, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Compris'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _ouvrirAideSupport() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(MboaSizes.radiusXl),
+        ),
+        title: const Text(
+          '💬 Aide & Support',
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
+        ),
+        content: const Text(
+          'Une question ou un problème avec ton compte, une annonce ou un '
+          'paiement ? Contacte l\'équipe Mboa via le chat de l\'application ou '
+          'par WhatsApp au support Mboa.',
+          style: TextStyle(fontFamily: 'Poppins', color: MboaColors.textMuted, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _ouvrirAPropos() {
+    showAboutDialog(
+      context: context,
+      applicationName: AppConstants.appName,
+      applicationVersion: AppConstants.appVersion,
+      applicationIcon: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.asset(
+          'assets/logo/logo_mboa.png',
+          width: 48,
+          height: 48,
+          errorBuilder: (_, __, ___) => const Text('🏘', style: TextStyle(fontSize: 32)),
+        ),
+      ),
+      applicationLegalese: AppConstants.appSlogan,
+    );
   }
 
   bool get _isConnected => _supabase.auth.currentUser != null;
@@ -144,7 +375,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () {},
+                          onTap: _ouvrirModifierProfil,
                           child: Container(
                             width: 38,
                             height: 38,
@@ -247,7 +478,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                         _buildStatDivider(),
                         _buildStat('0', 'Alertes', '🔔'),
                         _buildStatDivider(),
-                        _buildStat('0', 'Messages', '💬'),
+                        _buildStat('$_nbMessagesNonLus', 'Messages', '💬'),
                       ],
                     ),
                   ),
@@ -283,14 +514,18 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 color: MboaColors.boost,
                 label: 'Mes alertes de recherche',
                 badge: '0',
-                onTap: () {},
+                onTap: _afficherBientotDisponible,
               ),
               _buildMenuItem(
                 icon: Icons.chat_bubble_rounded,
                 color: MboaColors.primary,
                 label: 'Mes messages',
-                badge: '0',
-                onTap: () {},
+                badge: '$_nbMessagesNonLus',
+                onTap: () {
+                  if (widget.onOuvrirMessages != null) {
+                    widget.onOuvrirMessages!();
+                  }
+                },
               ),
             ],
           ),
@@ -305,20 +540,20 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 icon: Icons.person_outline_rounded,
                 color: MboaColors.primary,
                 label: 'Modifier mon profil',
-                onTap: () {},
+                onTap: _ouvrirModifierProfil,
               ),
               _buildMenuItem(
                 icon: Icons.phone_outlined,
                 color: MboaColors.primaryLight,
                 label: 'Mon WhatsApp',
                 subtitle: _user?['telephone'] ?? 'Non renseigné',
-                onTap: () {},
+                onTap: _ouvrirModifierProfil,
               ),
               _buildMenuItem(
                 icon: Icons.lock_outline_rounded,
                 color: MboaColors.textMuted,
                 label: 'Changer le mot de passe',
-                onTap: () {},
+                onTap: _ouvrirChangerMotDePasse,
               ),
             ],
           ),
@@ -334,30 +569,30 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 color: MboaColors.secondary,
                 label: 'Notifications',
                 trailing: Switch(
-                  value: true,
-                  onChanged: (_) {},
+                  value: _notificationsActivees,
+                  onChanged: _basculerNotifications,
                   activeColor: MboaColors.primary,
                 ),
-                onTap: () {},
+                onTap: () => _basculerNotifications(!_notificationsActivees),
               ),
               _buildMenuItem(
                 icon: Icons.shield_outlined,
                 color: MboaColors.primary,
                 label: 'Confidentialité',
-                onTap: () {},
+                onTap: _ouvrirConfidentialite,
               ),
               _buildMenuItem(
                 icon: Icons.help_outline_rounded,
                 color: MboaColors.primaryLight,
                 label: 'Aide & Support',
-                onTap: () {},
+                onTap: _ouvrirAideSupport,
               ),
               _buildMenuItem(
                 icon: Icons.info_outline_rounded,
                 color: MboaColors.textMuted,
                 label: 'À propos de Mboa',
-                subtitle: 'Version 1.0.0',
-                onTap: () {},
+                subtitle: 'Version ${AppConstants.appVersion}',
+                onTap: _ouvrirAPropos,
               ),
             ],
           ),

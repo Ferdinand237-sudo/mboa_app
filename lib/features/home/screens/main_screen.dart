@@ -63,7 +63,7 @@ class _MainScreenState extends State<MainScreen> {
     const LogementScreen(),
     const MarketScreen(),
     const ChatScreen(),
-    const ProfilScreen(),
+    ProfilScreen(onOuvrirMessages: () => setState(() => _currentIndex = 3)),
   ];
 
   List<_NavItem> get _navItemsVisiteur => [
@@ -80,7 +80,7 @@ class _MainScreenState extends State<MainScreen> {
     const LogementScreen(),
     const PublierScreen(),
     const ChatScreen(),
-    const ProfilScreen(),
+    ProfilScreen(onOuvrirMessages: () => setState(() => _currentIndex = 3)),
   ];
 
   List<_NavItem> get _navItemsVendeur => [

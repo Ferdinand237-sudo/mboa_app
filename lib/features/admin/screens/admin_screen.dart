@@ -304,7 +304,12 @@ class _DashboardTabState extends State<_DashboardTab> {
                           desc:
                               '${_stats['signalements']} signalement(s) à traiter',
                           color: MboaColors.danger,
-                          onTap: () {},
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AdminSignalementsScreen(),
+                            ),
+                          ),
                         ),
                       const SizedBox(height: 24),
                     ],
@@ -353,7 +358,12 @@ class _DashboardTabState extends State<_DashboardTab> {
                       desc:
                           'Mettre en avant une annonce logement ou marketplace',
                       color: MboaColors.boost,
-                      onTap: () {},
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminAnnoncesScreen(),
+                        ),
+                      ),
                     ),
                     _buildActionCard(
                       icon: Icons.verified_rounded,
@@ -361,7 +371,12 @@ class _DashboardTabState extends State<_DashboardTab> {
                       desc:
                           'Attribuer le badge Vérifié à un vendeur de confiance',
                       color: MboaColors.verified,
-                      onTap: () {},
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminUsersScreen(),
+                        ),
+                      ),
                     ),
                     _buildActionCard(
                       icon: Icons.block_rounded,
@@ -369,7 +384,12 @@ class _DashboardTabState extends State<_DashboardTab> {
                       desc:
                           'Bannir ou réactiver un compte utilisateur',
                       color: MboaColors.danger,
-                      onTap: () {},
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminUsersScreen(),
+                        ),
+                      ),
                     ),
                   ],
                 ),
