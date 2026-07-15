@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +16,25 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   int _selectedType = -1; // 0 = étudiant, 1 = commerçant
   bool _isLoadingGoogle = false;
+  StreamSubscription<AuthState>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Filet de sécurité : redirige immédiatement si l'inscription Google
+    // se termine pendant que cet écran est encore affiché.
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.signedIn && mounted) {
+        context.go(AppRoutes.main);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
 
   Future<void> _connexionGoogle() async {
     setState(() => _isLoadingGoogle = true);

@@ -1,10 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../app/router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,7 +16,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static const _prefsRememberedEmailKey = 'remembered_email';
+  static const _secureStorage = FlutterSecureStorage();
+  static const _keyRememberedEmail = 'remembered_email';
+  static const _keyRememberedPassword = 'remembered_password';
 
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -23,19 +27,29 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _isLoadingGoogle = false;
   bool _rememberMe = false;
+  StreamSubscription<AuthState>? _authSub;
 
   @override
   void initState() {
     super.initState();
-    _chargerEmailMemorise();
+    _chargerIdentifiantsMemorises();
+    // Filet de sécurité : si la connexion Google se termine pendant que
+    // cet écran est encore affiché, on redirige immédiatement sans
+    // attendre une éventuelle action de l'utilisateur.
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.signedIn && mounted) {
+        context.go(AppRoutes.main);
+      }
+    });
   }
 
-  Future<void> _chargerEmailMemorise() async {
-    final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString(_prefsRememberedEmailKey);
+  Future<void> _chargerIdentifiantsMemorises() async {
+    final email = await _secureStorage.read(key: _keyRememberedEmail);
+    final password = await _secureStorage.read(key: _keyRememberedPassword);
     if (email != null && mounted) {
       setState(() {
         _emailController.text = email;
+        if (password != null) _passwordController.text = password;
         _rememberMe = true;
       });
     }
@@ -43,6 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -60,12 +75,15 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text.trim(),
       );
 
-      final prefs = await SharedPreferences.getInstance();
       if (_rememberMe) {
-        await prefs.setString(
-            _prefsRememberedEmailKey, _emailController.text.trim());
+        await _secureStorage.write(
+            key: _keyRememberedEmail, value: _emailController.text.trim());
+        await _secureStorage.write(
+            key: _keyRememberedPassword,
+            value: _passwordController.text.trim());
       } else {
-        await prefs.remove(_prefsRememberedEmailKey);
+        await _secureStorage.delete(key: _keyRememberedEmail);
+        await _secureStorage.delete(key: _keyRememberedPassword);
       }
 
       if (mounted) context.go(AppRoutes.main);
@@ -309,7 +327,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           TextButton(
-                            onPressed: () {},
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const ForgotPasswordScreen(),
+                              ),
+                            ),
                             style: TextButton.styleFrom(
                               padding: EdgeInsets.zero,
                               minimumSize: Size.zero,

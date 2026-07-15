@@ -11,6 +11,7 @@ import '../features/home/screens/main_screen.dart';
 import '../features/auth/screens/register_etudiant_screen.dart';
 import '../features/admin/screens/admin_screen.dart';
 import '../features/splash/screens/splash_screen.dart';
+import '../features/auth/screens/reset_password_screen.dart';
 
 // ── Noms des routes ───────────────────────────────────────────
 class AppRoutes {
@@ -22,6 +23,7 @@ class AppRoutes {
   static const String main           = '/main';
   static const String registerEtudiant  = '/register/etudiant';
   static const String admin = '/admin';
+  static const String resetPassword = '/reset-password';
 }
 
 // ── Écoute les changements d'état d'authentification (utile pour la
@@ -46,7 +48,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange);
   ref.onDispose(refreshStream.dispose);
 
-  return GoRouter(
+  // Bascule automatiquement vers l'écran de nouveau mot de passe dès que
+  // Supabase détecte le lien de réinitialisation reçu par email.
+  late final GoRouter router;
+  final recoverySub =
+      Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    if (data.event == AuthChangeEvent.passwordRecovery) {
+      router.go(AppRoutes.resetPassword);
+    }
+  });
+  ref.onDispose(recoverySub.cancel);
+
+  router = GoRouter(
     initialLocation: AppRoutes.splash,
     refreshListenable: refreshStream,
     redirect: (context, state) {
@@ -100,6 +113,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.admin,
         builder: (context, state) => const AdminScreen(),
       ),
+      GoRoute(
+        path: AppRoutes.resetPassword,
+        builder: (context, state) => const ResetPasswordScreen(),
+      ),
     ],
   );
+  return router;
 });

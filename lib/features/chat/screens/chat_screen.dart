@@ -518,7 +518,7 @@ class ConversationScreenState extends State<ConversationScreen> {
           .from('messages')
           .select()
           .eq('conversation_id', widget.conversationId)
-          .order('date_envoi');
+          .order('date_envoi', ascending: true);
 
       if (mounted) {
         setState(() {

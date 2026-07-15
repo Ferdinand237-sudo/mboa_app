@@ -935,44 +935,72 @@ class _ProfilScreenState extends State<ProfilScreen> {
     );
   }
 
+  bool _isLoggingOut = false;
+
   void _showLogoutDialog() {
+    if (_isLoggingOut) return;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(MboaSizes.radiusXl),
-        ),
-        title: const Text(
-          'Déconnexion',
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.w700,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(MboaSizes.radiusXl),
           ),
-        ),
-        content: const Text(
-          'Es-tu sûr de vouloir te déconnecter ?',
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            color: MboaColors.textMuted,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await Supabase.instance.client.auth.signOut();
-              if (mounted) context.go(AppRoutes.onboarding);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: MboaColors.danger,
+          title: const Text(
+            'Déconnexion',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w700,
             ),
-            child: const Text('Déconnexion'),
           ),
-        ],
+          content: const Text(
+            'Es-tu sûr de vouloir te déconnecter ?',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              color: MboaColors.textMuted,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: _isLoggingOut
+                  ? null
+                  : () => Navigator.pop(dialogContext),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: _isLoggingOut
+                  ? null
+                  : () async {
+                      setDialogState(() => _isLoggingOut = true);
+                      setState(() => _isLoggingOut = true);
+                      try {
+                        await Supabase.instance.client.auth.signOut();
+                      } catch (_) {
+                        // On force la déconnexion locale même si l'appel
+                        // réseau échoue : l'utilisateur ne doit jamais
+                        // rester bloqué sur un compte qu'il veut quitter.
+                      }
+                      if (dialogContext.mounted) {
+                        Navigator.pop(dialogContext);
+                      }
+                      if (mounted) context.go(AppRoutes.onboarding);
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: MboaColors.danger,
+              ),
+              child: _isLoggingOut
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text('Déconnexion'),
+            ),
+          ],
+        ),
       ),
     );
   }

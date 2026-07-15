@@ -48,7 +48,7 @@ class _LogementScreenState extends State<LogementScreen> {
         query = query.eq('type', _selectedType);
       }
 
-      query = query.lte('prix', _prixMax);
+      query = query.lte('prix', _prixMax.toInt());
 
       if (_searchController.text.isNotEmpty) {
         query = query.or(
