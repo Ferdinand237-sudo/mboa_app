@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -25,13 +26,17 @@ class _LogementDetailScreenState
   final PageController _photoPageController = PageController();
   Timer? _autoScrollTimer;
 
-  final List<Map<String, dynamic>> _proximite = [
-    {'icon': '🎓', 'label': 'Campus IUT', 'dist': '650m', 'color': 0xFF2D6A4F},
-    {'icon': '🏥', 'label': 'Hôpital District', 'dist': '1.4km', 'color': 0xFFEF4444},
-    {'icon': '🛒', 'label': 'Grand Marché', 'dist': '500m', 'color': 0xFFF4A261},
-    {'icon': '🚔', 'label': 'Commissariat', 'dist': '800m', 'color': 0xFF1A1A2E},
-    {'icon': '💊', 'label': 'Pharmacie', 'dist': '300m', 'color': 0xFF10B981},
-  ];
+  List<Map<String, dynamic>> _proximite = [];
+  bool _isLoadingProximite = true;
+
+  static const Map<String, Map<String, dynamic>> _categorieStyleProximite = {
+    'ecole': {'icon': '🎓', 'color': 0xFF2D6A4F},
+    'hopital': {'icon': '🏥', 'color': 0xFFEF4444},
+    'marche': {'icon': '🛒', 'color': 0xFFF4A261},
+    'pharmacie': {'icon': '💊', 'color': 0xFF10B981},
+    'eglise': {'icon': '⛪', 'color': 0xFF6B7280},
+    'autre': {'icon': '📍', 'color': 0xFF1A1A2E},
+  };
 
   List<Map<String, dynamic>> _avis = [];
   bool _isLoadingAvis = true;
@@ -41,6 +46,7 @@ class _LogementDetailScreenState
     super.initState();
     _chargerAvis();
     _verifierFavori();
+    _chargerProximite();
     final photos = widget.logement['photos'] as List? ?? [];
     if (photos.length > 1) {
       _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
@@ -150,6 +156,63 @@ class _LogementDetailScreenState
           ),
         );
       }
+    }
+  }
+
+  double _distanceMetres(double lat1, double lng1, double lat2, double lng2) {
+    const rayonTerre = 6371000.0;
+    final dLat = (lat2 - lat1) * (pi / 180);
+    final dLng = (lng2 - lng1) * (pi / 180);
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1 * pi / 180) *
+            cos(lat2 * pi / 180) *
+            sin(dLng / 2) *
+            sin(dLng / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return rayonTerre * c;
+  }
+
+  Future<void> _chargerProximite() async {
+    final lat = (widget.logement['lat'] as num?)?.toDouble();
+    final lng = (widget.logement['lng'] as num?)?.toDouble();
+    if (lat == null || lng == null) {
+      if (mounted) setState(() => _isLoadingProximite = false);
+      return;
+    }
+    try {
+      final data = await _supabase
+          .from('lieux_publics')
+          .select('nom, categorie, lat, lng');
+      final lieux = List<Map<String, dynamic>>.from(data);
+      final avecDistance = lieux.map((lieu) {
+        final distanceM = _distanceMetres(
+          lat,
+          lng,
+          (lieu['lat'] as num).toDouble(),
+          (lieu['lng'] as num).toDouble(),
+        );
+        final style = _categorieStyleProximite[lieu['categorie']] ??
+            _categorieStyleProximite['autre']!;
+        return {
+          'icon': style['icon'],
+          'label': lieu['nom'],
+          'color': style['color'],
+          'distanceM': distanceM,
+          'dist': distanceM < 1000
+              ? '${distanceM.round()}m'
+              : '${(distanceM / 1000).toStringAsFixed(1)}km',
+        };
+      }).toList()
+        ..sort((a, b) => (a['distanceM'] as double)
+            .compareTo(b['distanceM'] as double));
+      if (mounted) {
+        setState(() {
+          _proximite = avecDistance.take(6).toList();
+          _isLoadingProximite = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingProximite = false);
     }
   }
 
@@ -585,14 +648,13 @@ class _LogementDetailScreenState
                       const SizedBox(height: 24),
 
                       // ── Proximité ─────────────────
-                      Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildSectionTitle(
-                              '📍 Points de proximité'),
-                          if (l['lat'] != null &&
-                              l['lng'] != null)
+                      if (l['lat'] != null && l['lng'] != null) ...[
+                        Row(
+                          mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildSectionTitle(
+                                '📍 Points de proximité'),
                             GestureDetector(
                               onTap: () => Navigator.push(
                                 context,
@@ -611,24 +673,44 @@ class _LogementDetailScreenState
                                 ),
                               ),
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius:
-                              BorderRadius.circular(
-                                  MboaSizes.radiusLg),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black
-                                  .withValues(alpha: 0.05),
-                              blurRadius: 10,
-                            ),
                           ],
                         ),
-                        child: Column(
+                        const SizedBox(height: 12),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius:
+                                BorderRadius.circular(
+                                    MboaSizes.radiusLg),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black
+                                    .withValues(alpha: 0.05),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: _isLoadingProximite
+                              ? const Padding(
+                                  padding: EdgeInsets.all(20),
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: MboaColors.primary),
+                                    ),
+                                  ),
+                                )
+                              : _proximite.isEmpty
+                                  ? Padding(
+                                      padding: const EdgeInsets.all(20),
+                                      child: Text(
+                                          'Aucun point de repère à proximité',
+                                          style: MboaTextStyles.muted),
+                                    )
+                                  : Column(
                           children:
                               _proximite.map((p) {
                             final isLast =
@@ -671,6 +753,8 @@ class _LogementDetailScreenState
                                       Expanded(
                                         child: Text(
                                           p['label'],
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style:
                                               const TextStyle(
                                             fontFamily:
@@ -684,6 +768,7 @@ class _LogementDetailScreenState
                                           ),
                                         ),
                                       ),
+                                      const SizedBox(width: 8),
                                       Container(
                                         padding:
                                             const EdgeInsets
@@ -728,8 +813,9 @@ class _LogementDetailScreenState
                             );
                           }).toList(),
                         ),
-                      ),
-                      const SizedBox(height: 24),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
 
                       // ── Propriétaire ──────────────
                       _buildSectionTitle('👤 Propriétaire'),
