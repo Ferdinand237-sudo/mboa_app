@@ -138,27 +138,43 @@ class _AdminDemandesScreenState
                   ),
                   const SizedBox(height: 16),
 
-                  // Mot de passe
-                  const Text(
-                    'Mot de passe temporaire',
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                  if (demande['user_id'] != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: MboaColors.verified.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        '👤 Compte existant : le rôle sera simplement mis à jour, sans nouveau mot de passe.',
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: MboaColors.text),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: passwordController,
-                    decoration: const InputDecoration(
-                      hintText: 'Min. 6 caractères',
+                    const SizedBox(height: 16),
+                  ] else ...[
+                    // Mot de passe
+                    const Text(
+                      'Mot de passe temporaire',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    validator: (v) =>
-                        v == null || v.length < 6
-                            ? 'Minimum 6 caractères'
-                            : null,
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: passwordController,
+                      decoration: const InputDecoration(
+                        hintText: 'Min. 6 caractères',
+                      ),
+                      validator: (v) => demande['user_id'] != null
+                          ? null
+                          : (v == null || v.length < 6
+                              ? 'Minimum 6 caractères'
+                              : null),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   // Permissions
                   const Text(
@@ -266,13 +282,20 @@ class _AdminDemandesScreenState
                   return;
                 }
                 Navigator.pop(context);
-                await _validerDemande(
-                  demande: demande,
-                  password: passwordController.text,
-                  sousRoles: selectedSousRoles,
-                );
+                if (demande['user_id'] != null) {
+                  await _mettreAJourCompteExistant(
+                    demande: demande,
+                    sousRoles: selectedSousRoles,
+                  );
+                } else {
+                  await _validerDemande(
+                    demande: demande,
+                    password: passwordController.text,
+                    sousRoles: selectedSousRoles,
+                  );
+                }
               },
-              child: const Text('Créer le compte'),
+              child: Text(demande['user_id'] != null ? 'Mettre à jour le compte' : 'Créer le compte'),
             ),
           ],
         ),
@@ -335,6 +358,45 @@ class _AdminDemandesScreenState
       }
     }
   }
+  Future<void> _mettreAJourCompteExistant({
+    required Map<String, dynamic> demande,
+    required List<String> sousRoles,
+  }) async {
+    final userId = demande['user_id'];
+    try {
+      final existing =
+          await _supabase.from('users').select('sous_roles').eq('id', userId).single();
+      final currentSousRoles = List<String>.from(existing['sous_roles'] ?? []);
+      final merged = {...currentSousRoles, ...sousRoles}.toList();
+
+      await _supabase.from('users').update({
+        'role': 'vendeur',
+        'sous_roles': merged,
+      }).eq('id', userId);
+
+      await _supabase
+          .from('demandes_compte')
+          .update({'statut': 'traite'})
+          .eq('id', demande['id']);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Compte de ${demande['nom']} mis à jour !'),
+            backgroundColor: MboaColors.primary,
+          ),
+        );
+        _chargerDemandes();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur : ${e.toString()}'), backgroundColor: MboaColors.danger),
+        );
+      }
+    }
+  }
+
   Future<dynamic> _invokeCreateVendorFunction(
       Map<String, dynamic> body) async {
     final functionNames = [

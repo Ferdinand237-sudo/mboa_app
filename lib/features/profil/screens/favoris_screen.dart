@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../logement/screens/logement_detail_screen.dart';
+import '../../market/screens/article_detail_screen.dart';
 
 class FavorisScreen extends StatefulWidget {
   const FavorisScreen({super.key});
@@ -31,13 +32,13 @@ class _FavorisScreenState extends State<FavorisScreen> {
       final data = await _supabase
           .from('favoris')
           .select(
-              '*, logement:logements(*, proprietaire:users!proprietaire_id(nom, verified))')
+              '*, logement:logements(*, proprietaire:users!proprietaire_id(nom, verified)), article:articles(*, vendeur:users!vendeur_id(nom, verified))')
           .eq('user_id', user.id)
           .order('created_at', ascending: false);
       if (mounted) {
         setState(() {
           _favoris = List<Map<String, dynamic>>.from(data)
-              .where((f) => f['logement'] != null)
+              .where((f) => f['logement'] != null || f['article'] != null)
               .toList();
           _isLoading = false;
         });
@@ -47,7 +48,7 @@ class _FavorisScreenState extends State<FavorisScreen> {
     }
   }
 
-  Future<void> _retirerFavori(String logementId) async {
+  Future<void> _retirerFavoriLogement(String logementId) async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
     try {
@@ -57,16 +58,35 @@ class _FavorisScreenState extends State<FavorisScreen> {
           .eq('user_id', user.id)
           .eq('logement_id', logementId);
       if (mounted) {
-        setState(() => _favoris.removeWhere(
-            (f) => f['logement']['id'] == logementId));
+        setState(() => _favoris
+            .removeWhere((f) => f['logement']?['id'] == logementId));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur : ${e.toString()}'),
-            backgroundColor: MboaColors.danger,
-          ),
+          SnackBar(content: Text('Erreur : ${e.toString()}'), backgroundColor: MboaColors.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _retirerFavoriArticle(String articleId) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      await _supabase
+          .from('favoris')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('article_id', articleId);
+      if (mounted) {
+        setState(() => _favoris
+            .removeWhere((f) => f['article']?['id'] == articleId));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur : ${e.toString()}'), backgroundColor: MboaColors.danger),
         );
       }
     }
@@ -74,11 +94,7 @@ class _FavorisScreenState extends State<FavorisScreen> {
 
   String _formatPrix(dynamic prix) {
     final p = (prix ?? 0) as int;
-    return p.toString().replaceAllMapped(
-              RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-              (m) => '${m[1]} ',
-            ) +
-        ' FCFA';
+    return '${p.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} FCFA';
   }
 
   @override
@@ -111,8 +127,32 @@ class _FavorisScreenState extends State<FavorisScreen> {
                   itemCount: _favoris.length,
                   separatorBuilder: (_, __) =>
                       const SizedBox(height: 14),
-                  itemBuilder: (context, index) =>
-                      _buildFavoriCard(_favoris[index]),
+                  itemBuilder: (context, index) {
+                    final favori = _favoris[index];
+                    return favori['logement'] != null
+                        ? _buildFavoriCard(
+                            item: favori['logement'],
+                            emoji: '🏠',
+                            sousTitre: favori['logement']['quartier'] ?? 'Sangmelima',
+                            verified: favori['logement']['proprietaire']?['verified'] == true,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => LogementDetailScreen(logement: favori['logement'])),
+                            ),
+                            onRetirer: () => _retirerFavoriLogement(favori['logement']['id']),
+                          )
+                        : _buildFavoriCard(
+                            item: favori['article'],
+                            emoji: '📦',
+                            sousTitre: favori['article']['etat'] ?? '',
+                            verified: favori['article']['vendeur']?['verified'] == true,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => ArticleDetailScreen(article: favori['article'])),
+                            ),
+                            onRetirer: () => _retirerFavoriArticle(favori['article']['id']),
+                          );
+                  },
                 ),
     );
   }
@@ -137,7 +177,7 @@ class _FavorisScreenState extends State<FavorisScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Ajoutez des logements à vos favoris en appuyant sur le cœur',
+              'Ajoutez des logements ou articles à vos favoris en appuyant sur le cœur',
               textAlign: TextAlign.center,
               style: MboaTextStyles.muted,
             ),
@@ -147,19 +187,18 @@ class _FavorisScreenState extends State<FavorisScreen> {
     );
   }
 
-  Widget _buildFavoriCard(Map<String, dynamic> favori) {
-    final l = favori['logement'] as Map<String, dynamic>;
-    final proprietaire =
-        l['proprietaire'] as Map<String, dynamic>? ?? {};
-    final photos = l['photos'] as List? ?? [];
+  Widget _buildFavoriCard({
+    required Map<String, dynamic> item,
+    required String emoji,
+    required String sousTitre,
+    required bool verified,
+    required VoidCallback onTap,
+    required VoidCallback onRetirer,
+  }) {
+    final photos = item['photos'] as List? ?? [];
 
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => LogementDetailScreen(logement: l),
-        ),
-      ),
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -189,14 +228,12 @@ class _FavorisScreenState extends State<FavorisScreen> {
                     ? Image.network(
                         photos[0],
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Center(
-                          child:
-                              Text('🏠', style: TextStyle(fontSize: 36)),
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Text(emoji, style: const TextStyle(fontSize: 36)),
                         ),
                       )
-                    : const Center(
-                        child:
-                            Text('🏠', style: TextStyle(fontSize: 36)),
+                    : Center(
+                        child: Text(emoji, style: const TextStyle(fontSize: 36)),
                       ),
               ),
             ),
@@ -207,7 +244,7 @@ class _FavorisScreenState extends State<FavorisScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      l['titre'] ?? '',
+                      item['titre'] ?? '',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -219,7 +256,7 @@ class _FavorisScreenState extends State<FavorisScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _formatPrix(l['prix']),
+                      _formatPrix(item['prix']),
                       style: const TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 13,
@@ -235,12 +272,12 @@ class _FavorisScreenState extends State<FavorisScreen> {
                         const SizedBox(width: 2),
                         Expanded(
                           child: Text(
-                            l['quartier'] ?? 'Sangmelima',
+                            sousTitre,
                             style: MboaTextStyles.caption,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (proprietaire['verified'] == true)
+                        if (verified)
                           const Text('✅', style: TextStyle(fontSize: 11)),
                       ],
                     ),
@@ -251,7 +288,7 @@ class _FavorisScreenState extends State<FavorisScreen> {
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: GestureDetector(
-                onTap: () => _retirerFavori(l['id']),
+                onTap: onRetirer,
                 child: Container(
                   width: 32,
                   height: 32,

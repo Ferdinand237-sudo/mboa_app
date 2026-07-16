@@ -8,6 +8,8 @@ import '../../../app/router.dart';
 import 'edit_profil_screen.dart';
 import 'favoris_screen.dart';
 import 'avis_moderation_screen.dart';
+import 'devenir_contributeur_screen.dart';
+import 'alertes_recherche_screen.dart';
 
 class ProfilScreen extends StatefulWidget {
   final VoidCallback? onOuvrirMessages;
@@ -25,6 +27,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
   Map<String, dynamic>? _user;
   bool _isLoading = true;
   int _nbFavoris = 0;
+  int _nbAlertes = 0;
   int _nbMessagesNonLus = 0;
   int _nbAvisEnAttente = 0;
   bool _notificationsActivees = true;
@@ -37,6 +40,19 @@ class _ProfilScreenState extends State<ProfilScreen> {
     _chargerNbMessagesNonLus();
     _chargerPreferenceNotifications();
     _chargerNbAvisEnAttente();
+    _chargerNbAlertes();
+  }
+
+  Future<void> _chargerNbAlertes() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final data = await _supabase
+          .from('alertes_recherche')
+          .select('id')
+          .eq('user_id', user.id);
+      if (mounted) setState(() => _nbAlertes = List.from(data).length);
+    } catch (_) {}
   }
 
   Future<void> _chargerNbAvisEnAttente() async {
@@ -147,13 +163,12 @@ class _ProfilScreenState extends State<ProfilScreen> {
     }
   }
 
-  void _afficherBientotDisponible() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('🔔 Les alertes de recherche arrivent bientôt !'),
-        backgroundColor: MboaColors.primary,
-      ),
+  Future<void> _ouvrirAlertes() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AlertesRechercheScreen()),
     );
+    _chargerNbAlertes();
   }
 
   void _ouvrirChangerMotDePasse() {
@@ -424,7 +439,27 @@ class _ProfilScreenState extends State<ProfilScreen> {
                         width: 3,
                       ),
                     ),
-                    child: Center(
+                    child: _user?['photo_url'] != null
+                        ? ClipOval(
+                            child: Image.network(
+                              _user!['photo_url'],
+                              width: 84,
+                              height: 84,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Center(
+                                child: Text(
+                                  _initiales,
+                                  style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 30,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                        : Center(
                       child: Text(
                         _initiales,
                         style: const TextStyle(
@@ -493,7 +528,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                       children: [
                         _buildStat('$_nbFavoris', 'Favoris', '❤️'),
                         _buildStatDivider(),
-                        _buildStat('0', 'Alertes', '🔔'),
+                        _buildStat('$_nbAlertes', 'Alertes', '🔔'),
                         _buildStatDivider(),
                         _buildStat('$_nbMessagesNonLus', 'Messages', '💬'),
                       ],
@@ -530,8 +565,8 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 icon: Icons.notifications_rounded,
                 color: MboaColors.boost,
                 label: 'Mes alertes de recherche',
-                badge: '0',
-                onTap: _afficherBientotDisponible,
+                badge: '$_nbAlertes',
+                onTap: _ouvrirAlertes,
               ),
               _buildMenuItem(
                 icon: Icons.chat_bubble_rounded,
@@ -588,6 +623,28 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 label: 'Changer le mot de passe',
                 onTap: _ouvrirChangerMotDePasse,
               ),
+              if (_user?['role'] == 'visiteur')
+                _buildMenuItem(
+                  icon: Icons.storefront_outlined,
+                  color: MboaColors.secondary,
+                  label: 'Devenir contributeur',
+                  subtitle: 'Publier des logements ou articles',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DevenirContributeurScreen()),
+                  ),
+                ),
+              if (_user?['role'] == 'vendeur')
+                _buildMenuItem(
+                  icon: Icons.add_business_outlined,
+                  color: MboaColors.secondary,
+                  label: 'Étendre mes activités',
+                  subtitle: 'Ajouter logements et/ou articles',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DevenirContributeurScreen(dejaVendeur: true)),
+                  ),
+                ),
             ],
           ),
 

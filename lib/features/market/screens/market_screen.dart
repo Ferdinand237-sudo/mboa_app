@@ -85,6 +85,39 @@ class _MarketScreenState extends State<MarketScreen> {
         ' FCFA';
   }
 
+  Future<void> _enregistrerAlerte() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connectez-vous pour enregistrer une alerte'), backgroundColor: MboaColors.primary),
+      );
+      return;
+    }
+    final libelle = [
+      if (_selectedCategorie != 'Tous') _selectedCategorie,
+      if (_selectedEtat != 'Tous') _selectedEtat,
+    ].join(' · ');
+    try {
+      await _supabase.from('alertes_recherche').insert({
+        'user_id': userId,
+        'type': 'article',
+        'libelle': libelle.isEmpty ? 'Tous les articles Market' : libelle,
+        'criteres': {'categorie': _selectedCategorie, 'etat': _selectedEtat},
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('🔔 Alerte enregistrée !'), backgroundColor: MboaColors.verified),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de l\'enregistrement'), backgroundColor: MboaColors.danger),
+        );
+      }
+    }
+  }
+
   bool get _isLoggedIn => _supabase.auth.currentUser != null;
 
   List<Map<String, dynamic>> get _displayedArticles => _isLoggedIn
@@ -365,23 +398,40 @@ class _MarketScreenState extends State<MarketScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    GestureDetector(
-                      onTap: () => setState(() {
-                        _selectedCategorie = 'Tous';
-                        _selectedEtat = 'Tous';
-                        _showFiltres = false;
-                        _searchController.clear();
-                        _chargerArticles();
-                      }),
-                      child: const Text(
-                        'Réinitialiser les filtres',
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: MboaColors.danger,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        GestureDetector(
+                          onTap: () => setState(() {
+                            _selectedCategorie = 'Tous';
+                            _selectedEtat = 'Tous';
+                            _showFiltres = false;
+                            _searchController.clear();
+                            _chargerArticles();
+                          }),
+                          child: const Text(
+                            'Réinitialiser les filtres',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: MboaColors.danger,
+                            ),
+                          ),
                         ),
-                      ),
+                        GestureDetector(
+                          onTap: _enregistrerAlerte,
+                          child: const Text(
+                            '🔔 Enregistrer comme alerte',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: MboaColors.secondary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ],
