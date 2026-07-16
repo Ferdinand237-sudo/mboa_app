@@ -719,21 +719,27 @@ class ConversationScreenState extends State<ConversationScreen> {
     if (envoye != true) return;
 
     try {
+      // Un avis lié à une annonce passe par la modération du propriétaire
+      // (publié automatiquement après 72h s'il n'a pas été retiré) ; la
+      // note chiffrée, elle, compte immédiatement dans le score global.
+      final necessiteModeration = widget.annonceId != null;
       await _supabase.from('avis').insert({
         'auteur_id': userId,
         'cible_id': widget.autreId,
         'annonce_id': widget.annonceId,
         'note': noteSelectionnee,
         'commentaire': commentaireController.text.trim(),
-        'valide': true,
+        'valide': !necessiteModeration,
       });
 
       await _recalculerNoteGlobale(widget.autreId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Merci pour votre avis !'),
+          SnackBar(
+            content: Text(necessiteModeration
+                ? 'Merci ! Votre avis sera visible dès validation par le propriétaire (ou automatiquement sous 72h).'
+                : 'Merci pour votre avis !'),
             backgroundColor: MboaColors.verified,
           ),
         );
@@ -751,11 +757,12 @@ class ConversationScreenState extends State<ConversationScreen> {
   }
 
   Future<void> _recalculerNoteGlobale(String cibleId) async {
+    // La note chiffrée compte immédiatement, que le commentaire soit
+    // encore en attente de modération ou déjà publié.
     final avisData = await _supabase
         .from('avis')
         .select('note')
-        .eq('cible_id', cibleId)
-        .eq('valide', true);
+        .eq('cible_id', cibleId);
 
     final notes = List<Map<String, dynamic>>.from(avisData);
     if (notes.isEmpty) return;

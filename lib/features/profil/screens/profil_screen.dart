@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../app/router.dart';
 import 'edit_profil_screen.dart';
 import 'favoris_screen.dart';
+import 'avis_moderation_screen.dart';
 
 class ProfilScreen extends StatefulWidget {
   final VoidCallback? onOuvrirMessages;
@@ -25,6 +26,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
   bool _isLoading = true;
   int _nbFavoris = 0;
   int _nbMessagesNonLus = 0;
+  int _nbAvisEnAttente = 0;
   bool _notificationsActivees = true;
 
   @override
@@ -34,6 +36,21 @@ class _ProfilScreenState extends State<ProfilScreen> {
     _chargerNbFavoris();
     _chargerNbMessagesNonLus();
     _chargerPreferenceNotifications();
+    _chargerNbAvisEnAttente();
+  }
+
+  Future<void> _chargerNbAvisEnAttente() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final data = await _supabase
+          .from('avis')
+          .select('id')
+          .eq('cible_id', user.id)
+          .eq('valide', false)
+          .not('annonce_id', 'is', null);
+      if (mounted) setState(() => _nbAvisEnAttente = List.from(data).length);
+    } catch (_) {}
   }
 
   Future<void> _chargerPreferenceNotifications() async {
@@ -527,6 +544,22 @@ class _ProfilScreenState extends State<ProfilScreen> {
                   }
                 },
               ),
+              if (_user?['role'] == 'vendeur')
+                _buildMenuItem(
+                  icon: Icons.star_rate_rounded,
+                  color: MboaColors.boost,
+                  label: 'Avis à modérer',
+                  badge: '$_nbAvisEnAttente',
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AvisModerationScreen(),
+                      ),
+                    );
+                    _chargerNbAvisEnAttente();
+                  },
+                ),
             ],
           ),
 

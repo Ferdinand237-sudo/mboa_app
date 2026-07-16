@@ -51,6 +51,9 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
       return;
     }
     try {
+      // Un avis est visible s'il a été validé par le propriétaire, ou
+      // automatiquement après 72h sans action de sa part.
+      final cutoff = DateTime.now().subtract(const Duration(hours: 72));
       final resultats = await Future.wait([
         _supabase.from('users').select().eq('id', id).single(),
         _supabase
@@ -69,7 +72,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
             .from('avis')
             .select('*, auteur:users!auteur_id(nom)')
             .eq('cible_id', id)
-            .eq('valide', true)
+            .or('valide.eq.true,date_publication.lt.${cutoff.toIso8601String()}')
             .order('date_publication', ascending: false),
       ]);
       if (mounted) {

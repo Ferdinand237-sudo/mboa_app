@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../chat/screens/chat_screen.dart';
 import '../../map/screens/map_screen.dart';
@@ -19,6 +21,8 @@ class _LogementDetailScreenState
   final _supabase = Supabase.instance.client;
   bool _isFavori = false;
   int _currentPhoto = 0;
+  final PageController _photoPageController = PageController();
+  Timer? _autoScrollTimer;
 
   final List<Map<String, dynamic>> _proximite = [
     {'icon': '🎓', 'label': 'Campus IUT', 'dist': '650m', 'color': 0xFF2D6A4F},
@@ -36,6 +40,70 @@ class _LogementDetailScreenState
     super.initState();
     _chargerAvis();
     _verifierFavori();
+    final photos = widget.logement['photos'] as List? ?? [];
+    if (photos.length > 1) {
+      _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+        if (!mounted || !_photoPageController.hasClients) return;
+        final next = (_currentPhoto + 1) % photos.length;
+        _photoPageController.animateToPage(
+          next,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _autoScrollTimer?.cancel();
+    _photoPageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _appelerProprietaire() async {
+    var tel = widget.logement['proprietaire']?['telephone'];
+    if (tel == null) {
+      final proprietaireId = widget.logement['proprietaire_id'];
+      if (proprietaireId != null) {
+        try {
+          final data = await _supabase
+              .from('users')
+              .select('telephone')
+              .eq('id', proprietaireId)
+              .single();
+          tel = data['telephone'];
+        } catch (_) {}
+      }
+    }
+    if (tel == null || tel.toString().trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Numéro non renseigné par le propriétaire'),
+            backgroundColor: MboaColors.primary,
+          ),
+        );
+      }
+      return;
+    }
+    final url = Uri.parse('tel:$tel');
+    try {
+      await launchUrl(url);
+    } catch (_) {}
+  }
+
+  void _ouvrirVisionneuse(List photos, int indexDepart) {
+    if (photos.isEmpty) return;
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black,
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            _PhotoViewerFullscreen(photos: photos, indexDepart: indexDepart),
+      ),
+    );
   }
 
   Future<void> _verifierFavori() async {
@@ -95,10 +163,14 @@ class _LogementDetailScreenState
 
   Future<void> _chargerAvis() async {
     try {
+      // Un commentaire est visible s'il a été validé par le propriétaire,
+      // ou automatiquement après 72h sans action de sa part.
+      final cutoff = DateTime.now().subtract(const Duration(hours: 72));
       final data = await _supabase
           .from('avis')
           .select('*, auteur:users!auteur_id(nom)')
           .eq('annonce_id', widget.logement['id'])
+          .or('valide.eq.true,date_publication.lt.${cutoff.toIso8601String()}')
           .order('date_publication', ascending: false);
       if (mounted) {
         setState(() {
@@ -108,6 +180,108 @@ class _LogementDetailScreenState
       }
     } catch (e) {
       if (mounted) setState(() => _isLoadingAvis = false);
+    }
+  }
+
+  Future<void> _laisserAvis() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connectez-vous pour laisser un avis'), backgroundColor: MboaColors.primary),
+      );
+      return;
+    }
+    final proprietaireId = widget.logement['proprietaire_id'];
+    if (proprietaireId == null || proprietaireId == userId) return;
+
+    int noteSelectionnee = 5;
+    final commentaireController = TextEditingController();
+
+    final envoye = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MboaSizes.radiusLg)),
+          title: const Text('⭐ Laisser un avis',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w800, color: MboaColors.text)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Votre expérience avec ce logement', style: MboaTextStyles.bodySm),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (i) {
+                  final valeur = i + 1;
+                  return IconButton(
+                    onPressed: () => setDialogState(() => noteSelectionnee = valeur),
+                    icon: Icon(
+                      valeur <= noteSelectionnee ? Icons.star_rounded : Icons.star_border_rounded,
+                      color: MboaColors.boost,
+                      size: 32,
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: commentaireController,
+                maxLines: 3,
+                style: MboaTextStyles.bodySm,
+                decoration: InputDecoration(
+                  hintText: 'Votre commentaire (optionnel)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(MboaSizes.radiusMd)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Annuler')),
+            ElevatedButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Envoyer')),
+          ],
+        ),
+      ),
+    );
+
+    if (envoye != true) return;
+
+    try {
+      await _supabase.from('avis').insert({
+        'auteur_id': userId,
+        'cible_id': proprietaireId,
+        'annonce_id': widget.logement['id'],
+        'note': noteSelectionnee,
+        'commentaire': commentaireController.text.trim(),
+        'valide': false,
+      });
+
+      final avisData = await _supabase.from('avis').select('note').eq('cible_id', proprietaireId);
+      final notes = List<Map<String, dynamic>>.from(avisData);
+      if (notes.isNotEmpty) {
+        final total = notes.fold<int>(0, (sum, a) => sum + ((a['note'] ?? 0) as int));
+        await _supabase.from('users').update({
+          'note_globale': double.parse((total / notes.length).toStringAsFixed(1)),
+          'nb_avis': notes.length,
+        }).eq('id', proprietaireId);
+      }
+
+      _chargerAvis();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Merci ! Votre avis sera visible dès validation par le propriétaire (ou sous 72h).'),
+            backgroundColor: MboaColors.verified,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de l\'envoi de l\'avis'), backgroundColor: MboaColors.danger),
+        );
+      }
     }
   }
 
@@ -666,8 +840,25 @@ class _LogementDetailScreenState
                       const SizedBox(height: 24),
 
                       // ── Avis ──────────────────────
-                      _buildSectionTitle(
-                          '⭐ Avis (${_avis.length})'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildSectionTitle(
+                              '⭐ Avis (${_avis.length})'),
+                          GestureDetector(
+                            onTap: _laisserAvis,
+                            child: const Text(
+                              'Laisser un avis',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: MboaColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
                       _isLoadingAvis
                           ? const Center(
@@ -757,7 +948,7 @@ class _LogementDetailScreenState
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {},
+                      onPressed: _appelerProprietaire,
                       icon: const Icon(
                           Icons.phone_rounded,
                           size: 18),
@@ -852,22 +1043,27 @@ class _LogementDetailScreenState
         children: [
           photos.isNotEmpty
               ? PageView.builder(
+                  controller: _photoPageController,
                   itemCount: photos.length,
                   onPageChanged: (i) =>
                       setState(() => _currentPhoto = i),
                   itemBuilder: (context, index) =>
-                      Image.network(
-                    photos[index],
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        Container(
-                      decoration: const BoxDecoration(
-                        gradient: MboaColors.primaryGradient,
-                      ),
-                      child: const Center(
-                        child: Text('🏠',
-                            style:
-                                TextStyle(fontSize: 100)),
+                      GestureDetector(
+                    onTap: () =>
+                        _ouvrirVisionneuse(photos, index),
+                    child: Image.network(
+                      photos[index],
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          Container(
+                        decoration: const BoxDecoration(
+                          gradient: MboaColors.primaryGradient,
+                        ),
+                        child: const Center(
+                          child: Text('🏠',
+                              style:
+                                  TextStyle(fontSize: 100)),
+                        ),
                       ),
                     ),
                   ),
@@ -1174,6 +1370,102 @@ class _LogementDetailScreenState
                     ),
                   ))
               .toList(),
+        ),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// VISIONNEUSE PLEIN ÉCRAN — glisser vers le bas pour fermer
+// ════════════════════════════════════════════════════════════
+class _PhotoViewerFullscreen extends StatefulWidget {
+  final List photos;
+  final int indexDepart;
+
+  const _PhotoViewerFullscreen({
+    required this.photos,
+    required this.indexDepart,
+  });
+
+  @override
+  State<_PhotoViewerFullscreen> createState() =>
+      _PhotoViewerFullscreenState();
+}
+
+class _PhotoViewerFullscreenState
+    extends State<_PhotoViewerFullscreen> {
+  late final PageController _controller;
+  double _dragOffset = 0;
+  double _opacity = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController(initialPage: widget.indexDepart);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onVerticalDragUpdate: (details) {
+        setState(() {
+          _dragOffset += details.delta.dy;
+          _opacity = (1 - (_dragOffset.abs() / 300)).clamp(0.3, 1.0);
+        });
+      },
+      onVerticalDragEnd: (details) {
+        if (_dragOffset.abs() > 120) {
+          Navigator.pop(context);
+        } else {
+          setState(() {
+            _dragOffset = 0;
+            _opacity = 1;
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black.withValues(alpha: _opacity),
+        body: Transform.translate(
+          offset: Offset(0, _dragOffset),
+          child: Stack(
+            children: [
+              PageView.builder(
+                controller: _controller,
+                itemCount: widget.photos.length,
+                itemBuilder: (context, index) => InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 4,
+                  child: Center(
+                    child: Image.network(
+                      widget.photos[index],
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Text(
+                          '🏠',
+                          style: TextStyle(fontSize: 100)),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 40,
+                right: 16,
+                child: SafeArea(
+                  child: IconButton(
+                    icon: const Icon(Icons.close_rounded,
+                        color: Colors.white, size: 28),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

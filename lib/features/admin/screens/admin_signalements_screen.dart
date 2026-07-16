@@ -133,6 +133,128 @@ class _AdminSignalementsScreenState
     }
   }
 
+  Future<String?> _trouverProprietaireId(String cibleId) async {
+    try {
+      final logement = await _supabase
+          .from('logements')
+          .select('proprietaire_id')
+          .eq('id', cibleId)
+          .maybeSingle();
+      if (logement != null) return logement['proprietaire_id'] as String?;
+    } catch (_) {}
+    try {
+      final article = await _supabase
+          .from('articles')
+          .select('vendeur_id')
+          .eq('id', cibleId)
+          .maybeSingle();
+      if (article != null) return article['vendeur_id'] as String?;
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _suspendreAnnonce(
+      String cibleId, String cibleType, String signalementId) async {
+    final raisonController = TextEditingController();
+    final raison = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(MboaSizes.radiusXl),
+        ),
+        title: const Text(
+          '⏸ Suspendre l\'annonce',
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'L\'annonce sera masquée du public. Explique la raison au '
+              'propriétaire, il recevra ce message directement.',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: MboaColors.textMuted),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: raisonController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Ex : Photos non conformes au bien réel, merci de corriger.',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, raisonController.text.trim()),
+            style: ElevatedButton.styleFrom(backgroundColor: MboaColors.boost),
+            child: const Text('Suspendre et prévenir'),
+          ),
+        ],
+      ),
+    );
+
+    if (raison == null || raison.isEmpty) return;
+
+    final table = cibleType == 'annonce' ? 'logements' : null;
+    try {
+      var suspendu = false;
+      if (table != null) {
+        try {
+          await _supabase.from('logements').update({'statut': 'suspendu'}).eq('id', cibleId);
+          suspendu = true;
+        } catch (_) {}
+        if (!suspendu) {
+          await _supabase.from('articles').update({'statut': 'suspendu'}).eq('id', cibleId);
+        }
+      }
+
+      final proprietaireId = await _trouverProprietaireId(cibleId);
+      final admin = _supabase.auth.currentUser;
+      if (proprietaireId != null && admin != null) {
+        final response = await _supabase
+            .from('conversations')
+            .insert({
+              'participants': [admin.id, proprietaireId],
+              'non_lu': {admin.id: 0, proprietaireId: 1},
+            })
+            .select('id')
+            .single();
+        await _supabase.from('messages').insert({
+          'conversation_id': response['id'],
+          'expediteur_id': admin.id,
+          'texte':
+              '⚠️ Une de vos annonces a été suspendue par l\'administration Mboa.\n\nRaison : $raison',
+        });
+        await _supabase.from('conversations').update({
+          'dernier_message': '⚠️ Annonce suspendue : $raison',
+          'dernier_message_date': DateTime.now().toIso8601String(),
+        }).eq('id', response['id']);
+      }
+
+      await _traiterSignalement(signalementId, 'traite');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Annonce suspendue, propriétaire prévenu'),
+            backgroundColor: MboaColors.boost,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de la suspension'), backgroundColor: MboaColors.danger),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -536,6 +658,31 @@ class _AdminSignalementsScreenState
                     ),
                   ),
                 ),
+                if (cibleType == 'annonce') ...[
+                  const SizedBox(width: 8),
+                  // Suspendre l'annonce et prévenir le propriétaire
+                  GestureDetector(
+                    onTap: () => _suspendreAnnonce(
+                      signalement['cible_id'],
+                      cibleType,
+                      signalement['id'],
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        color: MboaColors.boost
+                            .withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: MboaColors.boost
+                              .withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: const Icon(Icons.pause_circle_outline_rounded,
+                          size: 16, color: MboaColors.boost),
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 8),
                 // Supprimer l'annonce
                 GestureDetector(
