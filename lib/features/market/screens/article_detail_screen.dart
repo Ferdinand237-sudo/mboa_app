@@ -412,6 +412,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                           MaterialPageRoute(
                             builder: (_) => ProfilVendeurScreen(
                               vendeur: {
+                                'id': a['vendeur_id'],
                                 'nom': vendeurNom,
                                 'initiales': vendeurInitiales,
                                 'type': 'Commerçant',

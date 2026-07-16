@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../chat/screens/chat_screen.dart';
 import '../../map/screens/map_screen.dart';
+import '../../profil/screens/profil_vendeur_screen.dart';
 
 class LogementDetailScreen extends StatefulWidget {
   final Map<String, dynamic> logement;
@@ -567,7 +568,19 @@ class _LogementDetailScreenState
                       // ── Propriétaire ──────────────
                       _buildSectionTitle('👤 Propriétaire'),
                       const SizedBox(height: 12),
-                      Container(
+                      GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfilVendeurScreen(
+                            vendeur: {
+                              ...proprietaire,
+                              'id': l['proprietaire_id'],
+                            },
+                          ),
+                        ),
+                      ),
+                      child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -637,11 +650,18 @@ class _LogementDetailScreenState
                               ),
                             ),
                             if (proprietaire['verified'] ==
-                                true)
+                                true) ...[
                               _buildBadge('✅ Vérifié',
                                   MboaColors.verified),
+                              const SizedBox(width: 8),
+                            ],
+                            const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 14,
+                                color: MboaColors.textMuted),
                           ],
                         ),
+                      ),
                       ),
                       const SizedBox(height: 24),
 
