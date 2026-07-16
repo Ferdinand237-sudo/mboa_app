@@ -784,6 +784,61 @@ class ConversationScreenState extends State<ConversationScreen> {
     }
   }
 
+  bool _memeJour(String? a, String? b) {
+    if (a == null || b == null) return false;
+    try {
+      final da = DateTime.parse(a).toLocal();
+      final db = DateTime.parse(b).toLocal();
+      return da.year == db.year && da.month == db.month && da.day == db.day;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _formatDateSeparateur(String? dateStr) {
+    if (dateStr == null) return '';
+    try {
+      final date = DateTime.parse(dateStr).toLocal();
+      final now = DateTime.now();
+      final aujourdHui = DateTime(now.year, now.month, now.day);
+      final hier = aujourdHui.subtract(const Duration(days: 1));
+      final jour = DateTime(date.year, date.month, date.day);
+      if (jour == aujourdHui) return "Aujourd'hui";
+      if (jour == hier) return 'Hier';
+      const mois = [
+        'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+        'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'
+      ];
+      return '${date.day} ${mois[date.month - 1]} ${date.year}';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Widget _buildDateSeparateur(String? dateStr) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: MboaColors.textMuted.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            _formatDateSeparateur(dateStr),
+            style: const TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: MboaColors.textMuted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _ouvrirFormulaireAvis() async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
@@ -1076,10 +1131,23 @@ class ConversationScreenState extends State<ConversationScreen> {
                         controller: _scrollController,
                         padding: const EdgeInsets.all(16),
                         itemCount: _messages.length,
-                        itemBuilder: (context, index) =>
-                            _buildMessage(
-                                _messages[index],
-                                userId),
+                        itemBuilder: (context, index) {
+                          final msg = _messages[index];
+                          final showSeparateur = index == 0 ||
+                              !_memeJour(
+                                  _messages[index - 1]['date_envoi'],
+                                  msg['date_envoi']);
+                          return Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.stretch,
+                            children: [
+                              if (showSeparateur)
+                                _buildDateSeparateur(
+                                    msg['date_envoi']),
+                              _buildMessage(msg, userId),
+                            ],
+                          );
+                        },
                       ),
           ),
 

@@ -448,7 +448,7 @@ class _MarketScreenState extends State<MarketScreen> {
                   Text(
                     _isLoading
                         ? 'Chargement...'
-                        : '${_articles.length} article${_articles.length > 1 ? 's' : ''} trouvé${_articles.length > 1 ? 's' : ''}',
+                        : '${_displayedArticles.length} article${_displayedArticles.length > 1 ? 's' : ''} trouvé${_displayedArticles.length > 1 ? 's' : ''}',
                     style: MboaTextStyles.muted,
                   ),
                 ],

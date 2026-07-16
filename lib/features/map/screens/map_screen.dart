@@ -701,53 +701,25 @@ class _MapScreenState extends State<MapScreen> {
 
   Widget _buildLieuMarker(
       Map<String, dynamic> lieu, Map<String, dynamic> cat) {
-    return Column(
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: Color(cat['color'])
-                .withValues(alpha: 0.15),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Color(cat['color']),
-              width: 2,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              cat['icon'],
-              style: const TextStyle(fontSize: 18),
-            ),
-          ),
+    // Nom affiché uniquement au clic (fiche du bas) pour éviter que les
+    // étiquettes se chevauchent quand plusieurs lieux sont proches.
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: Color(cat['color']).withValues(alpha: 0.15),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Color(cat['color']),
+          width: 2,
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 4,
-              ),
-            ],
-          ),
-          child: Text(
-            lieu['nom'] ?? '',
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: Color(cat['color']),
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+      ),
+      child: Center(
+        child: Text(
+          cat['icon'],
+          style: const TextStyle(fontSize: 18),
         ),
-      ],
+      ),
     );
   }
 

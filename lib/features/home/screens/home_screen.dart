@@ -31,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingLogements = true;
   bool _isLoadingArticles = true;
   bool _isLoadingContributeurs = true;
-  String? _userName;
+  String? _userName = Supabase.instance.client.auth.currentUser?.userMetadata?['nom'];
   bool _hasNotifications = false;
 
   // ── Trouve ton Mboa ──────────────────────────────────────

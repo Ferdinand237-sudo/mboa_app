@@ -408,7 +408,7 @@ class _LogementScreenState extends State<LogementScreen> {
                   Text(
                     _isLoading
                         ? 'Chargement...'
-                        : '${_logements.length} logement${_logements.length > 1 ? 's' : ''} trouvé${_logements.length > 1 ? 's' : ''}',
+                        : '${_displayedLogements.length} logement${_displayedLogements.length > 1 ? 's' : ''} trouvé${_displayedLogements.length > 1 ? 's' : ''}',
                     style: MboaTextStyles.muted,
                   ),
                   const Spacer(),

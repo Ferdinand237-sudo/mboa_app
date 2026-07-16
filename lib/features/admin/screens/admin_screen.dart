@@ -130,11 +130,48 @@ class _DashboardTab extends StatefulWidget {
 class _DashboardTabState extends State<_DashboardTab> {
   final _supabase = Supabase.instance.client;
   Map<String, int> _stats = {};
+  bool _isLoadingStats = true;
 
   @override
   void initState() {
     super.initState();
     _chargerStats();
+  }
+
+  void _confirmerDeconnexion(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(MboaSizes.radiusXl),
+        ),
+        title: const Text(
+          'Déconnexion',
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
+        ),
+        content: const Text(
+          'Es-tu sûr de vouloir te déconnecter ?',
+          style: TextStyle(fontFamily: 'Poppins', color: MboaColors.textMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await Supabase.instance.client.auth.signOut();
+              if (context.mounted) {
+                context.go(AppRoutes.onboarding);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: MboaColors.danger),
+            child: const Text('Déconnexion'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _chargerStats() async {
@@ -160,10 +197,11 @@ class _DashboardTabState extends State<_DashboardTab> {
             'signalements': (signalements as List).length,
             'demandes': (demandes as List).length,
           };
+          _isLoadingStats = false;
         });
       }
     } catch (e) {
-      if (mounted) setState(() {});
+      if (mounted) setState(() => _isLoadingStats = false);
     }
   }
 
@@ -214,18 +252,12 @@ class _DashboardTabState extends State<_DashboardTab> {
                         ),
                         // Bouton déconnexion
                         GestureDetector(
-                          onTap: () async {
-                            await Supabase.instance.client.auth
-                                .signOut();
-                            if (context.mounted) {
-                              context.go(AppRoutes.onboarding);
-                            }
-                          },
+                          onTap: () => _confirmerDeconnexion(context),
                           child: Container(
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(
@@ -244,19 +276,19 @@ class _DashboardTabState extends State<_DashboardTab> {
                       children: [
                         _buildQuickStat(
                           '👥',
-                          '${_stats['users'] ?? 0}',
+                          _isLoadingStats ? '…' : '${_stats['users'] ?? 0}',
                           'Utilisateurs',
                         ),
                         const SizedBox(width: 12),
                         _buildQuickStat(
                           '🏠',
-                          '${_stats['logements'] ?? 0}',
+                          _isLoadingStats ? '…' : '${_stats['logements'] ?? 0}',
                           'Logements',
                         ),
                         const SizedBox(width: 12),
                         _buildQuickStat(
                           '🛒',
-                          '${_stats['articles'] ?? 0}',
+                          _isLoadingStats ? '…' : '${_stats['articles'] ?? 0}',
                           'Articles',
                         ),
                       ],
