@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1074104199846",
+    "project_id": "mboa-39325",
+    "storage_bucket": "mboa-39325.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1074104199846:android:706f84561c33198b8be267",
+        "android_client_info": {
+          "package_name": "com.mboa.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCT54H5LQUASZNJhhfOgjTIqjIiPwvDYhY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
