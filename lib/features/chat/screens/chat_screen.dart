@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../logement/screens/logement_detail_screen.dart';
+import '../../market/screens/article_detail_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -13,11 +15,17 @@ class _ChatScreenState extends State<ChatScreen> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _conversations = [];
   bool _isLoading = true;
+  String _filtreType = 'tous';
 
   @override
   void initState() {
     super.initState();
     _chargerConversations();
+  }
+
+  List<Map<String, dynamic>> get _conversationsAffichees {
+    if (_filtreType == 'tous') return _conversations;
+    return _conversations.where((c) => c['annonce_type'] == _filtreType).toList();
   }
 
   Future<void> _chargerConversations() async {
@@ -32,6 +40,8 @@ class _ChatScreenState extends State<ChatScreen> {
           .from('conversations')
           .select('*')
           .contains('participants', [user.id])
+          // Une conversation n'apparaît qu'une fois un message échangé.
+          .not('dernier_message', 'is', null)
           .order('dernier_message_date', ascending: false);
 
       if (data.isEmpty) {
@@ -58,15 +68,45 @@ class _ChatScreenState extends State<ChatScreen> {
 
       final mapUsers = {for (var u in usersData) u['id']: u};
 
+      // Récupérer les titres des annonces liées (logements et articles
+      // n'ont pas de FK commune, donc deux requêtes séparées).
+      final idsLogements = data
+          .where((c) => c['annonce_type'] == 'logement' && c['annonce_id'] != null)
+          .map((c) => c['annonce_id'].toString())
+          .toSet()
+          .toList();
+      final idsArticles = data
+          .where((c) => c['annonce_type'] == 'article' && c['annonce_id'] != null)
+          .map((c) => c['annonce_id'].toString())
+          .toSet()
+          .toList();
+
+      final mapTitres = <String, String>{};
+      if (idsLogements.isNotEmpty) {
+        final logementsData =
+            await _supabase.from('logements').select('id, titre').filter('id', 'in', idsLogements);
+        for (final l in List<Map<String, dynamic>>.from(logementsData)) {
+          mapTitres[l['id']] = l['titre'] ?? '';
+        }
+      }
+      if (idsArticles.isNotEmpty) {
+        final articlesData =
+            await _supabase.from('articles').select('id, titre').filter('id', 'in', idsArticles);
+        for (final a in List<Map<String, dynamic>>.from(articlesData)) {
+          mapTitres[a['id']] = a['titre'] ?? '';
+        }
+      }
+
       final enriched = <Map<String, dynamic>>[];
       for (final conv in data) {
         final autreId = List<String>.from(conv['participants'])
             .firstWhere((id) => id != user.id, orElse: () => user.id);
-        
+
         enriched.add({
           ...conv,
           'autre_user': mapUsers[autreId] ?? {'nom': 'Utilisateur'},
           'autre_id': autreId,
+          'annonce_titre': mapTitres[conv['annonce_id']?.toString()],
         });
       }
 
@@ -163,6 +203,61 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
 
+            // ── Filtres ──────────────────────────────
+            if (_conversations.isNotEmpty)
+              Container(
+                width: double.infinity,
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: Row(
+                  children: [
+                    'tous',
+                    'logement',
+                    'article',
+                  ].map((type) {
+                    final isSelected = _filtreType == type;
+                    final label = type == 'tous'
+                        ? 'Tous'
+                        : type == 'logement'
+                            ? '🏠 Logements'
+                            : '🛒 Market';
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () => setState(() => _filtreType = type),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? MboaColors.primary
+                                : MboaColors.background,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected
+                                  ? MboaColors.primary
+                                  : MboaColors.border,
+                            ),
+                          ),
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isSelected
+                                  ? Colors.white
+                                  : MboaColors.text,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+
             // ── Contenu ──────────────────────────────
             Expanded(
               child: user == null
@@ -172,7 +267,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           child: CircularProgressIndicator(
                               color: MboaColors.primary),
                         )
-                      : _conversations.isEmpty
+                      : _conversationsAffichees.isEmpty
                           ? _buildEmpty()
                           : RefreshIndicator(
                               color: MboaColors.primary,
@@ -180,7 +275,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   _chargerConversations,
                               child: ListView.separated(
                                 itemCount:
-                                    _conversations.length,
+                                    _conversationsAffichees.length,
                                 separatorBuilder: (_, __) =>
                                     const Divider(
                                   height: 1,
@@ -190,7 +285,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 itemBuilder:
                                     (context, index) =>
                                         _buildConversationTile(
-                                  _conversations[index],
+                                  _conversationsAffichees[index],
                                 ),
                               ),
                             ),
@@ -215,6 +310,11 @@ class _ChatScreenState extends State<ChatScreen> {
     if (nonLu is Map) {
       nbNonLu = (nonLu[userId] ?? 0) as int;
     }
+    final annonceTitre = conv['annonce_titre'] as String?;
+    final emoji = conv['annonce_type'] == 'logement' ? '🏠' : '🛒';
+    final sujet = (annonceTitre != null && annonceTitre.isNotEmpty)
+        ? '$emoji $annonceTitre'
+        : (conv['annonce_type'] == 'logement' ? '🏠 Logement' : '🛒 Article');
 
     return GestureDetector(
       onTap: () async {
@@ -225,9 +325,9 @@ class _ChatScreenState extends State<ChatScreen> {
               conversationId: conv['id'],
               autreUser: autreUser,
               autreId: conv['autre_id'],
-              sujet: conv['annonce_type'] == 'logement'
-                  ? '🏠 Logement'
-                  : '🛒 Article',
+              sujet: sujet,
+              annonceId: conv['annonce_id']?.toString(),
+              annonceType: conv['annonce_type'],
             ),
           ),
         );
@@ -335,6 +435,20 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ],
                   ),
+                  if (annonceTitre != null && annonceTitre.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      sujet,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: MboaColors.primary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                   const SizedBox(height: 3),
                   Row(
                     mainAxisAlignment:
@@ -581,6 +695,38 @@ class ConversationScreenState extends State<ConversationScreen> {
         );
       }
     });
+  }
+
+  Future<void> _ouvrirAnnonce() async {
+    final id = widget.annonceId;
+    if (id == null) return;
+    try {
+      if (widget.annonceType == 'logement') {
+        final data = await _supabase
+            .from('logements')
+            .select('*, proprietaire:users!proprietaire_id(nom, photo_url, verified, note_globale)')
+            .eq('id', id)
+            .single();
+        if (mounted) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => LogementDetailScreen(logement: data)));
+        }
+      } else {
+        final data = await _supabase
+            .from('articles')
+            .select('*, vendeur:users!vendeur_id(nom, photo_url, verified, note_globale)')
+            .eq('id', id)
+            .single();
+        if (mounted) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => ArticleDetailScreen(article: data)));
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossible de charger cette annonce'), backgroundColor: MboaColors.danger),
+        );
+      }
+    }
   }
 
   Future<void> _envoyerMessage() async {
@@ -869,24 +1015,38 @@ class ConversationScreenState extends State<ConversationScreen> {
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(36),
-          child: Container(
-            width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(
-                16, 0, 16, 8),
-            padding: const EdgeInsets.symmetric(
-                horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: MboaColors.primary
-                  .withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              widget.sujet,
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: MboaColors.primary,
+          child: GestureDetector(
+            onTap: widget.annonceId == null ? null : _ouvrirAnnonce,
+            child: Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: MboaColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      widget.sujet,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: MboaColors.primary,
+                      ),
+                    ),
+                  ),
+                  if (widget.annonceId != null) ...[
+                    const SizedBox(width: 4),
+                    const Icon(Icons.chevron_right_rounded,
+                        size: 14, color: MboaColors.primary),
+                  ],
+                ],
               ),
             ),
           ),
