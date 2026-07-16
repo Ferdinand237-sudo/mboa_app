@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/mboa_cached_image.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../app/router.dart';
 import 'article_detail_screen.dart';
@@ -566,16 +567,7 @@ class _MarketScreenState extends State<MarketScreen> {
                       child: a['photos'] != null &&
                               (a['photos'] as List)
                                   .isNotEmpty
-                          ? Image.network(
-                              a['photos'][0],
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  const Center(
-                                child: Text('📦',
-                                    style: TextStyle(
-                                        fontSize: 36)),
-                              ),
-                            )
+                          ? MboaCachedImage(url: a['photos'][0], emojiPlaceholder: '📦')
                           : const Center(
                               child: Text('📦',
                                   style: TextStyle(

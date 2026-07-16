@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/validators.dart';
 
 class DevenirContributeurScreen extends StatefulWidget {
   final bool dejaVendeur;
@@ -148,7 +149,7 @@ class _DevenirContributeurScreenState extends State<DevenirContributeurScreen> {
               controller: _whatsappController,
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(hintText: '+237 6XX XXX XXX', prefixIcon: Icon(Icons.phone_outlined)),
-              validator: (v) => v == null || v.trim().isEmpty ? 'Requis' : null,
+              validator: Validators.telephone,
             ),
             const SizedBox(height: 16),
             const Text('Décris ton activité',

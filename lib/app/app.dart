@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_theme.dart';
 import '../core/constants/app_constants.dart';
+import '../core/widgets/connectivity_banner.dart';
 import '../app/router.dart';
 
 class MboaApp extends ConsumerWidget {
@@ -16,6 +17,7 @@ class MboaApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       routerConfig: router,
+      builder: (context, child) => ConnectivityBanner(child: child ?? const SizedBox.shrink()),
     );
   }
 }

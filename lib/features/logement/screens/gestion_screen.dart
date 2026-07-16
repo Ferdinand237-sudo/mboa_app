@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../logement/screens/logement_detail_screen.dart';
 import '../../market/screens/article_detail_screen.dart';
+import 'edit_logement_screen.dart';
+import '../../market/screens/edit_article_screen.dart';
 
 class GestionScreen extends StatefulWidget {
   const GestionScreen({super.key});
@@ -189,6 +191,11 @@ class _GestionScreenState extends State<GestionScreen>
         table: 'logements',
         emoji: '🏠',
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LogementDetailScreen(logement: _logements[index]))),
+        onEdit: () async {
+          final modifie = await Navigator.push<bool>(
+              context, MaterialPageRoute(builder: (_) => EditLogementScreen(logement: _logements[index])));
+          if (modifie == true) _charger();
+        },
       ),
     );
   }
@@ -204,6 +211,11 @@ class _GestionScreenState extends State<GestionScreen>
         table: 'articles',
         emoji: '📦',
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ArticleDetailScreen(article: _articles[index]))),
+        onEdit: () async {
+          final modifie = await Navigator.push<bool>(
+              context, MaterialPageRoute(builder: (_) => EditArticleScreen(article: _articles[index])));
+          if (modifie == true) _charger();
+        },
       ),
     );
   }
@@ -213,6 +225,7 @@ class _GestionScreenState extends State<GestionScreen>
     required String table,
     required String emoji,
     required VoidCallback onTap,
+    required VoidCallback onEdit,
   }) {
     final photos = item['photos'] as List? ?? [];
     final estDisponible = item['statut'] == 'disponible';
@@ -279,6 +292,14 @@ class _GestionScreenState extends State<GestionScreen>
           const SizedBox(height: 8),
           Row(
             children: [
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('Modifier'),
+                  style: TextButton.styleFrom(foregroundColor: MboaColors.primary),
+                ),
+              ),
               Expanded(
                 child: TextButton.icon(
                   onPressed: () => _toggleStatut(table, item),

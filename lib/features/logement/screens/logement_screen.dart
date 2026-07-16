@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/mboa_cached_image.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../app/router.dart';
 import 'logement_detail_screen.dart';
@@ -523,16 +524,7 @@ class _LogementScreenState extends State<LogementScreen> {
                     ),
                     child: l['photos'] != null &&
                             (l['photos'] as List).isNotEmpty
-                        ? Image.network(
-                            l['photos'][0],
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                const Center(
-                              child: Text('🏠',
-                                  style: TextStyle(
-                                      fontSize: 44)),
-                            ),
-                          )
+                        ? MboaCachedImage(url: l['photos'][0], emojiPlaceholder: '🏠')
                         : const Center(
                             child: Text('🏠',
                                 style: TextStyle(

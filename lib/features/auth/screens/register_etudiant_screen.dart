@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/validators.dart';
 import '../../../app/router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -248,11 +249,7 @@ class _RegisterEtudiantScreenState extends State<RegisterEtudiantScreen> {
                           hintText: 'ton@email.com',
                           prefixIcon: Icon(Icons.email_outlined),
                         ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Requis';
-                          if (!v.contains('@')) return 'Email invalide';
-                          return null;
-                        },
+                        validator: Validators.email,
                       ),
                       const SizedBox(height: 20),
 
@@ -267,6 +264,7 @@ class _RegisterEtudiantScreenState extends State<RegisterEtudiantScreen> {
                           hintText: '+237 6XX XXX XXX',
                           prefixIcon: Icon(Icons.phone_outlined),
                         ),
+                        validator: (v) => Validators.telephone(v, required: false),
                       ),
                       const SizedBox(height: 20),
 
@@ -291,11 +289,7 @@ class _RegisterEtudiantScreenState extends State<RegisterEtudiantScreen> {
                             ),
                           ),
                         ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Requis';
-                          if (v.length < 6) return 'Minimum 6 caractères';
-                          return null;
-                        },
+                        validator: Validators.motDePasse,
                       ),
                       const SizedBox(height: 20),
 

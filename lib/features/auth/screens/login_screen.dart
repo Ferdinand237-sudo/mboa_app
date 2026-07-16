@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/validators.dart';
 import '../../../app/router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'forgot_password_screen.dart';
@@ -258,15 +259,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           hintText: 'ton@email.com',
                           prefixIcon: Icon(Icons.email_outlined),
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Veuillez entrer votre email';
-                          }
-                          if (!value.contains('@')) {
-                            return 'Email invalide';
-                          }
-                          return null;
-                        },
+                        validator: Validators.email,
                       ),
                       const SizedBox(height: 20),
 

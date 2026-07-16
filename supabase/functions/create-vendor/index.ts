@@ -12,12 +12,43 @@ serve(async (req) => {
   }
 
   try {
-    const { nom, email, password, whatsapp, sousRoles, demandeId } = await req.json()
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Non authentifié' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
+
+    // Vérifier que l'appelant est authentifié ET admin avant toute action privilégiée
+    const callerToken = authHeader.replace('Bearer ', '')
+    const { data: callerData, error: callerError } = await supabaseAdmin.auth.getUser(callerToken)
+    if (callerError || !callerData.user) {
+      return new Response(
+        JSON.stringify({ error: 'Non authentifié' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    const { data: callerProfile, error: profileError } = await supabaseAdmin
+      .from('users')
+      .select('role')
+      .eq('id', callerData.user.id)
+      .single()
+
+    if (profileError || callerProfile?.role !== 'admin') {
+      return new Response(
+        JSON.stringify({ error: 'Action réservée aux administrateurs' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    const { nom, email, password, whatsapp, sousRoles, demandeId } = await req.json()
 
     // Créer le compte Auth
     const { data: authData, error: authError } =

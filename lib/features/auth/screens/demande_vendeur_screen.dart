@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/validators.dart';
 import '../../../app/router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -285,11 +286,7 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
                           hintText: 'ton@email.com',
                           prefixIcon: Icon(Icons.email_outlined),
                         ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Requis';
-                          if (!v.contains('@')) return 'Email invalide';
-                          return null;
-                        },
+                        validator: Validators.email,
                       ),
                       const SizedBox(height: 20),
 
@@ -304,8 +301,7 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
                           hintText: '+237 6XX XXX XXX',
                           prefixIcon: Icon(Icons.phone_outlined),
                         ),
-                        validator: (v) =>
-                            v == null || v.isEmpty ? 'Requis' : null,
+                        validator: Validators.telephone,
                       ),
                       const SizedBox(height: 24),
 

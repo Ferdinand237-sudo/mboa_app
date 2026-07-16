@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/validators.dart';
 import '../../../app/router.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -102,9 +103,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       onPressed: () => setState(() => _obscure = !_obscure),
                     ),
                   ),
-                  validator: (v) => v == null || v.length < 6
-                      ? 'Minimum 6 caractères'
-                      : null,
+                  validator: Validators.motDePasse,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

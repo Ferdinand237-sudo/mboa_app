@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/widgets/mboa_cached_image.dart';
 import '../../logement/screens/logement_detail_screen.dart';
 import '../../market/screens/article_detail_screen.dart';
 import '../../map/screens/map_screen.dart';
@@ -705,8 +706,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: double.infinity,
                 decoration: const BoxDecoration(gradient: MboaColors.cardGradient),
                 child: photos.isNotEmpty
-                    ? Image.network(photos[0], fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Center(child: Text('🏠', style: TextStyle(fontSize: 30))))
+                    ? MboaCachedImage(url: photos[0], emojiPlaceholder: '🏠')
                     : const Center(child: Text('🏠', style: TextStyle(fontSize: 30))),
               ),
             ),
@@ -831,8 +831,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Container(
                       decoration: const BoxDecoration(gradient: MboaColors.cardGradient),
                       child: l['photos'] != null && (l['photos'] as List).isNotEmpty
-                          ? Image.network(l['photos'][0], fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Center(child: Text('🏠', style: TextStyle(fontSize: 40))))
+                          ? MboaCachedImage(url: l['photos'][0], emojiPlaceholder: '🏠')
                           : const Center(child: Text('🏠', style: TextStyle(fontSize: 40))),
                     ),
                   ),
@@ -907,8 +906,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         gradient: LinearGradient(colors: [MboaColors.secondary.withValues(alpha: 0.3), MboaColors.accent.withValues(alpha: 0.2)]),
                       ),
                       child: a['photos'] != null && (a['photos'] as List).isNotEmpty
-                          ? Image.network(a['photos'][0], fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Center(child: Text('📦', style: TextStyle(fontSize: 36))))
+                          ? MboaCachedImage(url: a['photos'][0], emojiPlaceholder: '📦')
                           : const Center(child: Text('📦', style: TextStyle(fontSize: 36))),
                     ),
                   ),

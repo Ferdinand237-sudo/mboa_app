@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/validators.dart';
 
 class EditProfilScreen extends StatefulWidget {
   final Map<String, dynamic> user;
@@ -236,6 +237,7 @@ class _EditProfilScreenState extends State<EditProfilScreen> {
                   hintText: '+237 6XX XXX XXX',
                   prefixIcon: Icon(Icons.phone_outlined),
                 ),
+                validator: (v) => Validators.telephone(v, required: false),
               ),
               const SizedBox(height: 32),
               SizedBox(
