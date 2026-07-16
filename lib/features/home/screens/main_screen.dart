@@ -8,6 +8,7 @@ import '../../market/screens/market_screen.dart';
 import '../../chat/screens/chat_screen.dart';
 import '../../profil/screens/profil_screen.dart';
 import '../../logement/screens/publier_screen.dart';
+import '../../logement/screens/gestion_screen.dart';
 import '../../../app/router.dart';
 
 class MainScreen extends StatefulWidget {
@@ -85,7 +86,7 @@ class _MainScreenState extends State<MainScreen> {
         MaterialPageRoute(builder: (_) => const MarketScreen()),
       ),
     ),
-    const LogementScreen(),
+    const GestionScreen(),
     const PublierScreen(),
     const ChatScreen(),
     ProfilScreen(onOuvrirMessages: () => setState(() => _currentIndex = 3)),
@@ -93,7 +94,7 @@ class _MainScreenState extends State<MainScreen> {
 
   List<_NavItem> get _navItemsVendeur => [
     _NavItem(icon: Icons.home_rounded, label: 'Home'),
-    _NavItem(icon: Icons.list_alt_rounded, label: 'Annonces'),
+    _NavItem(icon: Icons.list_alt_rounded, label: 'Gestion'),
     _NavItem(icon: Icons.add_circle_rounded, label: 'Publier'),
     _NavItem(icon: Icons.chat_bubble_rounded, label: 'Messages'),
     _NavItem(icon: Icons.person_rounded, label: 'Profil'),

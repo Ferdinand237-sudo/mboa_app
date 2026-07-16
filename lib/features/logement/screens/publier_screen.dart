@@ -15,22 +15,110 @@ class PublierScreen extends StatefulWidget {
 
 class _PublierScreenState extends State<PublierScreen>
     with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+  TabController? _tabController;
+  final _supabase = Supabase.instance.client;
+  bool _isLoading = true;
+  bool _peutLogement = false;
+  bool _peutArticle = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _chargerPermissions();
+  }
+
+  Future<void> _chargerPermissions() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+    try {
+      final data = await _supabase.from('users').select('sous_roles').eq('id', userId).single();
+      final sousRoles = List<String>.from(data['sous_roles'] ?? []);
+      final peutLogement = sousRoles.contains('proprietaire');
+      final peutArticle = sousRoles.contains('commercant') || sousRoles.contains('vendeur_independant');
+      if (mounted) {
+        setState(() {
+          _peutLogement = peutLogement;
+          _peutArticle = peutArticle;
+          if (peutLogement && peutArticle) {
+            _tabController = TabController(length: 2, vsync: this);
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: MboaColors.background,
+        body: Center(child: CircularProgressIndicator(color: MboaColors.primary)),
+      );
+    }
+
+    if (!_peutLogement && !_peutArticle) {
+      return Scaffold(
+        backgroundColor: MboaColors.background,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('🔒', style: TextStyle(fontSize: 56)),
+                const SizedBox(height: 16),
+                const Text(
+                  'Aucune permission de publication',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w700, color: MboaColors.text),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Ton compte contributeur ne dispose pas encore des droits de publication. Contacte l\'administrateur.',
+                  style: MboaTextStyles.muted,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Un seul type autorisé : on affiche directement le formulaire, sans onglets.
+    if (!(_peutLogement && _peutArticle)) {
+      return Scaffold(
+        backgroundColor: MboaColors.background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                child: Text(
+                  _peutLogement ? '🏠 Publier un logement' : '🛒 Publier un article',
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 22, fontWeight: FontWeight.w800, color: MboaColors.text),
+                ),
+              ),
+              Expanded(child: _peutLogement ? const _FormLogement() : const _FormArticle()),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: MboaColors.background,
       body: SafeArea(
@@ -120,6 +208,30 @@ class _FormLogementState extends State<_FormLogement> {
   double? _lat;
   double? _lng;
   bool _isGettingLocation = false;
+  List<Map<String, dynamic>> _lieuxPublics = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _chargerLieuxPublics();
+  }
+
+  Future<void> _chargerLieuxPublics() async {
+    try {
+      final data = await _supabase.from('lieux_publics').select('nom, lat, lng');
+      if (mounted) setState(() => _lieuxPublics = List<Map<String, dynamic>>.from(data));
+    } catch (_) {}
+  }
+
+  List<MapEntry<String, double>> get _lieuxProches {
+    if (_lat == null || _lng == null) return [];
+    final distances = _lieuxPublics.map((l) {
+      final d = Geolocator.distanceBetween(_lat!, _lng!, l['lat'], l['lng']);
+      return MapEntry(l['nom'] as String, d);
+    }).toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    return distances.take(3).toList();
+  }
 
   @override
   void dispose() {
@@ -623,6 +735,35 @@ class _FormLogementState extends State<_FormLogement> {
                         ],
                       ),
                     ),
+                  if (_lieuxProches.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _lieuxProches.map((e) {
+                          final distance = e.value < 1000
+                              ? '${e.value.round()} m'
+                              : '${(e.value / 1000).toStringAsFixed(1)} km';
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: MboaColors.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '📍 ${e.key} · $distance',
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: MboaColors.primary,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -789,6 +930,7 @@ class _FormArticleState extends State<_FormArticle> {
   String _selectedCategorie = 'Literie';
   String _selectedEtat = 'Bon état';
   bool _negociable = false;
+  bool _accepteAvis = false;
   List<File> _photos = [];
   bool _isLoading = false;
 
@@ -868,6 +1010,7 @@ class _FormArticleState extends State<_FormArticle> {
         'prix': int.parse(
             _prixController.text.trim().replaceAll(' ', '')),
         'negociable': _negociable,
+        'accepte_avis': _accepteAvis,
         'photos': photoUrls,
         'vendeur_id': _supabase.auth.currentUser!.id,
         'statut': AppConstants.statutDisponible,
@@ -889,6 +1032,7 @@ class _FormArticleState extends State<_FormArticle> {
           _selectedCategorie = 'Literie';
           _selectedEtat = 'Bon état';
           _negociable = false;
+          _accepteAvis = false;
         });
       }
     } catch (e) {
@@ -1198,6 +1342,27 @@ class _FormArticleState extends State<_FormArticle> {
                       ),
                     ),
                   ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Switch(
+                  value: _accepteAvis,
+                  onChanged: (v) => setState(() => _accepteAvis = v),
+                  activeColor: MboaColors.primary,
+                ),
+                const Expanded(
+                  child: Text(
+                    'Autoriser les avis et notes sur cet article (utile pour un article vendu en série)',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: MboaColors.text,
+                    ),
+                  ),
                 ),
               ],
             ),
