@@ -603,13 +603,17 @@ class _AdminSignalementsScreenState
                               size: 14,
                               color: MboaColors.textMuted),
                           SizedBox(width: 5),
-                          Text(
-                            'Ignorer',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: MboaColors.textMuted,
+                          Flexible(
+                            child: Text(
+                              'Ignorer',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: MboaColors.textMuted,
+                              ),
                             ),
                           ),
                         ],
@@ -644,13 +648,17 @@ class _AdminSignalementsScreenState
                               size: 14,
                               color: MboaColors.verified),
                           SizedBox(width: 5),
-                          Text(
-                            'Résoudre',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: MboaColors.verified,
+                          Flexible(
+                            child: Text(
+                              'Résoudre',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: MboaColors.verified,
+                              ),
                             ),
                           ),
                         ],

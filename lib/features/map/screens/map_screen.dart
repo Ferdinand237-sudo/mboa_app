@@ -837,7 +837,7 @@ class _MapScreenState extends State<MapScreen> {
                 child: OutlinedButton.icon(
                   onPressed: () => _ouvrirItineraire(lat, lng),
                   icon: const Icon(Icons.directions_rounded, size: 16),
-                  label: const Text('Itinéraire'),
+                  label: const Text('Itinéraire', maxLines: 1, overflow: TextOverflow.ellipsis),
                 ),
               ),
               const SizedBox(width: 10),
@@ -855,7 +855,7 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ),
                   icon: const Icon(Icons.search_rounded, size: 16),
-                  label: const Text('Autour de ce lieu'),
+                  label: const Text('Autour de ce lieu', maxLines: 1, overflow: TextOverflow.ellipsis),
                 ),
               ),
             ],
@@ -1008,7 +1008,7 @@ class _MapScreenState extends State<MapScreen> {
                     icon: const Icon(
                         Icons.directions_rounded,
                         size: 16),
-                    label: const Text('Itinéraire'),
+                    label: const Text('Itinéraire', maxLines: 1, overflow: TextOverflow.ellipsis),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -1029,7 +1029,7 @@ class _MapScreenState extends State<MapScreen> {
                     icon: const Icon(
                         Icons.visibility_rounded,
                         size: 16),
-                    label: const Text('Voir le logement'),
+                    label: const Text('Voir le logement', maxLines: 1, overflow: TextOverflow.ellipsis),
                   ),
                 ),
               ],

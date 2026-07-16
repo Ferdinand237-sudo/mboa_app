@@ -816,13 +816,17 @@ class _AdminDemandesScreenState
                               size: 16,
                               color: MboaColors.danger),
                           SizedBox(width: 6),
-                          Text(
-                            'Rejeter',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: MboaColors.danger,
+                          Flexible(
+                            child: Text(
+                              'Rejeter',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: MboaColors.danger,
+                              ),
                             ),
                           ),
                         ],
@@ -854,13 +858,17 @@ class _AdminDemandesScreenState
                             color: Colors.white,
                           ),
                           SizedBox(width: 6),
-                          Text(
-                            'Créer le compte',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                          Flexible(
+                            child: Text(
+                              'Créer le compte',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ],

@@ -948,7 +948,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     child: OutlinedButton.icon(
                       onPressed: _appelerVendeur,
                       icon: const Icon(Icons.phone_rounded, size: 18),
-                      label: const Text('Appeler'),
+                      label: const Text('Appeler', maxLines: 1, overflow: TextOverflow.ellipsis),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -957,7 +957,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () => _ouvrirChat(),
                       icon: const Icon(Icons.chat_bubble_rounded, size: 18),
-                      label: const Text('Contacter le vendeur'),
+                      label: const Text('Contacter le vendeur', maxLines: 1, overflow: TextOverflow.ellipsis),
                     ),
                   ),
                 ],

@@ -944,7 +944,7 @@ class _LogementDetailScreenState
                       icon: const Icon(
                           Icons.phone_rounded,
                           size: 18),
-                      label: const Text('Appeler'),
+                      label: const Text('Appeler', maxLines: 1, overflow: TextOverflow.ellipsis),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -956,7 +956,7 @@ class _LogementDetailScreenState
                           Icons.chat_bubble_rounded,
                           size: 18),
                       label: const Text(
-                          'Envoyer un message'),
+                          'Envoyer un message', maxLines: 1, overflow: TextOverflow.ellipsis),
                     ),
                   ),
                 ],
