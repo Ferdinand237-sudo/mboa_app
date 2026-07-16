@@ -920,7 +920,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(a['titre'] ?? '', style: const TextStyle(fontFamily: 'Poppins', fontSize: 11, fontWeight: FontWeight.w700, color: MboaColors.text),
-                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 4),
                   Text(a['etat'] ?? '', style: MboaTextStyles.caption),
                   const SizedBox(height: 4),

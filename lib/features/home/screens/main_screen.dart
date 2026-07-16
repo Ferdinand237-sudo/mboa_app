@@ -81,7 +81,9 @@ class _MainScreenState extends State<MainScreen> {
   // ── Navigation Vendeur ────────────────────────────────────
   List<Widget> get _screensVendeur => [
     HomeScreen(
-      onNavigateLogement: () => setState(() => _currentIndex = 1),
+      onNavigateLogement: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const LogementScreen()),
+      ),
       onNavigateMarket: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const MarketScreen()),
       ),
