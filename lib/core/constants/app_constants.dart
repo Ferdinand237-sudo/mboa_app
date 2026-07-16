@@ -133,4 +133,12 @@ class AppConstants {
     {'label': 'Moins de 2km',  'valeur': 2000},
     {'label': 'Toutes',        'valeur': 0},
   ];
+
+  // ── Nombre de colonnes de grille selon la largeur d'écran ──
+  static int gridColumns(double width) {
+    if (width < 600) return 2;
+    if (width < 900) return 3;
+    if (width < 1200) return 4;
+    return 5;
+  }
 }
