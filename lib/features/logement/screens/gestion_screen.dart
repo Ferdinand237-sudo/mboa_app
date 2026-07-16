@@ -295,25 +295,37 @@ class _GestionScreenState extends State<GestionScreen>
               Expanded(
                 child: TextButton.icon(
                   onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined, size: 16),
-                  label: const Text('Modifier'),
-                  style: TextButton.styleFrom(foregroundColor: MboaColors.primary),
+                  icon: const Icon(Icons.edit_outlined, size: 15),
+                  label: const Text('Modifier', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: MboaColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
               ),
               Expanded(
                 child: TextButton.icon(
                   onPressed: () => _toggleStatut(table, item),
-                  icon: Icon(estDisponible ? Icons.pause_circle_outline_rounded : Icons.play_circle_outline_rounded, size: 16),
-                  label: Text(estDisponible ? 'Suspendre' : 'Réactiver'),
-                  style: TextButton.styleFrom(foregroundColor: MboaColors.boost),
+                  icon: Icon(estDisponible ? Icons.pause_circle_outline_rounded : Icons.play_circle_outline_rounded, size: 15),
+                  label: Text(estDisponible ? 'Suspendre' : 'Réactiver', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: MboaColors.boost,
+                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
               ),
               Expanded(
                 child: TextButton.icon(
                   onPressed: () => _supprimer(table, item['id']),
-                  icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                  label: const Text('Supprimer'),
-                  style: TextButton.styleFrom(foregroundColor: MboaColors.danger),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 15),
+                  label: const Text('Supprimer', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: MboaColors.danger,
+                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
               ),
             ],
