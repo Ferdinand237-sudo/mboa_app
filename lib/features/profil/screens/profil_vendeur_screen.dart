@@ -250,7 +250,7 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
-            expandedHeight: 320,
+            expandedHeight: 400,
             pinned: true,
             backgroundColor: MboaColors.primary,
             leading: GestureDetector(
@@ -669,10 +669,11 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
 
   Widget _buildStat(String value, String label, Color color) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(value, style: TextStyle(fontFamily: 'Poppins', fontSize: 15, fontWeight: FontWeight.w800, color: color)),
+        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'Poppins', fontSize: 15, fontWeight: FontWeight.w800, color: color)),
         const SizedBox(height: 2),
-        Text(label, style: TextStyle(fontFamily: 'Poppins', fontSize: 10, color: color.withValues(alpha: 0.75))),
+        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'Poppins', fontSize: 10, color: color.withValues(alpha: 0.75))),
       ],
     );
   }
