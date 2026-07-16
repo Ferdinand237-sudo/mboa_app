@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../chat/screens/chat_screen.dart';
 import '../../map/screens/map_screen.dart';
 import '../../profil/screens/profil_vendeur_screen.dart';
+import '../../../core/widgets/photo_viewer_fullscreen.dart';
 
 class LogementDetailScreen extends StatefulWidget {
   final Map<String, dynamic> logement;
@@ -94,16 +95,7 @@ class _LogementDetailScreenState
   }
 
   void _ouvrirVisionneuse(List photos, int indexDepart) {
-    if (photos.isEmpty) return;
-    Navigator.push(
-      context,
-      PageRouteBuilder(
-        opaque: false,
-        barrierColor: Colors.black,
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            _PhotoViewerFullscreen(photos: photos, indexDepart: indexDepart),
-      ),
-    );
+    PhotoViewerFullscreen.ouvrir(context, photos, indexDepart, placeholder: '🏠');
   }
 
   Future<void> _verifierFavori() async {
@@ -1370,102 +1362,6 @@ class _LogementDetailScreenState
                     ),
                   ))
               .toList(),
-        ),
-      ),
-    );
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// VISIONNEUSE PLEIN ÉCRAN — glisser vers le bas pour fermer
-// ════════════════════════════════════════════════════════════
-class _PhotoViewerFullscreen extends StatefulWidget {
-  final List photos;
-  final int indexDepart;
-
-  const _PhotoViewerFullscreen({
-    required this.photos,
-    required this.indexDepart,
-  });
-
-  @override
-  State<_PhotoViewerFullscreen> createState() =>
-      _PhotoViewerFullscreenState();
-}
-
-class _PhotoViewerFullscreenState
-    extends State<_PhotoViewerFullscreen> {
-  late final PageController _controller;
-  double _dragOffset = 0;
-  double _opacity = 1;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = PageController(initialPage: widget.indexDepart);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onVerticalDragUpdate: (details) {
-        setState(() {
-          _dragOffset += details.delta.dy;
-          _opacity = (1 - (_dragOffset.abs() / 300)).clamp(0.3, 1.0);
-        });
-      },
-      onVerticalDragEnd: (details) {
-        if (_dragOffset.abs() > 120) {
-          Navigator.pop(context);
-        } else {
-          setState(() {
-            _dragOffset = 0;
-            _opacity = 1;
-          });
-        }
-      },
-      child: Scaffold(
-        backgroundColor: Colors.black.withValues(alpha: _opacity),
-        body: Transform.translate(
-          offset: Offset(0, _dragOffset),
-          child: Stack(
-            children: [
-              PageView.builder(
-                controller: _controller,
-                itemCount: widget.photos.length,
-                itemBuilder: (context, index) => InteractiveViewer(
-                  minScale: 1,
-                  maxScale: 4,
-                  child: Center(
-                    child: Image.network(
-                      widget.photos[index],
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Text(
-                          '🏠',
-                          style: TextStyle(fontSize: 100)),
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 40,
-                right: 16,
-                child: SafeArea(
-                  child: IconButton(
-                    icon: const Icon(Icons.close_rounded,
-                        color: Colors.white, size: 28),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

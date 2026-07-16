@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/photo_viewer_fullscreen.dart';
 import '../../profil/screens/profil_vendeur_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../chat/screens/chat_screen.dart';
@@ -15,8 +18,297 @@ class ArticleDetailScreen extends StatefulWidget {
 class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   bool _isFavori = false;
   int _currentPhoto = 0;
+  final PageController _photoPageController = PageController();
+  Timer? _autoScrollTimer;
+  List<Map<String, dynamic>> _avis = [];
+  bool _isLoadingAvis = true;
 
   final List<String> _emojisPhotos = ['', '', '', ''];
+
+  @override
+  void initState() {
+    super.initState();
+    _verifierFavori();
+    if (widget.article['accepte_avis'] == true) {
+      _chargerAvis();
+    } else {
+      _isLoadingAvis = false;
+    }
+    final photos = widget.article['photos'] is List
+        ? (widget.article['photos'] as List).where((p) => p != null).toList()
+        : [];
+    if (photos.length > 1) {
+      _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+        if (!mounted || !_photoPageController.hasClients) return;
+        final next = (_currentPhoto + 1) % photos.length;
+        _photoPageController.animateToPage(
+          next,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _autoScrollTimer?.cancel();
+    _photoPageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _verifierFavori() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final data = await _supabase
+          .from('favoris')
+          .select()
+          .eq('user_id', user.id)
+          .eq('article_id', widget.article['id'])
+          .maybeSingle();
+      if (mounted) setState(() => _isFavori = data != null);
+    } catch (_) {}
+  }
+
+  Future<void> _toggleFavori() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Connectez-vous pour ajouter aux favoris'),
+          backgroundColor: MboaColors.primary,
+        ),
+      );
+      return;
+    }
+    final nouveauStatut = !_isFavori;
+    setState(() => _isFavori = nouveauStatut);
+    try {
+      if (nouveauStatut) {
+        await _supabase.from('favoris').insert({
+          'user_id': user.id,
+          'article_id': widget.article['id'],
+        });
+      } else {
+        await _supabase
+            .from('favoris')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('article_id', widget.article['id']);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isFavori = !nouveauStatut);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur : ${e.toString()}'), backgroundColor: MboaColors.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _chargerAvis() async {
+    try {
+      final cutoff = DateTime.now().subtract(const Duration(hours: 72));
+      final data = await _supabase
+          .from('avis')
+          .select('*, auteur:users!auteur_id(nom)')
+          .eq('annonce_id', widget.article['id'])
+          .or('valide.eq.true,date_publication.lt.${cutoff.toIso8601String()}')
+          .order('date_publication', ascending: false);
+      if (mounted) {
+        setState(() {
+          _avis = List<Map<String, dynamic>>.from(data);
+          _isLoadingAvis = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingAvis = false);
+    }
+  }
+
+  Future<void> _laisserAvis() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connectez-vous pour laisser un avis'), backgroundColor: MboaColors.primary),
+      );
+      return;
+    }
+    final vendeurId = widget.article['vendeur_id'];
+    if (vendeurId == null || vendeurId == userId) return;
+
+    int noteSelectionnee = 5;
+    final commentaireController = TextEditingController();
+
+    final envoye = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MboaSizes.radiusLg)),
+          title: const Text('⭐ Laisser un avis',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w800, color: MboaColors.text)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Votre expérience avec cet article', style: MboaTextStyles.bodySm),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (i) {
+                  final valeur = i + 1;
+                  return IconButton(
+                    onPressed: () => setDialogState(() => noteSelectionnee = valeur),
+                    icon: Icon(
+                      valeur <= noteSelectionnee ? Icons.star_rounded : Icons.star_border_rounded,
+                      color: MboaColors.boost,
+                      size: 32,
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: commentaireController,
+                maxLines: 3,
+                style: MboaTextStyles.bodySm,
+                decoration: InputDecoration(
+                  hintText: 'Votre commentaire (optionnel)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(MboaSizes.radiusMd)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Annuler')),
+            ElevatedButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Envoyer')),
+          ],
+        ),
+      ),
+    );
+
+    if (envoye != true) return;
+
+    try {
+      await _supabase.from('avis').insert({
+        'auteur_id': userId,
+        'cible_id': vendeurId,
+        'annonce_id': widget.article['id'],
+        'note': noteSelectionnee,
+        'commentaire': commentaireController.text.trim(),
+        'valide': false,
+      });
+
+      final avisData = await _supabase.from('avis').select('note').eq('cible_id', vendeurId);
+      final notes = List<Map<String, dynamic>>.from(avisData);
+      if (notes.isNotEmpty) {
+        final total = notes.fold<int>(0, (sum, a) => sum + ((a['note'] ?? 0) as int));
+        await _supabase.from('users').update({
+          'note_globale': double.parse((total / notes.length).toStringAsFixed(1)),
+          'nb_avis': notes.length,
+        }).eq('id', vendeurId);
+      }
+
+      _chargerAvis();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Merci ! Votre avis sera visible dès validation par le vendeur (ou sous 72h).'),
+            backgroundColor: MboaColors.verified,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de l\'envoi de l\'avis'), backgroundColor: MboaColors.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _appelerVendeur() async {
+    var tel = widget.article['vendeur']?['telephone'];
+    if (tel == null) {
+      final vendeurId = widget.article['vendeur_id'];
+      if (vendeurId != null) {
+        try {
+          final data = await _supabase.from('users').select('telephone').eq('id', vendeurId).single();
+          tel = data['telephone'];
+        } catch (_) {}
+      }
+    }
+    if (tel == null || tel.toString().trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Numéro non renseigné par le vendeur'), backgroundColor: MboaColors.primary),
+        );
+      }
+      return;
+    }
+    final url = Uri.parse('tel:$tel');
+    try {
+      await launchUrl(url);
+    } catch (_) {}
+  }
+
+  void _signalerArticle() {
+    final raisons = [
+      'Fausse annonce',
+      'Arnaque',
+      'Prix incorrect',
+      'Contenu inapproprié',
+      'Annonce dupliquée',
+    ];
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('🚨 Signaler cet article',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w800, color: MboaColors.text)),
+              const SizedBox(height: 14),
+              ...raisons.map((r) => GestureDetector(
+                    onTap: () async {
+                      final userId = _supabase.auth.currentUser?.id;
+                      Navigator.pop(context);
+                      if (userId == null) return;
+                      try {
+                        await _supabase.from('signalements').insert({
+                          'signaleur_id': userId,
+                          'cible_type': 'annonce',
+                          'cible_id': widget.article['id'],
+                          'raison': r,
+                          'statut': 'en-attente',
+                        });
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Signalement envoyé. Merci !'), backgroundColor: MboaColors.primary),
+                          );
+                        }
+                      } catch (_) {}
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: MboaColors.border)),
+                      ),
+                      child: Text(r, style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, color: MboaColors.text)),
+                    ),
+                  )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   String _formatPrix(int prix) {
     return prix
@@ -534,12 +826,84 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                           ],
                         ),
                       ),
+                      const SizedBox(height: 24),
+
+                      // ── Avis (uniquement si le vendeur les autorise) ──
+                      if (a['accepte_avis'] == true) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildSectionTitle('⭐ Avis (${_avis.length})'),
+                            GestureDetector(
+                              onTap: _laisserAvis,
+                              child: const Text(
+                                'Laisser un avis',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: MboaColors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _isLoadingAvis
+                            ? const Center(child: CircularProgressIndicator(color: MboaColors.primary))
+                            : _avis.isEmpty
+                                ? Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
+                                    ),
+                                    child: Center(
+                                      child: Text('Aucun avis pour le moment', style: MboaTextStyles.muted),
+                                    ),
+                                  )
+                                : Column(
+                                    children: _avis.map((avis) {
+                                      final auteur = avis['auteur'] as Map<String, dynamic>? ?? {};
+                                      final nom = auteur['nom'] ?? 'Utilisateur';
+                                      final note = (avis['note'] ?? 0) as int;
+                                      return Container(
+                                        margin: const EdgeInsets.only(bottom: 10),
+                                        padding: const EdgeInsets.all(14),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(MboaSizes.radiusMd),
+                                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(nom,
+                                                      style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w700, color: MboaColors.text)),
+                                                ),
+                                                Row(children: List.generate(5, (i) => Icon(Icons.star_rounded, size: 14, color: i < note ? MboaColors.boost : MboaColors.border))),
+                                              ],
+                                            ),
+                                            if ((avis['commentaire'] ?? '').toString().isNotEmpty) ...[
+                                              const SizedBox(height: 8),
+                                              Text(avis['commentaire'], style: MboaTextStyles.body.copyWith(height: 1.5)),
+                                            ],
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                      ],
+
                       const SizedBox(height: 12),
 
                       // Signaler
                       Center(
                         child: TextButton.icon(
-                          onPressed: () {},
+                          onPressed: _signalerArticle,
                           icon: const Icon(Icons.flag_outlined,
                               size: 16, color: MboaColors.danger),
                           label: const Text(
@@ -582,7 +946,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {},
+                      onPressed: _appelerVendeur,
                       icon: const Icon(Icons.phone_rounded, size: 18),
                       label: const Text('Appeler'),
                     ),
@@ -631,7 +995,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
             top: MediaQuery.of(context).padding.top + 10,
             right: 16,
             child: GestureDetector(
-              onTap: () => setState(() => _isFavori = !_isFavori),
+              onTap: _toggleFavori,
               child: Container(
                 width: 38,
                 height: 38,
@@ -671,6 +1035,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       child: Stack(
         children: [
           PageView.builder(
+            controller: _photoPageController,
             itemCount: displayCount,
             onPageChanged: (i) => setState(() => _currentPhoto = i),
             itemBuilder: (context, index) {
@@ -695,12 +1060,17 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 );
               }
 
-              return Container(
-                decoration: BoxDecoration(
-                  color: Colors.black12,
-                  image: DecorationImage(
-                    image: NetworkImage(photos[index]),
-                    fit: BoxFit.cover,
+              return GestureDetector(
+                onTap: () => PhotoViewerFullscreen.ouvrir(
+                    context, photos, index,
+                    placeholder: _emojisPhotos[0]),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black12,
+                    image: DecorationImage(
+                      image: NetworkImage(photos[index]),
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               );

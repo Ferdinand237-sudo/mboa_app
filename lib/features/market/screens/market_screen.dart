@@ -423,11 +423,15 @@ class _MarketScreenState extends State<MarketScreen> {
                                     .fromLTRB(20, 0, 20, 20),
                                 sliver: SliverGrid(
                                   gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount:
+                                        AppConstants.gridColumns(
+                                            MediaQuery.of(context)
+                                                .size
+                                                .width),
                                     crossAxisSpacing: 12,
                                     mainAxisSpacing: 12,
-                                    childAspectRatio: 0.78,
+                                    childAspectRatio: 1,
                                   ),
                                   delegate:
                                       SliverChildBuilderDelegate(
@@ -480,140 +484,144 @@ class _MarketScreenState extends State<MarketScreen> {
             ),
           ],
         ),
+        // Carte carrée : proportion fixe entre l'image et le bloc
+        // d'informations pour ne jamais déborder quel que soit l'écran.
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Image
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft:
-                    Radius.circular(MboaSizes.radiusLg),
-                topRight:
-                    Radius.circular(MboaSizes.radiusLg),
-              ),
-              child: Stack(
-                children: [
-                  Container(
-                    height: 100,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          MboaColors.secondary
-                              .withValues(alpha: 0.25),
-                          MboaColors.accent
-                              .withValues(alpha: 0.15),
-                        ],
+            Expanded(
+              flex: 5,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft:
+                      Radius.circular(MboaSizes.radiusLg),
+                  topRight:
+                      Radius.circular(MboaSizes.radiusLg),
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            MboaColors.secondary
+                                .withValues(alpha: 0.25),
+                            MboaColors.accent
+                                .withValues(alpha: 0.15),
+                          ],
+                        ),
                       ),
-                    ),
-                    child: a['photos'] != null &&
-                            (a['photos'] as List).isNotEmpty
-                        ? Image.network(
-                            a['photos'][0],
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                const Center(
+                      child: a['photos'] != null &&
+                              (a['photos'] as List)
+                                  .isNotEmpty
+                          ? Image.network(
+                              a['photos'][0],
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  const Center(
+                                child: Text('📦',
+                                    style: TextStyle(
+                                        fontSize: 36)),
+                              ),
+                            )
+                          : const Center(
                               child: Text('📦',
                                   style: TextStyle(
-                                      fontSize: 44)),
+                                      fontSize: 36)),
                             ),
-                          )
-                        : const Center(
-                            child: Text('📦',
-                                style: TextStyle(
-                                    fontSize: 44)),
-                          ),
-                  ),
-                  if (a['boosted'] == true)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: _buildBadge(
-                          '🔥 Boost', MboaColors.boost),
                     ),
-                  if (a['negociable'] == true)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: _buildBadge(
-                          '💬', MboaColors.primary),
-                    ),
-                ],
+                    if (a['boosted'] == true)
+                      Positioned(
+                        top: 6,
+                        left: 6,
+                        child: _buildBadge(
+                            '🔥', MboaColors.boost),
+                      ),
+                    if (a['negociable'] == true)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: _buildBadge(
+                            '💬', MboaColors.primary),
+                      ),
+                  ],
+                ),
               ),
             ),
 
             // Infos
             Expanded(
+              flex: 6,
               child: Padding(
                 padding:
-                    const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                    const EdgeInsets.fromLTRB(8, 6, 8, 6),
                 child: Column(
                   crossAxisAlignment:
                       CrossAxisAlignment.start,
+                  mainAxisAlignment:
+                      MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       a['titre'] ?? '',
                       style: const TextStyle(
                         fontFamily: 'Poppins',
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: MboaColors.text,
                       ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 3),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: MboaColors.background,
-                        borderRadius:
-                            BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        a['etat'] ?? '',
-                        style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: MboaColors.textMuted,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
                     Text(
-                      _formatPrix(a['prix']),
+                      a['etat'] ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontFamily: 'Poppins',
-                        fontSize: 13,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: MboaColors.textMuted,
+                      ),
+                    ),
+                    Text(
+                      _formatPrix(a['prix']),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
                         fontWeight: FontWeight.w800,
                         color: MboaColors.accent,
                       ),
                     ),
-                    const Spacer(),
                     Row(
                       children: [
                         const Icon(Icons.person_rounded,
-                            size: 11,
+                            size: 10,
                             color: MboaColors.textMuted),
                         const SizedBox(width: 3),
                         Expanded(
                           child: Text(
                             vendeur?['nom'] ?? 'Vendeur',
-                            style: MboaTextStyles.caption,
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 9,
+                              color: MboaColors.textMuted,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (vendeur?['verified'] == true)
                           const Icon(
                             Icons.verified_rounded,
-                            size: 12,
+                            size: 11,
                             color: MboaColors.verified,
                           ),
                       ],
                     ),
-                    const SizedBox(height: 6),
                     GestureDetector(
                       onTap: () {
                         if (_supabase.auth.currentUser ==
@@ -641,11 +649,11 @@ class _MarketScreenState extends State<MarketScreen> {
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
-                            vertical: 7),
+                            vertical: 6),
                         decoration: BoxDecoration(
                           color: MboaColors.primary,
                           borderRadius:
-                              BorderRadius.circular(10),
+                              BorderRadius.circular(8),
                         ),
                         child: const Row(
                           mainAxisAlignment:
@@ -653,14 +661,14 @@ class _MarketScreenState extends State<MarketScreen> {
                           children: [
                             Icon(
                                 Icons.chat_bubble_rounded,
-                                size: 12,
+                                size: 11,
                                 color: Colors.white),
-                            SizedBox(width: 5),
+                            SizedBox(width: 4),
                             Text(
                               'Contacter',
                               style: TextStyle(
                                 fontFamily: 'Poppins',
-                                fontSize: 11,
+                                fontSize: 10,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
                               ),
