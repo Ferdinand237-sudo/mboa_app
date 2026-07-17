@@ -130,13 +130,19 @@ class _AmbassadeurVisiteScreenState extends State<AmbassadeurVisiteScreen> {
         if (mounted) _snack('Autorisez la localisation dans les paramètres de l\'app', MboaColors.danger);
         return;
       }
-      final position = await Geolocator.getCurrentPosition();
+      final position = await Geolocator.getCurrentPosition(
+        timeLimit: const Duration(seconds: 15),
+      );
       if (!mounted) return;
       setState(() {
         _lat = position.latitude;
         _lng = position.longitude;
       });
       await _sauvegarderBrouillon();
+    } on TimeoutException {
+      if (mounted) {
+        _snack('Signal GPS trop faible. Réessaie en extérieur ou près d\'une fenêtre.', MboaColors.danger);
+      }
     } catch (e) {
       if (mounted) _snack('Erreur de localisation : ${e.toString()}', MboaColors.danger);
     } finally {

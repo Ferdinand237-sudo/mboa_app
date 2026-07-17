@@ -392,12 +392,23 @@ class _FormLogementState extends State<_FormLogement> {
         return;
       }
 
-      final position = await Geolocator.getCurrentPosition();
+      final position = await Geolocator.getCurrentPosition(
+        timeLimit: const Duration(seconds: 15),
+      );
       if (mounted) {
         setState(() {
           _lat = position.latitude;
           _lng = position.longitude;
         });
+      }
+    } on TimeoutException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Signal GPS trop faible. Réessaie en extérieur ou près d\'une fenêtre.'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
