@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/mixins/realtime_table_mixin.dart';
 import 'ambassadeur_visite_screen.dart';
 
 class AmbassadeurListeScreen extends StatefulWidget {
@@ -11,7 +12,8 @@ class AmbassadeurListeScreen extends StatefulWidget {
   State<AmbassadeurListeScreen> createState() => _AmbassadeurListeScreenState();
 }
 
-class _AmbassadeurListeScreenState extends State<AmbassadeurListeScreen> {
+class _AmbassadeurListeScreenState extends State<AmbassadeurListeScreen>
+    with RealtimeTableMixin<AmbassadeurListeScreen> {
   final _supabase = Supabase.instance.client;
   bool _isLoading = true;
   List<Map<String, dynamic>> _verifications = [];
@@ -20,6 +22,30 @@ class _AmbassadeurListeScreenState extends State<AmbassadeurListeScreen> {
   void initState() {
     super.initState();
     _charger();
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId != null) {
+      // Filtré côté serveur sur ambassadeur_id : une nouvelle assignation
+      // par l'admin (ou une mise à jour de statut) apparaît automatiquement.
+      // Volontairement pas d'abonnement équivalent sur
+      // ambassadeur_visite_screen (batterie/data limitées en terrain).
+      subscribeToTable(
+        channelName: 'ambassadeur_liste_$userId',
+        table: AppConstants.tableVerificationsTerrain,
+        event: PostgresChangeEvent.all,
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'ambassadeur_id',
+          value: userId,
+        ),
+        onChange: (payload) => _charger(),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    disposeRealtimeChannels();
+    super.dispose();
   }
 
   Future<void> _charger() async {

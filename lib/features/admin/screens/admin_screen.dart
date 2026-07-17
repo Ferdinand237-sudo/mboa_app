@@ -21,6 +21,14 @@ class AdminScreen extends StatefulWidget {
 class _AdminScreenState extends State<AdminScreen> {
   int _currentIndex = 0;
 
+  // Onglets 3 (Signalements) et 5 (Vérifs) : badge temps réel affiché
+  // quand un élément arrive pendant que l'admin est sur un autre onglet
+  // (voir CLAUDE.md, section temps réel).
+  static const int _indexSignalements = 3;
+  static const int _indexVerifications = 5;
+  int _badgeSignalements = 0;
+  int _badgeVerifications = 0;
+
   final List<_AdminNavItem> _navItems = [
     _AdminNavItem(icon: Icons.dashboard_rounded, label: 'Dashboard'),
     _AdminNavItem(icon: Icons.people_rounded, label: 'Utilisateurs'),
@@ -30,14 +38,40 @@ class _AdminScreenState extends State<AdminScreen> {
     _AdminNavItem(icon: Icons.verified_user_rounded, label: 'Vérifs'),
   ];
 
-  final List<Widget> _screens = [
+  List<Widget> get _screens => [
     const _DashboardTab(),
     const AdminUsersScreen(),
     const AdminAnnoncesScreen(),
-    const AdminSignalementsScreen(),
+    AdminSignalementsScreen(
+      onNouvelElement: () {
+        if (_currentIndex != _indexSignalements && mounted) {
+          setState(() => _badgeSignalements++);
+        }
+      },
+    ),
     const AdminDemandesScreen(),
-    const AdminVerificationsScreen(),
+    AdminVerificationsScreen(
+      onNouvelElement: () {
+        if (_currentIndex != _indexVerifications && mounted) {
+          setState(() => _badgeVerifications++);
+        }
+      },
+    ),
   ];
+
+  int _badgePourOnglet(int index) {
+    if (index == _indexSignalements) return _badgeSignalements;
+    if (index == _indexVerifications) return _badgeVerifications;
+    return 0;
+  }
+
+  void _selectionnerOnglet(int index) {
+    setState(() {
+      _currentIndex = index;
+      if (index == _indexSignalements) _badgeSignalements = 0;
+      if (index == _indexVerifications) _badgeVerifications = 0;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,33 +99,51 @@ class _AdminScreenState extends State<AdminScreen> {
               children: List.generate(_navItems.length, (index) {
                 final item = _navItems[index];
                 final isActive = _currentIndex == index;
+                final badge = _badgePourOnglet(index);
                 return Expanded(
                   child: GestureDetector(
-                    onTap: () =>
-                        setState(() => _currentIndex = index),
+                    onTap: () => _selectionnerOnglet(index),
                     behavior: HitTestBehavior.opaque,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isActive
-                                ? MboaColors.primary.withOpacity(0.12)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Icon(
-                            item.icon,
-                            color: isActive
-                                ? MboaColors.primary
-                                : MboaColors.textMuted,
-                            size: 24,
-                          ),
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? MboaColors.primary.withOpacity(0.12)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Icon(
+                                item.icon,
+                                color: isActive
+                                    ? MboaColors.primary
+                                    : MboaColors.textMuted,
+                                size: 24,
+                              ),
+                            ),
+                            if (badge > 0)
+                              Positioned(
+                                top: 0,
+                                right: 6,
+                                child: Container(
+                                  width: 9,
+                                  height: 9,
+                                  decoration: const BoxDecoration(
+                                    color: MboaColors.danger,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 2),
                         Text(

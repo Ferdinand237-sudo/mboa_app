@@ -2,17 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/mixins/realtime_table_mixin.dart';
 
 class AdminSignalementsScreen extends StatefulWidget {
-  const AdminSignalementsScreen({super.key});
+  // Appelé à chaque nouveau signalement reçu en temps réel — le parent
+  // (AdminScreen) décide s'il doit afficher un badge sur l'onglet
+  // (uniquement si cet écran n'est pas l'onglet actif à ce moment-là).
+  final VoidCallback? onNouvelElement;
+  const AdminSignalementsScreen({super.key, this.onNouvelElement});
 
   @override
   State<AdminSignalementsScreen> createState() =>
       _AdminSignalementsScreenState();
 }
 
-class _AdminSignalementsScreenState
-    extends State<AdminSignalementsScreen> {
+class _AdminSignalementsScreenState extends State<AdminSignalementsScreen>
+    with RealtimeTableMixin<AdminSignalementsScreen> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _signalements = [];
   bool _isLoading = true;
@@ -23,6 +28,25 @@ class _AdminSignalementsScreenState
   void initState() {
     super.initState();
     _chargerSignalements();
+    // Un nouveau signalement (utilisateur ou detection_ia) doit apparaître
+    // instantanément. Comme pour admin_verifications_screen, le payload
+    // realtime n'a pas la jointure signaleur:users(...) : on recharge la
+    // liste filtrée plutôt que de fusionner un payload incomplet.
+    subscribeToTable(
+      channelName: 'admin_signalements',
+      table: AppConstants.tableSignalements,
+      event: PostgresChangeEvent.insert,
+      onChange: (payload) {
+        _chargerSignalements();
+        widget.onNouvelElement?.call();
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    disposeRealtimeChannels();
+    super.dispose();
   }
 
   Future<void> _chargerSignalements() async {

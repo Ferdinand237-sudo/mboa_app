@@ -335,6 +335,25 @@ Navigator.push pour écrans détail
    Créer user dans Authentication puis
    UPDATE users SET role='admin', verified=true WHERE email='ton_email'
 
+## Temps réel (Supabase Realtime)
+
+### Écrans qui l'utilisent, et pourquoi
+- chat_screen.dart (ConversationScreen) : `supabase.channel('conv_<id>').onPostgresChanges(event: insert, table: 'messages', ...)`, canal fermé dans `dispose()` via `removeChannel`. C'est le premier usage du temps réel dans le projet ; les écrans ci-dessous suivent le même principe (channel dédié, fermé au dispose).
+- admin_verifications_screen.dart : abonnement sur `verifications_terrain` (INSERT + UPDATE) — une nouvelle visite soumise par un ambassadeur apparaît sans recharger manuellement. Badge rouge sur l'onglet "Vérifs" de admin_screen.dart si l'admin est sur un autre onglet au moment de l'événement.
+- admin_signalements_screen.dart : abonnement sur `signalements` (INSERT) — un nouveau signalement (utilisateur ou `detection_ia`, voir Partie 1 modération IA) apparaît instantanément. Même mécanique de badge sur l'onglet "Signalements".
+- ambassadeur_liste_screen.dart : abonnement sur `verifications_terrain` filtré côté serveur `ambassadeur_id = auth.uid()` — une nouvelle assignation par l'admin apparaît automatiquement.
+
+Ces trois derniers écrans rechargent la liste filtrée (`_charger()`) à chaque événement plutôt que de fusionner le payload brut dans l'état local : les payloads `postgres_changes` ne contiennent que les colonnes de la table modifiée, jamais les jointures (`proprietaire:users(...)`, `signaleur:users(...)`) affichées par ces écrans — un recharger garantit des données toujours cohérentes sans dupliquer la logique de jointure.
+
+### Écrans qui l'évitent volontairement, et pourquoi
+- **logement_screen.dart, market_screen.dart, home_screen.dart, map_screen.dart** : listes publiques à fort trafic, consultées par tous les visiteurs. Un abonnement realtime par utilisateur connecté sur ces écrans multiplierait les connexions WebSocket sans bénéfice réel (une annonce qui apparaît 30 secondes plus tard après un pull-to-refresh n'a aucun impact produit). Le chargement classique + `RefreshIndicator` reste volontairement le pattern ici.
+- **ambassadeur_visite_screen.dart** (le formulaire de visite lui-même) : aucun abonnement, contrairement à ambassadeur_liste_screen.dart juste à côté. Choix délibéré : batterie et données mobiles limitées sur le terrain, et le formulaire n'a besoin d'aucune donnée live pendant la saisie (le brouillon est local, l'envoi se fait explicitement).
+
+### Réutilisation : `RealtimeTableMixin`
+`lib/core/mixins/realtime_table_mixin.dart` centralise l'abonnement/désabonnement (`subscribeToTable(...)` / `disposeRealtimeChannels()`) pour éviter de dupliquer ce code. Utilisé par les trois écrans admin/ambassadeur ci-dessus. `chat_screen.dart` garde son implémentation manuelle d'origine (antérieure au mixin, déjà correcte et testée) — non retouchée pour ne pas prendre de risque sur une fonctionnalité cœur déjà en production.
+
+Dans tous les cas : fermer le canal dans `dispose()` (`disposeRealtimeChannels()` pour les écrans utilisant le mixin) pour éviter l'accumulation de connexions WebSocket ouvertes.
+
 ## Ordre de travail recommandé
 1. Lire ce fichier en entier
 2. flutter pub get

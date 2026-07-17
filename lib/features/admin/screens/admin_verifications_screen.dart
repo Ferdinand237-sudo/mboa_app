@@ -2,15 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/mixins/realtime_table_mixin.dart';
 
 class AdminVerificationsScreen extends StatefulWidget {
-  const AdminVerificationsScreen({super.key});
+  // Appelé à chaque changement reçu en temps réel — le parent (AdminScreen)
+  // décide s'il doit afficher un badge sur l'onglet (uniquement si cet
+  // écran n'est pas l'onglet actif au moment de l'événement).
+  final VoidCallback? onNouvelElement;
+  const AdminVerificationsScreen({super.key, this.onNouvelElement});
 
   @override
   State<AdminVerificationsScreen> createState() => _AdminVerificationsScreenState();
 }
 
-class _AdminVerificationsScreenState extends State<AdminVerificationsScreen> {
+class _AdminVerificationsScreenState extends State<AdminVerificationsScreen>
+    with RealtimeTableMixin<AdminVerificationsScreen> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _verifications = [];
   bool _isLoading = true;
@@ -20,6 +26,25 @@ class _AdminVerificationsScreenState extends State<AdminVerificationsScreen> {
   void initState() {
     super.initState();
     _charger();
+    // Les payloads realtime ne contiennent que les colonnes brutes de
+    // verifications_terrain (pas les jointures propriétaire/ambassadeur) :
+    // on se contente donc de redéclencher un chargement filtré, plutôt que
+    // de fusionner manuellement un payload incomplet dans la liste.
+    subscribeToTable(
+      channelName: 'admin_verifications_terrain',
+      table: AppConstants.tableVerificationsTerrain,
+      event: PostgresChangeEvent.all,
+      onChange: (payload) {
+        _charger();
+        widget.onNouvelElement?.call();
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    disposeRealtimeChannels();
+    super.dispose();
   }
 
   Future<void> _charger() async {
