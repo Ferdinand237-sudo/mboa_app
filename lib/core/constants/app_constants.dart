@@ -26,12 +26,15 @@ class AppConstants {
   static const String tableSignalements   = 'signalements';
   static const String tableModerationIa   = 'moderation_ia';
   static const String tableImageHashes    = 'image_hashes';
+  static const String tableVerificationsTerrain    = 'verifications_terrain';
+  static const String tableAttestationsAccesLog    = 'attestations_acces_log';
 
   // ── Storage Supabase (buckets) ────────────────────────────
   static const String bucketLogements     = 'logements';
   static const String bucketArticles      = 'articles';
   static const String bucketProfils       = 'profils';
   static const String bucketBoutiques     = 'boutiques';
+  static const String bucketAttestations  = 'attestations-proprietaires';
 
   // ── Pagination ────────────────────────────────────────────
   static const int pageSize              = 10;
@@ -102,6 +105,7 @@ class AppConstants {
   static const String roleVisiteur     = 'visiteur';
   static const String roleVendeur      = 'vendeur';
   static const String roleAdmin        = 'admin';
+  static const String roleAmbassadeur  = 'ambassadeur';
 
   // ── Sous-rôles vendeur ────────────────────────────────────
   static const String sousRoleProprietaire       = 'proprietaire';
@@ -134,6 +138,22 @@ class AppConstants {
   static const String statutModerationPublie    = 'publie';
   static const String statutModerationAVerifier = 'a_verifier';
   static const String statutModerationBloque    = 'bloque';
+
+  // ── Statuts de vérification terrain (Partie 2) ────────────
+  static const String statutVerificationEnAttenteAssignation = 'en_attente_assignation';
+  static const String statutVerificationAssignee              = 'assignee';
+  static const String statutVerificationVisiteEffectuee        = 'visite_effectuee';
+  static const String statutVerificationValidee                = 'validee';
+  static const String statutVerificationRejetee                = 'rejetee';
+
+  // ── Types de justificatif (jamais le numéro de pièce en clair) ──
+  static const List<String> typesJustificatif = [
+    'Carte Nationale d\'Identité',
+    'Passeport',
+    'Titre de propriété',
+    'Acte de vente',
+    'Autre document officiel',
+  ];
 
   // ── Prix min/max filtre ───────────────────────────────────
   static const double prixMin = 5000;

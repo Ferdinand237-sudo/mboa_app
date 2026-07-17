@@ -723,7 +723,9 @@ class _ProfilScreenState extends State<ProfilScreen> {
                               ? '🏪 Vendeur / Commerçant'
                               : _user?['role'] == 'admin'
                                   ? '👑 Administrateur'
-                                  : '🎓 Étudiant / Visiteur',
+                                  : _user?['role'] == 'ambassadeur'
+                                      ? '🧭 Ambassadeur Mboa'
+                                      : '🎓 Étudiant / Visiteur',
                           style: const TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 13,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/constants/app_constants.dart';
 import 'admin_demandes_screen.dart';
 
 class AdminUsersScreen extends StatefulWidget {
@@ -13,6 +14,7 @@ class AdminUsersScreen extends StatefulWidget {
 class _AdminUsersScreenState extends State<AdminUsersScreen> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _users = [];
+  Map<String, String> _statutVerificationParUser = {};
   bool _isLoadingUsers = true;
 
   @override
@@ -23,19 +25,115 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   Future<void> _chargerUsers() async {
     try {
-      final data = await _supabase
-          .from('users')
-          .select()
-          .order('date_inscription', ascending: false);
+      final resultats = await Future.wait<dynamic>([
+        _supabase.from('users').select().order('date_inscription', ascending: false),
+        _supabase.from(AppConstants.tableVerificationsTerrain).select('user_id, statut'),
+      ]);
+      final users = List<Map<String, dynamic>>.from(resultats[0] as List);
+      final verifications = List<Map<String, dynamic>>.from(resultats[1] as List);
+
       if (mounted) {
         setState(() {
-          _users = List<Map<String, dynamic>>.from(data);
+          _users = users;
+          _statutVerificationParUser = {
+            for (final v in verifications) v['user_id'] as String: v['statut'] as String,
+          };
           _isLoadingUsers = false;
         });
       }
     } catch (e) {
       if (mounted) setState(() => _isLoadingUsers = false);
     }
+  }
+
+  Future<void> _creerAmbassadeur() async {
+    final formKey = GlobalKey<FormState>();
+    final nomController = TextEditingController();
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    final whatsappController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MboaSizes.radiusXl)),
+        title: const Text('🧭 Créer un ambassadeur', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nomController,
+                  decoration: const InputDecoration(labelText: 'Nom complet'),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Requis' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: emailController,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (v) => (v == null || !v.contains('@')) ? 'Email invalide' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: passwordController,
+                  decoration: const InputDecoration(labelText: 'Mot de passe temporaire'),
+                  obscureText: true,
+                  validator: (v) => (v == null || v.length < 6) ? '6 caractères minimum' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: whatsappController,
+                  decoration: const InputDecoration(labelText: 'WhatsApp (optionnel)'),
+                  keyboardType: TextInputType.phone,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.pop(context);
+              try {
+                final response = await _supabase.functions.invoke('create-ambassadeur', body: {
+                  'nom': nomController.text.trim(),
+                  'email': emailController.text.trim(),
+                  'password': passwordController.text,
+                  'whatsapp': whatsappController.text.trim(),
+                });
+                if (response.status == 200) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('✅ Ambassadeur ${nomController.text.trim()} créé'), backgroundColor: MboaColors.primary),
+                    );
+                    _chargerUsers();
+                  }
+                } else {
+                  final error = (response.data as Map?)?['error'] ?? 'Erreur inconnue';
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Erreur : $error'), backgroundColor: MboaColors.danger),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Erreur : ${e.toString()}'), backgroundColor: MboaColors.danger),
+                  );
+                }
+              }
+            },
+            child: const Text('Créer le compte'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _toggleActif(
@@ -220,15 +318,24 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       color: MboaColors.text,
                     ),
                   ),
-                  TextButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AdminDemandesScreen(),
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        onPressed: _creerAmbassadeur,
+                        icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                        label: const Text('Ambassadeur'),
                       ),
-                    ),
-                    icon: const Icon(Icons.mail_rounded, size: 16),
-                    label: const Text('Demandes Pro'),
+                      TextButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AdminDemandesScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.mail_rounded, size: 16),
+                        label: const Text('Demandes Pro'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -278,6 +385,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       case 'vendeur':
         roleColor = MboaColors.secondary;
         roleLabel = '🏪 Vendeur';
+        break;
+      case 'ambassadeur':
+        roleColor = MboaColors.primaryDark;
+        roleLabel = '🧭 Ambassadeur';
         break;
       default:
         roleColor = MboaColors.primary;
@@ -361,22 +472,30 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       style: MboaTextStyles.caption,
                     ),
                     const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: roleColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        roleLabel,
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: roleColor,
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: roleColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            roleLabel,
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: roleColor,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (_statutVerificationParUser.containsKey(user['id']))
+                          _buildBadgeVerification(_statutVerificationParUser[user['id']]!),
+                      ],
                     ),
                   ],
                 ),
@@ -417,6 +536,43 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildBadgeVerification(String statut) {
+    final Color color;
+    final String label;
+    switch (statut) {
+      case 'assignee':
+        color = MboaColors.boost;
+        label = '📍 Visite en cours';
+        break;
+      case 'visite_effectuee':
+        color = MboaColors.primary;
+        label = '📤 À valider';
+        break;
+      case 'validee':
+        color = MboaColors.verified;
+        label = '✅ Vérifié terrain';
+        break;
+      case 'rejetee':
+        color = MboaColors.danger;
+        label = '❌ Vérif. rejetée';
+        break;
+      default:
+        color = MboaColors.textMuted;
+        label = '🕓 À assigner';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontFamily: 'Poppins', fontSize: 10, fontWeight: FontWeight.w700, color: color),
       ),
     );
   }

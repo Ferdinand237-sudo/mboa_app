@@ -9,6 +9,8 @@ import '../../chat/screens/chat_screen.dart';
 import '../../profil/screens/profil_screen.dart';
 import '../../logement/screens/publier_screen.dart';
 import '../../logement/screens/gestion_screen.dart';
+import '../../ambassadeur/screens/ambassadeur_dashboard_screen.dart';
+import '../../ambassadeur/screens/ambassadeur_liste_screen.dart';
 import '../../../app/router.dart';
 
 class MainScreen extends StatefulWidget {
@@ -102,13 +104,31 @@ class _MainScreenState extends State<MainScreen> {
     _NavItem(icon: Icons.person_rounded, label: 'Profil'),
   ];
 
+  // ── Navigation Ambassadeur ────────────────────────────────
+  List<Widget> get _screensAmbassadeur => [
+    const AmbassadeurDashboardScreen(),
+    const AmbassadeurListeScreen(),
+    ProfilScreen(onOuvrirMessages: () {}),
+  ];
+
+  List<_NavItem> get _navItemsAmbassadeur => [
+    _NavItem(icon: Icons.dashboard_rounded, label: 'Dashboard'),
+    _NavItem(icon: Icons.people_alt_rounded, label: 'Assignés'),
+    _NavItem(icon: Icons.person_rounded, label: 'Profil'),
+  ];
+
   bool get _isVendeur => _userRole == 'vendeur';
+  bool get _isAmbassadeur => _userRole == 'ambassadeur';
 
-  List<Widget> get _screens =>
-      _isVendeur ? _screensVendeur : _screensVisiteur;
+  List<Widget> get _screens {
+    if (_isAmbassadeur) return _screensAmbassadeur;
+    return _isVendeur ? _screensVendeur : _screensVisiteur;
+  }
 
-  List<_NavItem> get _navItems =>
-      _isVendeur ? _navItemsVendeur : _navItemsVisiteur;
+  List<_NavItem> get _navItems {
+    if (_isAmbassadeur) return _navItemsAmbassadeur;
+    return _isVendeur ? _navItemsVendeur : _navItemsVisiteur;
+  }
 
   @override
   Widget build(BuildContext context) {

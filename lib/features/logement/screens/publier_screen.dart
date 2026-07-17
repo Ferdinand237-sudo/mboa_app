@@ -87,6 +87,7 @@ class _PublierScreenState extends State<PublierScreen>
   bool _isLoading = true;
   bool _peutLogement = false;
   bool _peutArticle = false;
+  bool _compteActifPublication = true;
 
   @override
   void initState() {
@@ -101,7 +102,11 @@ class _PublierScreenState extends State<PublierScreen>
       return;
     }
     try {
-      final data = await _supabase.from('users').select('sous_roles').eq('id', userId).single();
+      final data = await _supabase
+          .from('users')
+          .select('sous_roles, compte_actif_publication')
+          .eq('id', userId)
+          .single();
       final sousRoles = List<String>.from(data['sous_roles'] ?? []);
       final peutLogement = sousRoles.contains('proprietaire');
       final peutArticle = sousRoles.contains('commercant') || sousRoles.contains('vendeur_independant');
@@ -109,6 +114,7 @@ class _PublierScreenState extends State<PublierScreen>
         setState(() {
           _peutLogement = peutLogement;
           _peutArticle = peutArticle;
+          _compteActifPublication = data['compte_actif_publication'] ?? true;
           if (peutLogement && peutArticle) {
             _tabController = TabController(length: 2, vsync: this);
           }
@@ -179,7 +185,11 @@ class _PublierScreenState extends State<PublierScreen>
                   style: const TextStyle(fontFamily: 'Poppins', fontSize: 22, fontWeight: FontWeight.w800, color: MboaColors.text),
                 ),
               ),
-              Expanded(child: _peutLogement ? const _FormLogement() : const _FormArticle()),
+              Expanded(
+                child: _peutLogement
+                    ? _FormLogement(compteActifPublication: _compteActifPublication)
+                    : const _FormArticle(),
+              ),
             ],
           ),
         ),
@@ -234,9 +244,9 @@ class _PublierScreenState extends State<PublierScreen>
             Expanded(
               child: TabBarView(
                 controller: _tabController,
-                children: const [
-                  _FormLogement(),
-                  _FormArticle(),
+                children: [
+                  _FormLogement(compteActifPublication: _compteActifPublication),
+                  const _FormArticle(),
                 ],
               ),
             ),
@@ -251,7 +261,8 @@ class _PublierScreenState extends State<PublierScreen>
 // FORMULAIRE LOGEMENT
 // ════════════════════════════════════════════════════════════
 class _FormLogement extends StatefulWidget {
-  const _FormLogement();
+  final bool compteActifPublication;
+  const _FormLogement({required this.compteActifPublication});
 
   @override
   State<_FormLogement> createState() => _FormLogementState();
@@ -420,6 +431,15 @@ class _FormLogementState extends State<_FormLogement> {
   }
 
   Future<void> _publier() async {
+    if (!widget.compteActifPublication) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vérification terrain en cours : publication indisponible pour le moment'),
+          backgroundColor: MboaColors.danger,
+        ),
+      );
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     if (_photos.length < AppConstants.minPhotosLogement) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -513,6 +533,34 @@ class _FormLogementState extends State<_FormLogement> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 8),
+
+            if (!widget.compteActifPublication) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: MboaColors.danger.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
+                  border: Border.all(color: MboaColors.danger.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.verified_user_outlined, color: MboaColors.danger, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Vérification terrain en cours. Un ambassadeur Mboa doit visiter '
+                        'ton logement avant que tu puisses publier une annonce. Tu peux '
+                        'préparer ton annonce dès maintenant, la publication se débloquera '
+                        'automatiquement une fois la vérification validée par l\'administration.',
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 12.5, color: MboaColors.text),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // ── Photos ──────────────────────────────
             _buildSectionTitle('📷 Photos du logement'),
@@ -947,7 +995,7 @@ class _FormLogementState extends State<_FormLogement> {
               width: double.infinity,
               height: MboaSizes.buttonHeight,
               child: ElevatedButton.icon(
-                onPressed: _isLoading ? null : _publier,
+                onPressed: (_isLoading || !widget.compteActifPublication) ? null : _publier,
                 icon: _isLoading
                     ? const SizedBox(
                         width: 20,

@@ -8,6 +8,7 @@ import 'admin_users_screen.dart';
 import 'admin_annonces_screen.dart';
 import 'admin_signalements_screen.dart';
 import 'admin_demandes_screen.dart';
+import 'admin_verifications_screen.dart';
 // import 'admin_demandes_screen.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -26,6 +27,7 @@ class _AdminScreenState extends State<AdminScreen> {
     _AdminNavItem(icon: Icons.list_alt_rounded, label: 'Annonces'),
     _AdminNavItem(icon: Icons.flag_rounded, label: 'Signalements'),
     _AdminNavItem(icon: Icons.mail_rounded, label: 'Demandes'),
+    _AdminNavItem(icon: Icons.verified_user_rounded, label: 'Vérifs'),
   ];
 
   final List<Widget> _screens = [
@@ -34,6 +36,7 @@ class _AdminScreenState extends State<AdminScreen> {
     const AdminAnnoncesScreen(),
     const AdminSignalementsScreen(),
     const AdminDemandesScreen(),
+    const AdminVerificationsScreen(),
   ];
 
   @override
