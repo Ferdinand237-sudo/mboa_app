@@ -9,6 +9,7 @@ import 'admin_annonces_screen.dart';
 import 'admin_signalements_screen.dart';
 import 'admin_demandes_screen.dart';
 import 'admin_verifications_screen.dart';
+import '../../../core/mixins/refreshable_state.dart';
 // import 'admin_demandes_screen.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -29,6 +30,16 @@ class _AdminScreenState extends State<AdminScreen> {
   int _badgeSignalements = 0;
   int _badgeVerifications = 0;
 
+  // Signalements et Vérifs ont déjà leur propre abonnement realtime
+  // (voir CLAUDE.md) : pas de clé de rafraîchissement nécessaire pour eux.
+  final _dashboardKey = GlobalKey<State>();
+  final _usersKey = GlobalKey<State>();
+  final _annoncesKey = GlobalKey<State>();
+  final _demandesKey = GlobalKey<State>();
+
+  List<GlobalKey<State>?> get _refreshKeys =>
+      [_dashboardKey, _usersKey, _annoncesKey, null, _demandesKey, null];
+
   final List<_AdminNavItem> _navItems = [
     _AdminNavItem(icon: Icons.dashboard_rounded, label: 'Dashboard'),
     _AdminNavItem(icon: Icons.people_rounded, label: 'Utilisateurs'),
@@ -39,9 +50,9 @@ class _AdminScreenState extends State<AdminScreen> {
   ];
 
   List<Widget> get _screens => [
-    const _DashboardTab(),
-    const AdminUsersScreen(),
-    const AdminAnnoncesScreen(),
+    _DashboardTab(key: _dashboardKey),
+    AdminUsersScreen(key: _usersKey),
+    AdminAnnoncesScreen(key: _annoncesKey),
     AdminSignalementsScreen(
       onNouvelElement: () {
         if (_currentIndex != _indexSignalements && mounted) {
@@ -49,7 +60,7 @@ class _AdminScreenState extends State<AdminScreen> {
         }
       },
     ),
-    const AdminDemandesScreen(),
+    AdminDemandesScreen(key: _demandesKey),
     AdminVerificationsScreen(
       onNouvelElement: () {
         if (_currentIndex != _indexVerifications && mounted) {
@@ -71,6 +82,8 @@ class _AdminScreenState extends State<AdminScreen> {
       if (index == _indexSignalements) _badgeSignalements = 0;
       if (index == _indexVerifications) _badgeVerifications = 0;
     });
+    final state = _refreshKeys[index]?.currentState;
+    if (state is RefreshableState) (state as RefreshableState).refresh();
   }
 
   @override
@@ -176,13 +189,13 @@ class _AdminScreenState extends State<AdminScreen> {
 // DASHBOARD TAB
 // ════════════════════════════════════════════════════════════
 class _DashboardTab extends StatefulWidget {
-  const _DashboardTab();
+  const _DashboardTab({super.key});
 
   @override
   State<_DashboardTab> createState() => _DashboardTabState();
 }
 
-class _DashboardTabState extends State<_DashboardTab> {
+class _DashboardTabState extends State<_DashboardTab> with RefreshableState {
   final _supabase = Supabase.instance.client;
   Map<String, int> _stats = {};
   bool _isLoadingStats = true;
@@ -192,6 +205,9 @@ class _DashboardTabState extends State<_DashboardTab> {
     super.initState();
     _chargerStats();
   }
+
+  @override
+  Future<void> refresh() => _chargerStats();
 
   void _confirmerDeconnexion(BuildContext context) {
     showDialog(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/mixins/refreshable_state.dart';
 
 class AdminDemandesScreen extends StatefulWidget {
   const AdminDemandesScreen({super.key});
@@ -11,7 +12,7 @@ class AdminDemandesScreen extends StatefulWidget {
 }
 
 class _AdminDemandesScreenState
-    extends State<AdminDemandesScreen> {
+    extends State<AdminDemandesScreen> with RefreshableState {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _demandes = [];
   bool _isLoading = true;
@@ -22,6 +23,9 @@ class _AdminDemandesScreenState
     super.initState();
     _chargerDemandes();
   }
+
+  @override
+  Future<void> refresh() => _chargerDemandes();
 
   Future<void> _chargerDemandes() async {
     setState(() => _isLoading = true);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/mixins/refreshable_state.dart';
 
 class AmbassadeurDashboardScreen extends StatefulWidget {
   const AmbassadeurDashboardScreen({super.key});
@@ -10,7 +11,7 @@ class AmbassadeurDashboardScreen extends StatefulWidget {
   State<AmbassadeurDashboardScreen> createState() => _AmbassadeurDashboardScreenState();
 }
 
-class _AmbassadeurDashboardScreenState extends State<AmbassadeurDashboardScreen> {
+class _AmbassadeurDashboardScreenState extends State<AmbassadeurDashboardScreen> with RefreshableState {
   final _supabase = Supabase.instance.client;
   bool _isLoading = true;
   String? _nom;
@@ -24,6 +25,9 @@ class _AmbassadeurDashboardScreenState extends State<AmbassadeurDashboardScreen>
     super.initState();
     _charger();
   }
+
+  @override
+  Future<void> refresh() => _charger();
 
   Future<void> _charger() async {
     final userId = _supabase.auth.currentUser?.id;

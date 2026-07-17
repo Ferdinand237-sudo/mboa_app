@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/mixins/refreshable_state.dart';
 
 class AdminAnnoncesScreen extends StatefulWidget {
   const AdminAnnoncesScreen({super.key});
@@ -11,7 +12,7 @@ class AdminAnnoncesScreen extends StatefulWidget {
 }
 
 class _AdminAnnoncesScreenState extends State<AdminAnnoncesScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RefreshableState {
   late TabController _tabController;
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _logements = [];
@@ -32,6 +33,9 @@ class _AdminAnnoncesScreenState extends State<AdminAnnoncesScreen>
     _tabController.dispose();
     super.dispose();
   }
+
+  @override
+  Future<void> refresh() => Future.wait([_chargerLogements(), _chargerArticles()]);
 
   Future<void> _chargerLogements() async {
     try {

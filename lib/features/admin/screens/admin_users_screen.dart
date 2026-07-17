@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/mixins/refreshable_state.dart';
 import 'admin_demandes_screen.dart';
 
 class AdminUsersScreen extends StatefulWidget {
@@ -11,7 +12,7 @@ class AdminUsersScreen extends StatefulWidget {
   State<AdminUsersScreen> createState() => _AdminUsersScreenState();
 }
 
-class _AdminUsersScreenState extends State<AdminUsersScreen> {
+class _AdminUsersScreenState extends State<AdminUsersScreen> with RefreshableState {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _users = [];
   Map<String, String> _statutVerificationParUser = {};
@@ -22,6 +23,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     super.initState();
     _chargerUsers();
   }
+
+  @override
+  Future<void> refresh() => _chargerUsers();
 
   Future<void> _chargerUsers() async {
     try {

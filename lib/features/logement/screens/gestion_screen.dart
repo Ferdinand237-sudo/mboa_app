@@ -5,6 +5,7 @@ import '../../logement/screens/logement_detail_screen.dart';
 import '../../market/screens/article_detail_screen.dart';
 import 'edit_logement_screen.dart';
 import '../../market/screens/edit_article_screen.dart';
+import '../../../core/mixins/refreshable_state.dart';
 
 class GestionScreen extends StatefulWidget {
   const GestionScreen({super.key});
@@ -14,7 +15,7 @@ class GestionScreen extends StatefulWidget {
 }
 
 class _GestionScreenState extends State<GestionScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RefreshableState {
   final _supabase = Supabase.instance.client;
   TabController? _tabController;
   bool _isLoading = true;
@@ -34,6 +35,9 @@ class _GestionScreenState extends State<GestionScreen>
     _tabController?.dispose();
     super.dispose();
   }
+
+  @override
+  Future<void> refresh() => _charger();
 
   Future<void> _charger() async {
     final userId = _supabase.auth.currentUser?.id;

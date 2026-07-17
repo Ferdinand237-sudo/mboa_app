@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../logement/screens/logement_detail_screen.dart';
 import '../../market/screens/article_detail_screen.dart';
+import '../../../core/mixins/refreshable_state.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -11,7 +12,7 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with RefreshableState {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _conversations = [];
   bool _isLoading = true;
@@ -22,6 +23,9 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _chargerConversations();
   }
+
+  @override
+  Future<void> refresh() => _chargerConversations();
 
   List<Map<String, dynamic>> get _conversationsAffichees {
     if (_filtreType == 'tous') return _conversations;

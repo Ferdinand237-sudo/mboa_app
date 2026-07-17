@@ -10,6 +10,7 @@ import 'favoris_screen.dart';
 import 'avis_moderation_screen.dart';
 import 'devenir_contributeur_screen.dart';
 import 'alertes_recherche_screen.dart';
+import '../../../core/mixins/refreshable_state.dart';
 
 class ProfilScreen extends StatefulWidget {
   final VoidCallback? onOuvrirMessages;
@@ -20,7 +21,7 @@ class ProfilScreen extends StatefulWidget {
   State<ProfilScreen> createState() => _ProfilScreenState();
 }
 
-class _ProfilScreenState extends State<ProfilScreen> {
+class _ProfilScreenState extends State<ProfilScreen> with RefreshableState {
   static const _prefsNotificationsKey = 'notifications_activees';
 
   final _supabase = Supabase.instance.client;
@@ -42,6 +43,15 @@ class _ProfilScreenState extends State<ProfilScreen> {
     _chargerNbAvisEnAttente();
     _chargerNbAlertes();
   }
+
+  @override
+  Future<void> refresh() => Future.wait([
+        _chargerProfil(),
+        _chargerNbFavoris(),
+        _chargerNbMessagesNonLus(),
+        _chargerNbAvisEnAttente(),
+        _chargerNbAlertes(),
+      ]);
 
   Future<void> _chargerNbAlertes() async {
     final user = _supabase.auth.currentUser;

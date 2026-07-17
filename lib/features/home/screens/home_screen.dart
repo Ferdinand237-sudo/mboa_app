@@ -12,6 +12,7 @@ import 'home_search_screen.dart';
 import 'notifications_screen.dart';
 import 'contributeurs_screen.dart';
 import '../../profil/screens/profil_vendeur_screen.dart';
+import '../../../core/mixins/refreshable_state.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onNavigateLogement;
@@ -23,7 +24,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with RefreshableState {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _logements = [];
   List<Map<String, dynamic>> _articles = [];
@@ -49,6 +50,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _chargerDonnees();
     _initTrouveTonMboa();
   }
+
+  @override
+  Future<void> refresh() => _chargerDonnees();
 
   Future<void> _chargerDonnees() async {
     await Future.wait([

@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/mboa_cached_image.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../app/router.dart';
+import '../../../core/mixins/refreshable_state.dart';
 import 'logement_detail_screen.dart';
 
 class LogementScreen extends StatefulWidget {
@@ -14,7 +15,7 @@ class LogementScreen extends StatefulWidget {
   State<LogementScreen> createState() => _LogementScreenState();
 }
 
-class _LogementScreenState extends State<LogementScreen> {
+class _LogementScreenState extends State<LogementScreen> with RefreshableState {
   final _supabase = Supabase.instance.client;
   final _searchController = TextEditingController();
 
@@ -36,6 +37,9 @@ class _LogementScreenState extends State<LogementScreen> {
     _searchController.dispose();
     super.dispose();
   }
+
+  @override
+  Future<void> refresh() => _chargerLogements();
 
   Future<void> _chargerLogements() async {
     setState(() => _isLoading = true);

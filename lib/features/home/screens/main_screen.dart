@@ -12,6 +12,7 @@ import '../../logement/screens/gestion_screen.dart';
 import '../../ambassadeur/screens/ambassadeur_dashboard_screen.dart';
 import '../../ambassadeur/screens/ambassadeur_liste_screen.dart';
 import '../../../app/router.dart';
+import '../../../core/mixins/refreshable_state.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -24,6 +25,18 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   String _userRole = 'visiteur';
   bool _isLoading = true;
+
+  // Clés utilisées pour déclencher un rafraîchissement explicite au
+  // changement d'onglet : IndexedStack garde tous les onglets montés en
+  // permanence, donc leur initState ne se relance jamais tout seul.
+  final _homeKey = GlobalKey<State>();
+  final _logementKey = GlobalKey<State>();
+  final _marketKey = GlobalKey<State>();
+  final _chatKey = GlobalKey<State>();
+  final _profilKey = GlobalKey<State>();
+  final _gestionKey = GlobalKey<State>();
+  final _publierKey = GlobalKey<State>();
+  final _ambassadeurDashboardKey = GlobalKey<State>();
 
   @override
   void initState() {
@@ -63,14 +76,18 @@ class _MainScreenState extends State<MainScreen> {
   // ── Navigation Visiteur ───────────────────────────────────
   List<Widget> get _screensVisiteur => [
     HomeScreen(
-      onNavigateLogement: () => setState(() => _currentIndex = 1),
-      onNavigateMarket: () => setState(() => _currentIndex = 2),
+      key: _homeKey,
+      onNavigateLogement: () => _onTabTapped(1),
+      onNavigateMarket: () => _onTabTapped(2),
     ),
-    const LogementScreen(),
-    const MarketScreen(),
-    const ChatScreen(),
-    ProfilScreen(onOuvrirMessages: () => setState(() => _currentIndex = 3)),
+    LogementScreen(key: _logementKey),
+    MarketScreen(key: _marketKey),
+    ChatScreen(key: _chatKey),
+    ProfilScreen(key: _profilKey, onOuvrirMessages: () => _onTabTapped(3)),
   ];
+
+  List<GlobalKey<State>?> get _refreshKeysVisiteur =>
+      [_homeKey, _logementKey, _marketKey, _chatKey, _profilKey];
 
   List<_NavItem> get _navItemsVisiteur => [
     _NavItem(icon: Icons.home_rounded, label: 'Home'),
@@ -83,6 +100,7 @@ class _MainScreenState extends State<MainScreen> {
   // ── Navigation Vendeur ────────────────────────────────────
   List<Widget> get _screensVendeur => [
     HomeScreen(
+      key: _homeKey,
       onNavigateLogement: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const LogementScreen()),
       ),
@@ -90,11 +108,14 @@ class _MainScreenState extends State<MainScreen> {
         MaterialPageRoute(builder: (_) => const MarketScreen()),
       ),
     ),
-    const GestionScreen(),
-    const PublierScreen(),
-    const ChatScreen(),
-    ProfilScreen(onOuvrirMessages: () => setState(() => _currentIndex = 3)),
+    GestionScreen(key: _gestionKey),
+    PublierScreen(key: _publierKey),
+    ChatScreen(key: _chatKey),
+    ProfilScreen(key: _profilKey, onOuvrirMessages: () => _onTabTapped(3)),
   ];
+
+  List<GlobalKey<State>?> get _refreshKeysVendeur =>
+      [_homeKey, _gestionKey, _publierKey, _chatKey, _profilKey];
 
   List<_NavItem> get _navItemsVendeur => [
     _NavItem(icon: Icons.home_rounded, label: 'Home'),
@@ -106,10 +127,15 @@ class _MainScreenState extends State<MainScreen> {
 
   // ── Navigation Ambassadeur ────────────────────────────────
   List<Widget> get _screensAmbassadeur => [
-    const AmbassadeurDashboardScreen(),
+    AmbassadeurDashboardScreen(key: _ambassadeurDashboardKey),
+    // AmbassadeurListeScreen a déjà son propre abonnement realtime
+    // (voir CLAUDE.md) : pas besoin de la rafraîchir manuellement ici.
     const AmbassadeurListeScreen(),
-    ProfilScreen(onOuvrirMessages: () {}),
+    ProfilScreen(key: _profilKey, onOuvrirMessages: () {}),
   ];
+
+  List<GlobalKey<State>?> get _refreshKeysAmbassadeur =>
+      [_ambassadeurDashboardKey, null, _profilKey];
 
   List<_NavItem> get _navItemsAmbassadeur => [
     _NavItem(icon: Icons.dashboard_rounded, label: 'Dashboard'),
@@ -128,6 +154,17 @@ class _MainScreenState extends State<MainScreen> {
   List<_NavItem> get _navItems {
     if (_isAmbassadeur) return _navItemsAmbassadeur;
     return _isVendeur ? _navItemsVendeur : _navItemsVisiteur;
+  }
+
+  List<GlobalKey<State>?> get _refreshKeys {
+    if (_isAmbassadeur) return _refreshKeysAmbassadeur;
+    return _isVendeur ? _refreshKeysVendeur : _refreshKeysVisiteur;
+  }
+
+  void _onTabTapped(int index) {
+    setState(() => _currentIndex = index);
+    final state = _refreshKeys[index]?.currentState;
+    if (state is RefreshableState) (state as RefreshableState).refresh();
   }
 
   @override
@@ -176,8 +213,7 @@ class _MainScreenState extends State<MainScreen> {
               if (_isVendeur && index == 2) {
                 return Expanded(
                   child: GestureDetector(
-                    onTap: () =>
-                        setState(() => _currentIndex = index),
+                    onTap: () => _onTabTapped(index),
                     behavior: HitTestBehavior.opaque,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -223,8 +259,7 @@ class _MainScreenState extends State<MainScreen> {
 
               return Expanded(
                 child: GestureDetector(
-                  onTap: () =>
-                      setState(() => _currentIndex = index),
+                  onTap: () => _onTabTapped(index),
                   behavior: HitTestBehavior.opaque,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,

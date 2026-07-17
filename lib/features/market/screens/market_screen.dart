@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/mboa_cached_image.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../app/router.dart';
+import '../../../core/mixins/refreshable_state.dart';
 import 'article_detail_screen.dart';
 
 class MarketScreen extends StatefulWidget {
@@ -14,7 +15,7 @@ class MarketScreen extends StatefulWidget {
   State<MarketScreen> createState() => _MarketScreenState();
 }
 
-class _MarketScreenState extends State<MarketScreen> {
+class _MarketScreenState extends State<MarketScreen> with RefreshableState {
   final _supabase = Supabase.instance.client;
   final _searchController = TextEditingController();
 
@@ -35,6 +36,9 @@ class _MarketScreenState extends State<MarketScreen> {
     _searchController.dispose();
     super.dispose();
   }
+
+  @override
+  Future<void> refresh() => _chargerArticles();
 
   Future<void> _chargerArticles() async {
     setState(() => _isLoading = true);

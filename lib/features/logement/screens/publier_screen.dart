@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/mixins/refreshable_state.dart';
 
 // Attend le résultat de l'analyse de modération IA (moderate-annonce) sur la
 // ligne fraîchement insérée, via un canal realtime ciblé sur son id — fermé
@@ -81,7 +82,7 @@ class PublierScreen extends StatefulWidget {
 }
 
 class _PublierScreenState extends State<PublierScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RefreshableState {
   TabController? _tabController;
   final _supabase = Supabase.instance.client;
   bool _isLoading = true;
@@ -94,6 +95,9 @@ class _PublierScreenState extends State<PublierScreen>
     super.initState();
     _chargerPermissions();
   }
+
+  @override
+  Future<void> refresh() => _chargerPermissions();
 
   Future<void> _chargerPermissions() async {
     final userId = _supabase.auth.currentUser?.id;
