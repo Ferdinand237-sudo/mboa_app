@@ -99,6 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .from('logements')
           .select('*, proprietaire:users!proprietaire_id(nom, verified)')
           .eq('statut', 'disponible')
+          .eq('statut_moderation', 'publie')
           .order('boosted', ascending: false)
           .order('date_publication', ascending: false)
           .limit(6);
@@ -119,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .from('articles')
           .select('*, vendeur:users!vendeur_id(nom, verified)')
           .eq('statut', 'disponible')
+          .eq('statut_moderation', 'publie')
           .order('boosted', ascending: false)
           .order('date_publication', ascending: false)
           .limit(6);

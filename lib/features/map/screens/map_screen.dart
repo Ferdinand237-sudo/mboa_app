@@ -59,6 +59,7 @@ class _MapScreenState extends State<MapScreen> {
             .from('logements')
             .select('*, proprietaire:users!proprietaire_id(nom, verified)')
             .eq('statut', 'disponible')
+            .eq('statut_moderation', 'publie')
             .not('lat', 'is', null)
             .not('lng', 'is', null),
         _supabase.from('lieux_publics').select(),

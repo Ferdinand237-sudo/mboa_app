@@ -112,6 +112,30 @@ class _GestionScreenState extends State<GestionScreen>
     } catch (_) {}
   }
 
+  Color _couleurModeration(String statutModeration) {
+    switch (statutModeration) {
+      case 'a_verifier':
+        return MboaColors.boost;
+      case 'bloque':
+        return MboaColors.danger;
+      default:
+        return MboaColors.textMuted;
+    }
+  }
+
+  String _libelleModeration(String statutModeration) {
+    switch (statutModeration) {
+      case 'en_attente':
+        return 'Analyse en cours';
+      case 'a_verifier':
+        return 'En vérification';
+      case 'bloque':
+        return 'Bloqué';
+      default:
+        return '';
+    }
+  }
+
   String _formatPrix(dynamic prix) {
     final p = (prix ?? 0) as int;
     return '${p.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} FCFA';
@@ -229,6 +253,7 @@ class _GestionScreenState extends State<GestionScreen>
   }) {
     final photos = item['photos'] as List? ?? [];
     final estDisponible = item['statut'] == 'disponible';
+    final statutModeration = item['statut_moderation'] as String? ?? 'publie';
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -265,21 +290,44 @@ class _GestionScreenState extends State<GestionScreen>
                       Text(_formatPrix(item['prix']),
                           style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w800, color: MboaColors.primary)),
                       const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: (estDisponible ? MboaColors.verified : MboaColors.textMuted).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          estDisponible ? 'Disponible' : 'Suspendu',
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: estDisponible ? MboaColors.verified : MboaColors.textMuted,
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: (estDisponible ? MboaColors.verified : MboaColors.textMuted).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              estDisponible ? 'Disponible' : 'Suspendu',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: estDisponible ? MboaColors.verified : MboaColors.textMuted,
+                              ),
+                            ),
                           ),
-                        ),
+                          if (statutModeration != 'publie')
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: _couleurModeration(statutModeration).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                _libelleModeration(statutModeration),
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: _couleurModeration(statutModeration),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),

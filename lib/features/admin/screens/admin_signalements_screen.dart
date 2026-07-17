@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/constants/app_constants.dart';
 
 class AdminSignalementsScreen extends StatefulWidget {
   const AdminSignalementsScreen({super.key});
@@ -16,6 +17,7 @@ class _AdminSignalementsScreenState
   List<Map<String, dynamic>> _signalements = [];
   bool _isLoading = true;
   String _filtre = 'en-attente';
+  bool _seulementIa = false;
 
   @override
   void initState() {
@@ -32,6 +34,9 @@ class _AdminSignalementsScreenState
 
       if (_filtre != 'tous') {
         query = query.eq('statut', _filtre);
+      }
+      if (_seulementIa) {
+        query = query.eq('raison', AppConstants.raisonDetectionIa);
       }
 
       final data = await query
@@ -363,6 +368,48 @@ class _AdminSignalementsScreenState
                       }).toList(),
                     ),
                   ),
+                  const SizedBox(height: 8),
+
+                  // Filtre origine IA
+                  GestureDetector(
+                    onTap: () {
+                      setState(() => _seulementIa = !_seulementIa);
+                      _chargerSignalements();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _seulementIa
+                            ? MboaColors.primary.withValues(alpha: 0.1)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: _seulementIa ? MboaColors.primary : MboaColors.border,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _seulementIa ? Icons.check_circle_rounded : Icons.smart_toy_outlined,
+                            size: 14,
+                            color: _seulementIa ? MboaColors.primary : MboaColors.textMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '🤖 Détections IA uniquement',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: _seulementIa ? MboaColors.primary : MboaColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -423,6 +470,7 @@ class _AdminSignalementsScreenState
     final statut = signalement['statut'] ?? 'en-attente';
     final signaleur = signalement['signaleur'];
     final cibleType = signalement['cible_type'] ?? 'annonce';
+    final estDetectionIa = signalement['raison'] == AppConstants.raisonDetectionIa;
 
     Color statutColor;
     switch (statut) {
@@ -466,13 +514,13 @@ class _AdminSignalementsScreenState
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color:
-                          MboaColors.danger.withValues(alpha: 0.1),
+                      color: (estDetectionIa ? MboaColors.primary : MboaColors.danger)
+                          .withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Center(
-                      child: Text('🚩',
-                          style: TextStyle(fontSize: 18)),
+                    child: Center(
+                      child: Text(estDetectionIa ? '🤖' : '🚩',
+                          style: const TextStyle(fontSize: 18)),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -481,11 +529,13 @@ class _AdminSignalementsScreenState
                         CrossAxisAlignment.start,
                     children: [
                       Text(
-                        cibleType == 'annonce'
-                            ? '📋 Annonce signalée'
-                            : cibleType == 'utilisateur'
-                                ? '👤 Utilisateur signalé'
-                                : '⭐ Avis signalé',
+                        estDetectionIa
+                            ? '🤖 Détection IA — Annonce'
+                            : cibleType == 'annonce'
+                                ? '📋 Annonce signalée'
+                                : cibleType == 'utilisateur'
+                                    ? '👤 Utilisateur signalé'
+                                    : '⭐ Avis signalé',
                         style: const TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 13,
@@ -493,7 +543,12 @@ class _AdminSignalementsScreenState
                           color: MboaColors.text,
                         ),
                       ),
-                      if (signaleur != null)
+                      if (estDetectionIa)
+                        const Text(
+                          'Analyse automatique Mboa',
+                          style: MboaTextStyles.caption,
+                        )
+                      else if (signaleur != null)
                         Text(
                           'Par ${signaleur['nom'] ?? 'Inconnu'}',
                           style: MboaTextStyles.caption,
@@ -549,11 +604,13 @@ class _AdminSignalementsScreenState
                       ),
                     ),
                     Text(
-                      signalement['raison'] ?? '',
-                      style: const TextStyle(
+                      estDetectionIa
+                          ? 'Détection automatique (modération IA)'
+                          : (signalement['raison'] ?? ''),
+                      style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 12,
-                        color: MboaColors.danger,
+                        color: estDetectionIa ? MboaColors.primary : MboaColors.danger,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

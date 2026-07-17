@@ -13,6 +13,7 @@ class ArticleModel {
   final bool vendeurVerified;
   final double vendeurNote;
   final String statut;
+  final String statutModeration;
   final double? lat;
   final double? lng;
   final bool boosted;
@@ -35,6 +36,7 @@ class ArticleModel {
     this.vendeurVerified = false,
     this.vendeurNote = 0.0,
     this.statut = 'disponible',
+    this.statutModeration = 'publie',
     this.lat,
     this.lng,
     this.boosted = false,
@@ -45,6 +47,10 @@ class ArticleModel {
 
   bool get isDisponible => statut == 'disponible';
   bool get isVendu      => statut == 'vendu';
+
+  bool get enAttenteModeration => statutModeration == 'en_attente';
+  bool get aVerifierModeration => statutModeration == 'a_verifier';
+  bool get bloqueModeration    => statutModeration == 'bloque';
 
   String get prixFormate =>
       '${prix.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} FCFA';
@@ -68,6 +74,7 @@ class ArticleModel {
       vendeurVerified: map['vendeur_verified'] ?? false,
       vendeurNote: (map['vendeur_note'] ?? 0.0).toDouble(),
       statut: map['statut'] ?? 'disponible',
+      statutModeration: map['statut_moderation'] ?? 'publie',
       lat: map['lat'] != null ? (map['lat']).toDouble() : null,
       lng: map['lng'] != null ? (map['lng']).toDouble() : null,
       boosted: map['boosted'] ?? false,

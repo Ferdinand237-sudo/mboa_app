@@ -43,7 +43,8 @@ class _MarketScreenState extends State<MarketScreen> {
           .from('articles')
           .select(
               '*, vendeur:users!vendeur_id(nom, photo_url, verified, note_globale)')
-          .eq('statut', 'disponible');
+          .eq('statut', 'disponible')
+          .eq('statut_moderation', 'publie');
 
       if (_selectedCategorie != 'Tous') {
         query = query.eq('categorie', _selectedCategorie);

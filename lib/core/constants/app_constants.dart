@@ -24,6 +24,8 @@ class AppConstants {
   static const String tableMessages       = 'messages';
   static const String tableAvis           = 'avis';
   static const String tableSignalements   = 'signalements';
+  static const String tableModerationIa   = 'moderation_ia';
+  static const String tableImageHashes    = 'image_hashes';
 
   // ── Storage Supabase (buckets) ────────────────────────────
   static const String bucketLogements     = 'logements';
@@ -121,6 +123,17 @@ class AppConstants {
     'Annonce dupliquée',
     'Autre',
   ];
+
+  // Raison utilisée par l'Edge Function moderate-annonce pour les
+  // signalements générés automatiquement (non choisie dans raisonsSignalement,
+  // qui reste réservée aux signalements saisis par un utilisateur).
+  static const String raisonDetectionIa = 'detection_ia';
+
+  // ── Statuts de modération IA (Partie 1) ───────────────────
+  static const String statutModerationEnAttente = 'en_attente';
+  static const String statutModerationPublie    = 'publie';
+  static const String statutModerationAVerifier = 'a_verifier';
+  static const String statutModerationBloque    = 'bloque';
 
   // ── Prix min/max filtre ───────────────────────────────────
   static const double prixMin = 5000;

@@ -10,6 +10,7 @@ class LogementModel {
   final List<String> regles;
   final DateTime? disponibleLe;
   final String statut;
+  final String statutModeration;
 
   // Localisation
   final String? adresseApprox;
@@ -44,6 +45,7 @@ class LogementModel {
     this.regles = const [],
     this.disponibleLe,
     this.statut = 'disponible',
+    this.statutModeration = 'publie',
     this.adresseApprox,
     this.quartier,
     this.ville = 'Sangmelima',
@@ -65,6 +67,10 @@ class LogementModel {
   bool get isDisponible => statut == 'disponible';
   bool get isReserve    => statut == 'reserve';
   bool get isLoue       => statut == 'loue';
+
+  bool get enAttenteModeration => statutModeration == 'en_attente';
+  bool get aVerifierModeration => statutModeration == 'a_verifier';
+  bool get bloqueModeration    => statutModeration == 'bloque';
 
   String get prixFormate =>
       '${prix.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} FCFA';
@@ -90,6 +96,7 @@ class LogementModel {
           ? DateTime.parse(map['disponible_le'])
           : null,
       statut: map['statut'] ?? 'disponible',
+      statutModeration: map['statut_moderation'] ?? 'publie',
       adresseApprox: map['adresse_approx'],
       quartier: map['quartier'],
       ville: map['ville'] ?? 'Sangmelima',

@@ -43,7 +43,8 @@ class _LogementScreenState extends State<LogementScreen> {
       var query = _supabase
           .from('logements')
           .select('*, proprietaire:users!proprietaire_id(nom, photo_url, verified)')
-          .eq('statut', 'disponible');
+          .eq('statut', 'disponible')
+          .eq('statut_moderation', 'publie');
 
       if (_selectedType != 'Tous') {
         query = query.eq('type', _selectedType);

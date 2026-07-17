@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -5,6 +6,72 @@ import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+
+// Attend le résultat de l'analyse de modération IA (moderate-annonce) sur la
+// ligne fraîchement insérée, via un canal realtime ciblé sur son id — fermé
+// dès réception de la mise à jour ou au bout de 20s (l'annonce reste
+// `en_attente` : l'analyse se terminera en arrière-plan, l'utilisateur sera
+// simplement informé qu'elle est toujours en cours).
+Future<String?> attendreDecisionModeration(
+  SupabaseClient supabase,
+  String table,
+  String id,
+) async {
+  final completer = Completer<String?>();
+  final channel = supabase.channel('moderation_${table}_$id');
+  channel.onPostgresChanges(
+    event: PostgresChangeEvent.update,
+    schema: 'public',
+    table: table,
+    filter: PostgresChangeFilter(
+      type: PostgresChangeFilterType.eq,
+      column: 'id',
+      value: id,
+    ),
+    callback: (payload) {
+      final statut = payload.newRecord['statut_moderation'] as String?;
+      if (statut != null && statut != 'en_attente' && !completer.isCompleted) {
+        completer.complete(statut);
+      }
+    },
+  ).subscribe();
+
+  final decision = await completer.future.timeout(
+    const Duration(seconds: 20),
+    onTimeout: () => null,
+  );
+  await supabase.removeChannel(channel);
+  return decision;
+}
+
+void afficherResultatModeration(
+  BuildContext context,
+  String? decision,
+  String libelle,
+) {
+  final String message;
+  final Color couleur;
+  switch (decision) {
+    case 'publie':
+      message = '✅ $libelle publié avec succès !';
+      couleur = MboaColors.primary;
+      break;
+    case 'a_verifier':
+      message = '🔍 $libelle enregistré, en cours de vérification avant publication.';
+      couleur = MboaColors.boost;
+      break;
+    case 'bloque':
+      message = '⛔ $libelle refusé par la modération. Consultez "Gestion" pour plus de détails.';
+      couleur = MboaColors.danger;
+      break;
+    default:
+      message = '⏳ $libelle enregistré, analyse en cours. Vous serez notifié une fois validée.';
+      couleur = MboaColors.boost;
+  }
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message), backgroundColor: couleur, duration: const Duration(seconds: 4)),
+  );
+}
 
 class PublierScreen extends StatefulWidget {
   const PublierScreen({super.key});
@@ -205,6 +272,7 @@ class _FormLogementState extends State<_FormLogement> {
   List<String> _selectedEquipements = [];
   List<File> _photos = [];
   bool _isLoading = false;
+  bool _analyseEnCours = false;
   double? _lat;
   double? _lng;
   bool _isGettingLocation = false;
@@ -371,7 +439,7 @@ class _FormLogementState extends State<_FormLogement> {
       final photoUrls = await _uploadPhotos();
 
       // Insérer dans Supabase
-      await _supabase.from(AppConstants.tableLogements).insert({
+      final insere = await _supabase.from(AppConstants.tableLogements).insert({
         'titre': _titreController.text.trim(),
         'description': _descController.text.trim(),
         'type': _selectedType,
@@ -394,15 +462,18 @@ class _FormLogementState extends State<_FormLogement> {
         'signalements': 0,
         'note_globale': 0.0,
         'nb_avis': 0,
-      });
+      }).select('id').single();
+
+      // Attend le résultat de l'analyse de modération IA (moderate-annonce)
+      if (mounted) setState(() => _analyseEnCours = true);
+      final decision = await attendreDecisionModeration(
+        _supabase,
+        AppConstants.tableLogements,
+        insere['id'] as String,
+      );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Logement publié avec succès !'),
-            backgroundColor: MboaColors.primary,
-          ),
-        );
+        afficherResultatModeration(context, decision, 'Logement');
         // Reset formulaire
         _formKey.currentState!.reset();
         setState(() {
@@ -423,7 +494,12 @@ class _FormLogementState extends State<_FormLogement> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _analyseEnCours = false;
+        });
+      }
     }
   }
 
@@ -884,7 +960,9 @@ class _FormLogementState extends State<_FormLogement> {
                     : const Icon(Icons.publish_rounded,
                         size: 20),
                 label: Text(_isLoading
-                    ? 'Publication en cours...'
+                    ? (_analyseEnCours
+                        ? 'Analyse en cours...'
+                        : 'Publication en cours...')
                     : 'Publier le logement'),
               ),
             ),
@@ -933,6 +1011,7 @@ class _FormArticleState extends State<_FormArticle> {
   bool _accepteAvis = false;
   List<File> _photos = [];
   bool _isLoading = false;
+  bool _analyseEnCours = false;
 
   @override
   void dispose() {
@@ -1002,7 +1081,7 @@ class _FormArticleState extends State<_FormArticle> {
     try {
       final photoUrls = await _uploadPhotos();
 
-      await _supabase.from(AppConstants.tableArticles).insert({
+      final insere = await _supabase.from(AppConstants.tableArticles).insert({
         'titre': _titreController.text.trim(),
         'description': _descController.text.trim(),
         'categorie': _selectedCategorie,
@@ -1017,15 +1096,18 @@ class _FormArticleState extends State<_FormArticle> {
         'boosted': false,
         'vues': 0,
         'signalements': 0,
-      });
+      }).select('id').single();
+
+      // Attend le résultat de l'analyse de modération IA (moderate-annonce)
+      if (mounted) setState(() => _analyseEnCours = true);
+      final decision = await attendreDecisionModeration(
+        _supabase,
+        AppConstants.tableArticles,
+        insere['id'] as String,
+      );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Article publié avec succès !'),
-            backgroundColor: MboaColors.secondary,
-          ),
-        );
+        afficherResultatModeration(context, decision, 'Article');
         _formKey.currentState!.reset();
         setState(() {
           _photos = [];
@@ -1045,7 +1127,12 @@ class _FormArticleState extends State<_FormArticle> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _analyseEnCours = false;
+        });
+      }
     }
   }
 
@@ -1409,7 +1496,9 @@ class _FormArticleState extends State<_FormArticle> {
                     : const Icon(Icons.publish_rounded,
                         size: 20),
                 label: Text(_isLoading
-                    ? 'Publication en cours...'
+                    ? (_analyseEnCours
+                        ? 'Analyse en cours...'
+                        : 'Publication en cours...')
                     : 'Publier l\'article'),
               ),
             ),
