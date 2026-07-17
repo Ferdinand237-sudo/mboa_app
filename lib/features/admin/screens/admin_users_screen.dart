@@ -55,7 +55,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MboaSizes.radiusXl)),
         title: const Text('🧭 Créer un ambassadeur', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
         content: Form(
@@ -94,11 +94,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Annuler')),
           ElevatedButton(
             onPressed: () async {
               if (!formKey.currentState!.validate()) return;
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               try {
                 final response = await _supabase.functions.invoke('create-ambassadeur', body: {
                   'nom': nomController.text.trim(),
