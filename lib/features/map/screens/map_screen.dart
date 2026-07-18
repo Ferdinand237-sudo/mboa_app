@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -30,6 +31,13 @@ class _MapScreenState extends State<MapScreen> {
   bool _isAdmin = false;
   bool _isLoading = true;
   String _selectedFilter = 'Tous';
+
+  // Reconstruits à chaque build : associent un Marker (identité d'objet) à
+  // la donnée logement/lieu correspondante, pour retrouver l'annonce/le
+  // lieu exact quand flutter_map_marker_cluster signale un tap (il ne
+  // renvoie que le Marker, pas la donnée métier).
+  final Map<Marker, Map<String, dynamic>> _markerLogementData = {};
+  final Map<Marker, Map<String, dynamic>> _markerLieuData = {};
 
   // Centre de la carte (Sangmelima ou logement ciblé)
   late final LatLng _center = widget.focusLogement != null &&
@@ -125,6 +133,68 @@ class _MapScreenState extends State<MapScreen> {
 
   bool get _afficherLieux =>
       _selectedFilter == 'Tous' || _selectedFilter == '📍 Lieux';
+
+  List<Marker> _buildLogementMarkers() {
+    _markerLogementData.clear();
+    return _filteredLogements
+        .where((l) => l['lat'] != null && l['lng'] != null)
+        .map((l) {
+      final isSelected = _selectedLogement?['id'] == l['id'];
+      final marker = Marker(
+        point: LatLng(
+          (l['lat'] as num).toDouble(),
+          (l['lng'] as num).toDouble(),
+        ),
+        width: isSelected ? 120 : 90,
+        height: isSelected ? 50 : 40,
+        child: _buildLogementMarker(l, isSelected),
+      );
+      _markerLogementData[marker] = l;
+      return marker;
+    }).toList();
+  }
+
+  List<Marker> _buildLieuMarkers() {
+    _markerLieuData.clear();
+    return _lieuxPublics.map((lieu) {
+      final cat = _categorieInfo(lieu['categorie'] ?? 'autre');
+      final marker = Marker(
+        point: LatLng(
+          (lieu['lat'] as num).toDouble(),
+          (lieu['lng'] as num).toDouble(),
+        ),
+        width: 80,
+        height: 60,
+        child: _buildLieuMarker(lieu, cat),
+      );
+      _markerLieuData[marker] = lieu;
+      return marker;
+    }).toList();
+  }
+
+  Widget _buildClusterBadge(int count, Color color) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 8),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          '$count',
+          style: const TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
 
   Map<String, dynamic> _categorieInfo(String categorie) {
     return AppConstants.categoriesLieuxPublics.firstWhere(
@@ -470,66 +540,38 @@ class _MapScreenState extends State<MapScreen> {
                                 ),
                               ]),
 
-                            // Marqueurs logements
+                            // Marqueurs logements (regroupés en cluster
+                            // quand plusieurs sont géographiquement trop
+                            // proches pour rester lisibles individuellement)
                             if (_selectedFilter != '📍 Lieux')
-                              MarkerLayer(
-                                markers: _filteredLogements
-                                    .where((l) =>
-                                        l['lat'] != null &&
-                                        l['lng'] != null)
-                                    .map((l) {
-                                  final isSelected =
-                                      _selectedLogement?[
-                                              'id'] ==
-                                          l['id'];
-                                  return Marker(
-                                    point: LatLng(
-                                      (l['lat'] as num)
-                                          .toDouble(),
-                                      (l['lng'] as num)
-                                          .toDouble(),
-                                    ),
-                                    width: isSelected
-                                        ? 120
-                                        : 90,
-                                    height: isSelected
-                                        ? 50
-                                        : 40,
-                                    child: GestureDetector(
-                                      onTap: () => setState(() {
-                                        _selectedLogement = l;
-                                        _selectedLieu = null;
-                                      }),
-                                      child:
-                                          _buildLogementMarker(
-                                              l, isSelected),
-                                    ),
-                                  );
-                                }).toList(),
+                              MarkerClusterLayerWidget(
+                                options: MarkerClusterLayerOptions(
+                                  maxClusterRadius: 45,
+                                  size: const Size(36, 36),
+                                  markers: _buildLogementMarkers(),
+                                  onMarkerTap: (marker) => setState(() {
+                                    _selectedLogement = _markerLogementData[marker];
+                                    _selectedLieu = null;
+                                  }),
+                                  builder: (context, markers) =>
+                                      _buildClusterBadge(markers.length, MboaColors.primary),
+                                ),
                               ),
 
                             // Marqueurs lieux publics
                             if (_afficherLieux)
-                              MarkerLayer(
-                                markers: _lieuxPublics.map((lieu) {
-                                  final cat = _categorieInfo(
-                                      lieu['categorie'] ?? 'autre');
-                                  return Marker(
-                                    point: LatLng(
-                                      (lieu['lat'] as num).toDouble(),
-                                      (lieu['lng'] as num).toDouble(),
-                                    ),
-                                    width: 80,
-                                    height: 60,
-                                    child: GestureDetector(
-                                      onTap: () => setState(() {
-                                        _selectedLieu = lieu;
-                                        _selectedLogement = null;
-                                      }),
-                                      child: _buildLieuMarker(lieu, cat),
-                                    ),
-                                  );
-                                }).toList(),
+                              MarkerClusterLayerWidget(
+                                options: MarkerClusterLayerOptions(
+                                  maxClusterRadius: 45,
+                                  size: const Size(32, 32),
+                                  markers: _buildLieuMarkers(),
+                                  onMarkerTap: (marker) => setState(() {
+                                    _selectedLieu = _markerLieuData[marker];
+                                    _selectedLogement = null;
+                                  }),
+                                  builder: (context, markers) =>
+                                      _buildClusterBadge(markers.length, MboaColors.accent),
+                                ),
                               ),
                           ],
                         ),

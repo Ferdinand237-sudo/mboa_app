@@ -24,6 +24,7 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
   String _selectedType = 'Tous';
   double _prixMax = 60000;
   String _selectedDistance = 'Toutes';
+  int _noteMin = 0;
   bool _showFiltres = false;
 
   @override
@@ -112,12 +113,22 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
 
   bool get _isLoggedIn => _supabase.auth.currentUser != null;
 
+  // note_globale n'existe pas sur logements (les avis notent le
+  // propriétaire, pas l'annonce) : le filtre lit la note jointe.
+  List<Map<String, dynamic>> get _logementsFiltres {
+    if (_noteMin == 0) return _logements;
+    return _logements.where((l) {
+      final note = (l['proprietaire']?['note_globale'] ?? 0) as num;
+      return note >= _noteMin;
+    }).toList();
+  }
+
   List<Map<String, dynamic>> get _displayedLogements => _isLoggedIn
-      ? _logements
-      : _logements.take(AppConstants.pageSizeVisiteur).toList();
+      ? _logementsFiltres
+      : _logementsFiltres.take(AppConstants.pageSizeVisiteur).toList();
 
   bool get _showLimitBanner =>
-      !_isLoggedIn && _logements.length > AppConstants.pageSizeVisiteur;
+      !_isLoggedIn && _logementsFiltres.length > AppConstants.pageSizeVisiteur;
 
   String _formatPrix(dynamic prix) {
     final p = (prix ?? 0) as int;
@@ -362,6 +373,69 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
                         },
                       ),
                     ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Note minimum',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: MboaColors.text,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 32,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [0, 3, 4, 5].map((n) {
+                          final isSelected = _noteMin == n;
+                          return GestureDetector(
+                            onTap: () => setState(() => _noteMin = n),
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? MboaColors.boost
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? MboaColors.boost
+                                      : MboaColors.border,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (n > 0) ...[
+                                    Icon(Icons.star_rounded,
+                                        size: 14,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : MboaColors.boost),
+                                    const SizedBox(width: 3),
+                                  ],
+                                  Text(
+                                    n == 0 ? 'Toutes' : '$n+',
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : MboaColors.text,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -371,6 +445,7 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
                             _selectedType = 'Tous';
                             _prixMax = 60000;
                             _selectedDistance = 'Toutes';
+                            _noteMin = 0;
                             _showFiltres = false;
                             _searchController.clear();
                             _chargerLogements();
@@ -732,6 +807,7 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
               _selectedType = 'Tous';
               _prixMax = 60000;
               _selectedDistance = 'Toutes';
+              _noteMin = 0;
               _searchController.clear();
               _chargerLogements();
             }),

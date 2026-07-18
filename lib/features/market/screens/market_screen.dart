@@ -23,6 +23,7 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
   bool _isLoading = true;
   String _selectedCategorie = 'Tous';
   String _selectedEtat = 'Tous';
+  int _noteMin = 0;
   bool _showFiltres = false;
 
   @override
@@ -126,12 +127,22 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
 
   bool get _isLoggedIn => _supabase.auth.currentUser != null;
 
+  // articles n'a pas de colonne note_globale (les avis notent le vendeur,
+  // pas l'annonce) : le filtre lit la note jointe.
+  List<Map<String, dynamic>> get _articlesFiltres {
+    if (_noteMin == 0) return _articles;
+    return _articles.where((a) {
+      final note = (a['vendeur']?['note_globale'] ?? 0) as num;
+      return note >= _noteMin;
+    }).toList();
+  }
+
   List<Map<String, dynamic>> get _displayedArticles => _isLoggedIn
-      ? _articles
-      : _articles.take(AppConstants.pageSizeVisiteur).toList();
+      ? _articlesFiltres
+      : _articlesFiltres.take(AppConstants.pageSizeVisiteur).toList();
 
   bool get _showLimitBanner =>
-      !_isLoggedIn && _articles.length > AppConstants.pageSizeVisiteur;
+      !_isLoggedIn && _articlesFiltres.length > AppConstants.pageSizeVisiteur;
 
   final List<Map<String, String>> _categories = [
     {'label': 'Tous', 'icon': '🛍'},
@@ -403,6 +414,69 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
                         }).toList(),
                       ),
                     ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Note minimum du vendeur',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: MboaColors.text,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 32,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [0, 3, 4, 5].map((n) {
+                          final isSelected = _noteMin == n;
+                          return GestureDetector(
+                            onTap: () => setState(() => _noteMin = n),
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? MboaColors.boost
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? MboaColors.boost
+                                      : MboaColors.border,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (n > 0) ...[
+                                    Icon(Icons.star_rounded,
+                                        size: 14,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : MboaColors.boost),
+                                    const SizedBox(width: 3),
+                                  ],
+                                  Text(
+                                    n == 0 ? 'Toutes' : '$n+',
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : MboaColors.text,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
                     const SizedBox(height: 10),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -411,6 +485,7 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
                           onTap: () => setState(() {
                             _selectedCategorie = 'Tous';
                             _selectedEtat = 'Tous';
+                            _noteMin = 0;
                             _showFiltres = false;
                             _searchController.clear();
                             _chargerArticles();
@@ -841,6 +916,7 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
             onTap: () => setState(() {
               _selectedCategorie = 'Tous';
               _selectedEtat = 'Tous';
+              _noteMin = 0;
               _searchController.clear();
               _chargerArticles();
             }),

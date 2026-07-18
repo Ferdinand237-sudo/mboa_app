@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
@@ -13,6 +14,7 @@ import 'notifications_screen.dart';
 import 'contributeurs_screen.dart';
 import '../../profil/screens/profil_vendeur_screen.dart';
 import '../../../core/mixins/refreshable_state.dart';
+import '../../../app/router.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onNavigateLogement;
@@ -43,6 +45,8 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
   bool _isLoadingProches = false;
   List<Map<String, dynamic>> _logementsProches = [];
   List<Map<String, dynamic>> _lieuxPublics = [];
+
+  bool get _isLoggedIn => _supabase.auth.currentUser != null;
 
   @override
   void initState() {
@@ -432,7 +436,15 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
                           '🗺️',
                           'Carte',
                           MboaColors.accent,
-                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MapScreen())),
+                          () {
+                            if (!_isLoggedIn) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Connectez-vous pour accéder à la carte'), backgroundColor: MboaColors.primary),
+                              );
+                              return;
+                            }
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const MapScreen()));
+                          },
                         ),
                       ],
                     ),
@@ -460,7 +472,9 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
                     const SizedBox(height: 28),
 
                     // ── Trouve ton Mboa ─────────────────
-                    _buildTrouveTonMboa(),
+                    _isLoggedIn
+                        ? _buildTrouveTonMboa()
+                        : _buildTrouveTonMboaVerrouille(),
                     const SizedBox(height: 28),
 
                     // ── Market ──────────────────────────
@@ -669,6 +683,58 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
                 foregroundColor: MboaColors.primary,
               ),
               child: const Text('Voir tous les résultats →'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrouveTonMboaVerrouille() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [MboaColors.primaryDark, MboaColors.primary]),
+        borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Icon(Icons.lock_rounded, color: Colors.white, size: 22),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('Trouve ton Mboa 🏘',
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Crée ton compte pour accéder à cette fonctionnalité puissante : trouve tous les logements autour de toi ou d\'un lieu que tu choisis.',
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Colors.white.withValues(alpha: 0.9), height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => context.push(AppRoutes.register),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: MboaColors.primary,
+              ),
+              child: const Text('Créer un compte'),
             ),
           ),
         ],
