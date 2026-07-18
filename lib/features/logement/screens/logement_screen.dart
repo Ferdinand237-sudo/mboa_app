@@ -46,7 +46,7 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
     try {
       var query = _supabase
           .from('logements')
-          .select('*, proprietaire:users!proprietaire_id(nom, photo_url, verified)')
+          .select('*, proprietaire:users!proprietaire_id(nom, photo_url, verified, note_globale, nb_avis)')
           .eq('statut', 'disponible')
           .eq('statut_moderation', 'publie');
 
@@ -614,7 +614,7 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
                             color: MboaColors.boost),
                         const SizedBox(width: 3),
                         Text(
-                          '${l['note_globale'] ?? 0}',
+                          '${l['proprietaire']?['note_globale'] ?? 0}',
                           style: const TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 11,

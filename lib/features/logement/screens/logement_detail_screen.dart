@@ -41,10 +41,19 @@ class _LogementDetailScreenState
   List<Map<String, dynamic>> _avis = [];
   bool _isLoadingAvis = true;
 
+  // logements.note_globale/nb_avis ne sont jamais alimentés : la note
+  // affichée est celle du propriétaire (avis notés par utilisateur, pas par
+  // annonce). On la recharge nous-mêmes plutôt que de dépendre de la
+  // jointure proprietaire faite par l'écran appelant (pas toujours présente
+  // selon le point d'entrée : home, liste, favoris, carte...).
+  double _noteProprietaire = 0;
+  int _nbAvisProprietaire = 0;
+
   @override
   void initState() {
     super.initState();
     _chargerAvis();
+    _chargerNoteProprietaire();
     _verifierFavori();
     _chargerProximite();
     final photos = widget.logement['photos'] as List? ?? [];
@@ -238,6 +247,24 @@ class _LogementDetailScreenState
     }
   }
 
+  Future<void> _chargerNoteProprietaire() async {
+    final proprietaireId = widget.logement['proprietaire_id'];
+    if (proprietaireId == null) return;
+    try {
+      final data = await _supabase
+          .from('users')
+          .select('note_globale, nb_avis')
+          .eq('id', proprietaireId)
+          .single();
+      if (mounted) {
+        setState(() {
+          _noteProprietaire = (data['note_globale'] ?? 0).toDouble();
+          _nbAvisProprietaire = (data['nb_avis'] ?? 0) as int;
+        });
+      }
+    } catch (_) {}
+  }
+
   Future<void> _laisserAvis() async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) {
@@ -311,16 +338,9 @@ class _LogementDetailScreenState
         'valide': false,
       });
 
-      final avisData = await _supabase.from('avis').select('note').eq('cible_id', proprietaireId);
-      final notes = List<Map<String, dynamic>>.from(avisData);
-      if (notes.isNotEmpty) {
-        final total = notes.fold<int>(0, (sum, a) => sum + ((a['note'] ?? 0) as int));
-        await _supabase.from('users').update({
-          'note_globale': double.parse((total / notes.length).toStringAsFixed(1)),
-          'nb_avis': notes.length,
-        }).eq('id', proprietaireId);
-      }
-
+      // note_globale/nb_avis du propriétaire sont recalculés côté serveur
+      // par le trigger trg_recalculer_note_utilisateur (RLS interdit à ce
+      // client de modifier la ligne users d'un autre utilisateur).
       _chargerAvis();
 
       if (mounted) {
@@ -558,7 +578,7 @@ class _LogementDetailScreenState
                                   size: 20),
                               const SizedBox(width: 4),
                               Text(
-                                '${l['note_globale'] ?? 0}',
+                                '$_noteProprietaire',
                                 style: const TextStyle(
                                   fontFamily: 'Poppins',
                                   fontSize: 18,
@@ -567,7 +587,7 @@ class _LogementDetailScreenState
                                 ),
                               ),
                               Text(
-                                '  (${l['nb_avis'] ?? 0} avis)',
+                                '  ($_nbAvisProprietaire avis)',
                                 style: MboaTextStyles.muted,
                               ),
                             ],

@@ -925,8 +925,10 @@ class ConversationScreenState extends State<ConversationScreen> {
 
     try {
       // Un avis lié à une annonce passe par la modération du propriétaire
-      // (publié automatiquement après 72h s'il n'a pas été retiré) ; la
-      // note chiffrée, elle, compte immédiatement dans le score global.
+      // (publié automatiquement après 72h s'il n'a pas été retiré). Le
+      // trigger trg_recalculer_note_utilisateur recalcule note_globale/
+      // nb_avis côté serveur dès que valide passe à true (RLS interdit à
+      // ce client de modifier la ligne users d'un autre utilisateur).
       final necessiteModeration = widget.annonceId != null;
       await _supabase.from('avis').insert({
         'auteur_id': userId,
@@ -936,8 +938,6 @@ class ConversationScreenState extends State<ConversationScreen> {
         'commentaire': commentaireController.text.trim(),
         'valide': !necessiteModeration,
       });
-
-      await _recalculerNoteGlobale(widget.autreId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -959,27 +959,6 @@ class ConversationScreenState extends State<ConversationScreen> {
         );
       }
     }
-  }
-
-  Future<void> _recalculerNoteGlobale(String cibleId) async {
-    // La note chiffrée compte immédiatement, que le commentaire soit
-    // encore en attente de modération ou déjà publié.
-    final avisData = await _supabase
-        .from('avis')
-        .select('note')
-        .eq('cible_id', cibleId);
-
-    final notes = List<Map<String, dynamic>>.from(avisData);
-    if (notes.isEmpty) return;
-
-    final total = notes.fold<int>(
-        0, (sum, a) => sum + ((a['note'] ?? 0) as int));
-    final moyenne = total / notes.length;
-
-    await _supabase.from('users').update({
-      'note_globale': double.parse(moyenne.toStringAsFixed(1)),
-      'nb_avis': notes.length,
-    }).eq('id', cibleId);
   }
 
   @override

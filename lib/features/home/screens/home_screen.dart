@@ -101,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
     try {
       final data = await _supabase
           .from('logements')
-          .select('*, proprietaire:users!proprietaire_id(nom, verified)')
+          .select('*, proprietaire:users!proprietaire_id(nom, verified, note_globale)')
           .eq('statut', 'disponible')
           .eq('statut_moderation', 'publie')
           .order('boosted', ascending: false)
@@ -876,7 +876,7 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
                     children: [
                       const Icon(Icons.star_rounded, size: 12, color: MboaColors.boost),
                       const SizedBox(width: 2),
-                      Text('${l['note_globale'] ?? 0}', style: const TextStyle(fontFamily: 'Poppins', fontSize: 10, fontWeight: FontWeight.w600, color: MboaColors.text)),
+                      Text('${l['proprietaire']?['note_globale'] ?? 0}', style: const TextStyle(fontFamily: 'Poppins', fontSize: 10, fontWeight: FontWeight.w600, color: MboaColors.text)),
                       Text(' (${l['nb_avis'] ?? 0})', style: const TextStyle(fontFamily: 'Poppins', fontSize: 10, color: MboaColors.textMuted)),
                     ],
                   ),

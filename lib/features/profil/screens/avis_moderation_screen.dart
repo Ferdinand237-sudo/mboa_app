@@ -74,7 +74,7 @@ class _AvisModerationScreenState extends State<AvisModerationScreen> {
     } catch (_) {}
   }
 
-  Future<void> _refuser(String avisId, String cibleId) async {
+  Future<void> _refuser(String avisId) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -97,14 +97,9 @@ class _AvisModerationScreenState extends State<AvisModerationScreen> {
     if (confirm != true) return;
 
     try {
+      // note_globale/nb_avis sont recalculés côté serveur par le trigger
+      // trg_recalculer_note_utilisateur dès la suppression de la ligne.
       await _supabase.from('avis').delete().eq('id', avisId);
-
-      final avisData = await _supabase.from('avis').select('note').eq('cible_id', cibleId);
-      final notes = List<Map<String, dynamic>>.from(avisData);
-      await _supabase.from('users').update({
-        'note_globale': notes.isEmpty ? 0 : double.parse((notes.fold<int>(0, (s, a) => s + ((a['note'] ?? 0) as int)) / notes.length).toStringAsFixed(1)),
-        'nb_avis': notes.length,
-      }).eq('id', cibleId);
 
       if (mounted) {
         setState(() => _avisEnAttente.removeWhere((a) => a['id'] == avisId));
@@ -188,7 +183,7 @@ class _AvisModerationScreenState extends State<AvisModerationScreen> {
                               children: [
                                 Expanded(
                                   child: OutlinedButton(
-                                    onPressed: () => _refuser(a['id'], a['cible_id']),
+                                    onPressed: () => _refuser(a['id']),
                                     style: OutlinedButton.styleFrom(foregroundColor: MboaColors.danger, side: const BorderSide(color: MboaColors.danger)),
                                     child: const Text('Refuser'),
                                   ),

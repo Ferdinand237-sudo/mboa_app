@@ -200,16 +200,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         'valide': false,
       });
 
-      final avisData = await _supabase.from('avis').select('note').eq('cible_id', vendeurId);
-      final notes = List<Map<String, dynamic>>.from(avisData);
-      if (notes.isNotEmpty) {
-        final total = notes.fold<int>(0, (sum, a) => sum + ((a['note'] ?? 0) as int));
-        await _supabase.from('users').update({
-          'note_globale': double.parse((total / notes.length).toStringAsFixed(1)),
-          'nb_avis': notes.length,
-        }).eq('id', vendeurId);
-      }
-
+      // note_globale/nb_avis du vendeur sont recalculés côté serveur par le
+      // trigger trg_recalculer_note_utilisateur (RLS interdit à ce client
+      // de modifier la ligne users d'un autre utilisateur).
       _chargerAvis();
 
       if (mounted) {
