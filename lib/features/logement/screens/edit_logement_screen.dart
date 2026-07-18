@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -69,13 +70,12 @@ class _EditLogementScreenState extends State<EditLogementScreen> {
 
   Future<List<String>> _uploadNouvellesPhotos() async {
     final userId = _supabase.auth.currentUser!.id;
-    final urls = <String>[];
-    for (final photo in _nouvellesPhotos) {
-      final fileName = '$userId/${DateTime.now().millisecondsSinceEpoch}_${urls.length}.jpg';
-      await _supabase.storage.from(AppConstants.bucketLogements).upload(fileName, photo);
-      urls.add(_supabase.storage.from(AppConstants.bucketLogements).getPublicUrl(fileName));
-    }
-    return urls;
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return Future.wait(_nouvellesPhotos.asMap().entries.map((entry) async {
+      final fileName = '$userId/${timestamp}_${entry.key}.jpg';
+      await _supabase.storage.from(AppConstants.bucketLogements).upload(fileName, entry.value).timeout(const Duration(seconds: 30));
+      return _supabase.storage.from(AppConstants.bucketLogements).getPublicUrl(fileName);
+    }));
   }
 
   Future<void> _enregistrer() async {
@@ -105,6 +105,12 @@ class _EditLogementScreenState extends State<EditLogementScreen> {
           const SnackBar(content: Text('✅ Logement mis à jour'), backgroundColor: MboaColors.primary),
         );
         Navigator.pop(context, true);
+      }
+    } on TimeoutException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Envoi des photos trop lent. Vérifie ta connexion et réessaie.'), backgroundColor: MboaColors.danger),
+        );
       }
     } catch (e) {
       if (mounted) {

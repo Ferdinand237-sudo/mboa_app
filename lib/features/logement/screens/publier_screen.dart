@@ -430,19 +430,22 @@ class _FormLogementState extends State<_FormLogement> {
 
   Future<List<String>> _uploadPhotos() async {
     final userId = _supabase.auth.currentUser!.id;
-    final urls = <String>[];
-    for (final photo in _photos) {
-      final fileName =
-          '$userId/${DateTime.now().millisecondsSinceEpoch}_${urls.length}.jpg';
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    // Uploads en parallèle (au lieu d'un par un) : réduit fortement le
+    // temps de publication vu que les photos sont déjà compressées à
+    // l'étape de sélection (image_picker maxWidth/imageQuality) et donc
+    // légères — le goulot d'étranglement est la latence réseau par
+    // requête, pas la bande passante.
+    return Future.wait(_photos.asMap().entries.map((entry) async {
+      final fileName = '$userId/${timestamp}_${entry.key}.jpg';
       await _supabase.storage
           .from(AppConstants.bucketLogements)
-          .upload(fileName, photo);
-      final url = _supabase.storage
+          .upload(fileName, entry.value)
+          .timeout(const Duration(seconds: 30));
+      return _supabase.storage
           .from(AppConstants.bucketLogements)
           .getPublicUrl(fileName);
-      urls.add(url);
-    }
-    return urls;
+    }));
   }
 
   Future<void> _publier() async {
@@ -518,6 +521,15 @@ class _FormLogementState extends State<_FormLogement> {
           _lat = null;
           _lng = null;
         });
+      }
+    } on TimeoutException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Envoi des photos trop lent. Vérifie ta connexion et réessaie.'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -1112,19 +1124,17 @@ class _FormArticleState extends State<_FormArticle> {
 
   Future<List<String>> _uploadPhotos() async {
     final userId = _supabase.auth.currentUser!.id;
-    final urls = <String>[];
-    for (final photo in _photos) {
-      final fileName =
-          '$userId/${DateTime.now().millisecondsSinceEpoch}_${urls.length}.jpg';
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return Future.wait(_photos.asMap().entries.map((entry) async {
+      final fileName = '$userId/${timestamp}_${entry.key}.jpg';
       await _supabase.storage
           .from(AppConstants.bucketArticles)
-          .upload(fileName, photo);
-      final url = _supabase.storage
+          .upload(fileName, entry.value)
+          .timeout(const Duration(seconds: 30));
+      return _supabase.storage
           .from(AppConstants.bucketArticles)
           .getPublicUrl(fileName);
-      urls.add(url);
-    }
-    return urls;
+    }));
   }
 
   Future<void> _publier() async {
@@ -1179,6 +1189,15 @@ class _FormArticleState extends State<_FormArticle> {
           _negociable = false;
           _accepteAvis = false;
         });
+      }
+    } on TimeoutException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Envoi des photos trop lent. Vérifie ta connexion et réessaie.'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {

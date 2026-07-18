@@ -199,7 +199,7 @@ class _AmbassadeurVisiteScreenState extends State<AmbassadeurVisiteScreen> {
       final ambassadeurId = _supabase.auth.currentUser!.id;
       final verificationId = widget.verification['id'] as String;
       final fileName = '$ambassadeurId/${verificationId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await _supabase.storage.from(AppConstants.bucketAttestations).upload(fileName, _photo!);
+      await _supabase.storage.from(AppConstants.bucketAttestations).upload(fileName, _photo!).timeout(const Duration(seconds: 30));
 
       await _supabase.from(AppConstants.tableVerificationsTerrain).update({
         'conformite_bien': _conformiteBien,
@@ -217,6 +217,10 @@ class _AmbassadeurVisiteScreenState extends State<AmbassadeurVisiteScreen> {
       if (mounted) {
         _snack('✅ Visite envoyée à l\'administration', MboaColors.primary);
         Navigator.pop(context, true);
+      }
+    } on TimeoutException {
+      if (mounted) {
+        _snack('Envoi trop lent (connexion faible). Le brouillon est conservé, réessaie plus tard.', MboaColors.danger);
       }
     } catch (e) {
       if (mounted) _snack('Erreur lors de l\'envoi : ${e.toString()}', MboaColors.danger);

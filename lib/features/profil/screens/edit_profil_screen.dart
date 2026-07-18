@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -71,7 +72,7 @@ class _EditProfilScreenState extends State<EditProfilScreen> {
           fileName,
           fichier,
           fileOptions: const FileOptions(upsert: true),
-        );
+        ).timeout(const Duration(seconds: 30));
     return _supabase.storage.from(bucket).getPublicUrl(fileName);
   }
 
@@ -100,6 +101,15 @@ class _EditProfilScreenState extends State<EditProfilScreen> {
 
       if (mounted) {
         Navigator.pop(context, true);
+      }
+    } on TimeoutException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Envoi de la photo trop lent. Vérifie ta connexion et réessaie.'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
