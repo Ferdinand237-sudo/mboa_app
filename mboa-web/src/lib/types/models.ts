@@ -94,6 +94,8 @@ export type LogementModel = {
   proprietaireNom: string | null;
   proprietairePhoto: string | null;
   proprietaireVerified: boolean;
+  proprietaireNoteGlobale: number;
+  proprietaireNbAvis: number;
   boosted: boolean;
   vues: number;
   signalements: number;
@@ -130,6 +132,8 @@ export function logementFromRow(row: SupabaseRow): LogementModel {
       row.proprietaire_verified != null
         ? bool(row.proprietaire_verified)
         : bool(proprietaire.verified),
+    proprietaireNoteGlobale: num(proprietaire.note_globale),
+    proprietaireNbAvis: num(proprietaire.nb_avis),
     boosted: bool(row.boosted),
     vues: num(row.vues),
     signalements: num(row.signalements),
@@ -160,6 +164,7 @@ export type ArticleModel = {
   boosted: boolean;
   vues: number;
   signalements: number;
+  accepteAvis: boolean;
   datePublication: string;
 };
 
@@ -189,6 +194,7 @@ export function articleFromRow(row: SupabaseRow): ArticleModel {
     boosted: bool(row.boosted),
     vues: num(row.vues),
     signalements: num(row.signalements),
+    accepteAvis: bool(row.accepte_avis),
     datePublication: str(row.date_publication, new Date().toISOString()),
   };
 }

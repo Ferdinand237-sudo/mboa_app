@@ -28,3 +28,16 @@ export function formatDateFr(iso: string): string {
     year: "numeric",
   });
 }
+
+// Miroir de _formatPublicationDate dans article_detail_screen.dart.
+export function formatRelativeDate(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(diffMs / 3600000);
+  const days = Math.floor(diffMs / 86400000);
+
+  if (days >= 1) return `Il y a ${days} jour${days > 1 ? "s" : ""}`;
+  if (hours >= 1) return `Il y a ${hours} heure${hours > 1 ? "s" : ""}`;
+  if (minutes >= 1) return `Il y a ${minutes} minute${minutes > 1 ? "s" : ""}`;
+  return "À l'instant";
+}

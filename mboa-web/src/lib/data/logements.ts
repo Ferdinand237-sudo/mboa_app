@@ -3,7 +3,7 @@ import { logementFromRow, type LogementModel } from "@/lib/types/models";
 import { PAGE_SIZE } from "@/lib/constants";
 
 const SELECT_WITH_PROPRIETAIRE =
-  "*, proprietaire:users!proprietaire_id(nom, photo_url, verified)";
+  "*, proprietaire:users!proprietaire_id(nom, photo_url, verified, note_globale, nb_avis)";
 
 export async function getLogements(params: {
   type?: string;
@@ -18,7 +18,8 @@ export async function getLogements(params: {
   let query = supabase
     .from("logements")
     .select(SELECT_WITH_PROPRIETAIRE)
-    .eq("statut", "disponible");
+    .eq("statut", "disponible")
+    .eq("statut_moderation", "publie");
 
   if (type && type !== "Tous") {
     query = query.eq("type", type);
@@ -53,6 +54,7 @@ export async function getLogement(id: string): Promise<LogementModel | null> {
     .from("logements")
     .select(SELECT_WITH_PROPRIETAIRE)
     .eq("id", id)
+    .eq("statut_moderation", "publie")
     .single();
 
   if (error || !data) return null;

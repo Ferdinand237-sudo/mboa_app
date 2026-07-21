@@ -18,7 +18,8 @@ export async function getArticles(params: {
   let query = supabase
     .from("articles")
     .select(SELECT_WITH_VENDEUR)
-    .eq("statut", "disponible");
+    .eq("statut", "disponible")
+    .eq("statut_moderation", "publie");
 
   if (categorie && categorie !== "Tous") {
     query = query.eq("categorie", categorie);
@@ -50,6 +51,7 @@ export async function getArticle(id: string): Promise<ArticleModel | null> {
     .from("articles")
     .select(SELECT_WITH_VENDEUR)
     .eq("id", id)
+    .eq("statut_moderation", "publie")
     .single();
 
   if (error || !data) return null;

@@ -50,3 +50,13 @@ export const ROLE_VISITEUR = "visiteur";
 export const ROLE_VENDEUR = "vendeur";
 export const ROLE_ADMIN = "admin";
 export const ROLE_AMBASSADEUR = "ambassadeur";
+
+// Miroir de _categorieStyleProximite dans logement_detail_screen.dart.
+export const CATEGORIE_STYLE_PROXIMITE: Record<string, { icon: string; color: string }> = {
+  ecole: { icon: "🎓", color: "#2D6A4F" },
+  hopital: { icon: "🏥", color: "#EF4444" },
+  marche: { icon: "🛒", color: "#F4A261" },
+  pharmacie: { icon: "💊", color: "#10B981" },
+  eglise: { icon: "⛪", color: "#6B7280" },
+  autre: { icon: "📍", color: "#1A1A2E" },
+};
