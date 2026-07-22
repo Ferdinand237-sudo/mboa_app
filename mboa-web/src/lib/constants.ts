@@ -15,6 +15,8 @@ export const TABLE_AVIS = "avis";
 
 export const BUCKET_LOGEMENTS = "logements";
 export const BUCKET_ARTICLES = "articles";
+export const BUCKET_PROFILS = "profils";
+export const BUCKET_BOUTIQUES = "boutiques";
 
 export const PAGE_SIZE = 10;
 export const PAGE_SIZE_VISITEUR = 4;

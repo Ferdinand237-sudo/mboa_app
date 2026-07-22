@@ -1,61 +1,46 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getCurrentUser } from "@/lib/data/auth";
-import { initiales, formatDateFr } from "@/lib/utils/format";
-import { Badge } from "@/components/ui/badge";
-import { Rating } from "@/components/ui/rating";
-import { LogoutButton } from "@/components/profil/logout-button";
+import { getProfilStats } from "@/lib/data/profil-stats";
+import { ProfilConnected } from "@/components/profil/profil-connected";
 
 export const metadata: Metadata = {
   title: "Mon profil",
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  visiteur: "Étudiant",
-  vendeur: "Vendeur",
-  admin: "Administrateur",
-  ambassadeur: "Ambassadeur",
-};
-
+// Miroir de profil_screen.dart : deux vues selon l'état de connexion (pas de
+// redirection forcée — un visiteur non inscrit voit un écran d'invitation).
 export default async function ProfilPage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/login");
+    return (
+      <div className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center px-8 text-center">
+        <span className="flex h-[100px] w-[100px] items-center justify-center rounded-full bg-mboa-primary/10 text-5xl">
+          👤
+        </span>
+        <h1 className="mt-6 text-[22px] font-extrabold text-mboa-text">Mon Profil</h1>
+        <p className="mt-3 text-sm leading-relaxed text-mboa-text-muted">
+          Veuillez créer un compte pour configurer votre profil et accéder à toutes les
+          fonctionnalités.
+        </p>
+        <Link
+          href="/register"
+          className="mt-8 flex h-[52px] w-full items-center justify-center rounded-mboa-lg bg-mboa-primary text-sm font-bold text-white"
+        >
+          Créer un compte
+        </Link>
+        <Link
+          href="/login"
+          className="mt-3 flex h-[52px] w-full items-center justify-center rounded-mboa-lg border-[1.5px] border-mboa-primary text-sm font-bold text-mboa-primary"
+        >
+          Se connecter
+        </Link>
+      </div>
+    );
   }
 
-  return (
-    <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
-      <div className="flex flex-col items-center rounded-mboa-xl border border-mboa-border bg-mboa-card p-8 text-center">
-        <span className="flex h-20 w-20 items-center justify-center rounded-full bg-mboa-primary text-2xl font-bold text-white">
-          {initiales(user.nom)}
-        </span>
-        <h1 className="mt-4 flex items-center gap-1.5 text-xl font-extrabold text-mboa-text">
-          {user.nom}
-          {user.verified && <span title="Vérifié">✓</span>}
-        </h1>
-        <p className="text-sm text-mboa-text-muted">{user.email}</p>
+  const stats = await getProfilStats(user.id, user.role);
 
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-          <Badge variant="neutral">
-            {ROLE_LABELS[user.role] ?? user.role}
-          </Badge>
-          {user.verified && <Badge variant="verified">✓ Vérifié</Badge>}
-          {user.boosted && <Badge variant="boost">✦ Boosté</Badge>}
-        </div>
-
-        <div className="mt-4">
-          <Rating note={user.noteGlobale} nbAvis={user.nbAvis} />
-        </div>
-
-        <p className="mt-4 text-xs text-mboa-text-muted">
-          Membre depuis le {formatDateFr(user.dateInscription)}
-        </p>
-
-        <div className="mt-8 w-full border-t border-mboa-border pt-6">
-          <LogoutButton />
-        </div>
-      </div>
-    </div>
-  );
+  return <ProfilConnected user={user} stats={stats} />;
 }
