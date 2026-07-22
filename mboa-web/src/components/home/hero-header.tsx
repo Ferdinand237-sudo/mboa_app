@@ -21,7 +21,7 @@ export function HeroHeader({
             </p>
           </div>
           <Link
-            href="/profil"
+            href="/notifications"
             className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-lg"
             aria-label="Notifications"
           >
