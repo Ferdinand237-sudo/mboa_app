@@ -89,7 +89,11 @@ export default async function HomePage() {
 
         {/* Contributeurs */}
         <div className="mt-7">
-          <SectionTitle title="🤝 Contributeurs Mboa" />
+          <SectionTitle
+            title="🤝 Contributeurs Mboa"
+            actionLabel="Voir tout"
+            actionHref="/contributeurs"
+          />
           <div className="mt-3.5">
             {contributeurs.length === 0 ? (
               <div className="rounded-mboa-lg bg-mboa-card p-6 text-center text-sm text-mboa-text-muted">
