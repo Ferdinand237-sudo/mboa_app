@@ -139,7 +139,7 @@ export default async function ArticleDetailPage({
                 {article.vendeurNom ?? "Vendeur"}
               </p>
               <p className="text-xs text-mboa-text-muted">
-                ⭐ {article.vendeurNote.toFixed(1)}
+                ⭐ {article.vendeurNote.toFixed(1)} · Note globale du vendeur
                 <span className="text-mboa-primary"> · Voir le profil →</span>
               </p>
             </div>

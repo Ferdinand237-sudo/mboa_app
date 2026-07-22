@@ -57,7 +57,7 @@ export default async function VendeurPage({
           )}
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
             <Badge variant="neutral">
-              ⭐ {user.noteGlobale.toFixed(1)} ({user.nbAvis} avis)
+              ⭐ {user.noteGlobale.toFixed(1)} ({user.nbAvis} avis) · Note globale du vendeur
             </Badge>
             <Badge variant="neutral">
               Depuis {new Date(user.dateInscription).getFullYear()}
