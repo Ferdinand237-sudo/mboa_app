@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 // Miroir de la barre d'actions fixe en bas de logement_detail_screen.dart /
@@ -10,15 +11,14 @@ export function ContactSticky({
   destinataireId,
   annonceId,
   annonceType,
-  annonceTitre,
   isLoggedIn,
 }: {
   destinataireId: string;
   annonceId: string;
   annonceType: "logement" | "article";
-  annonceTitre: string;
   isLoggedIn: boolean;
 }) {
+  const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -61,19 +61,27 @@ export function ContactSticky({
       .eq("annonce_id", annonceId)
       .maybeSingle();
 
-    if (!existing) {
-      await supabase.from("conversations").insert({
-        participants: [user.id, destinataireId],
-        annonce_id: annonceId,
-        annonce_type: annonceType,
-        non_lu: { [user.id]: 0, [destinataireId]: 0 },
-      });
+    let conversationId = existing?.id as string | undefined;
+    if (!conversationId) {
+      const { data: created } = await supabase
+        .from("conversations")
+        .insert({
+          participants: [user.id, destinataireId],
+          annonce_id: annonceId,
+          annonce_type: annonceType,
+          non_lu: { [user.id]: 0, [destinataireId]: 0 },
+        })
+        .select("id")
+        .single();
+      conversationId = created?.id;
     }
 
     setSending(false);
-    setMessage(
-      `Conversation créée à propos de "${annonceTitre}" — continue la discussion depuis l'app mobile Mboa.`,
-    );
+    if (conversationId) {
+      router.push(`/chat/${conversationId}`);
+    } else {
+      setMessage("Impossible de démarrer la conversation. Réessaie.");
+    }
   }
 
   return (

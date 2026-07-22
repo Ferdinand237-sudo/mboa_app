@@ -1,29 +1,31 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/data/auth";
+import { getConversations } from "@/lib/data/chat";
+import { ChatList } from "@/components/chat/chat-list";
 
 export const metadata: Metadata = {
   title: "Messages",
 };
 
-// Miroir de chat_screen.dart : la messagerie temps réel n'existe pas encore
-// sur le web (nécessite l'infrastructure Realtime complète). En attendant,
-// on explique clairement où retrouver la fonctionnalité, comme pour
-// ContactSticky/ContactButtons dans les pages de détail.
+// Miroir de ChatScreen (chat_screen.dart).
 export default async function ChatPage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
 
-  return (
-    <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 text-center">
-      <span className="text-4xl" aria-hidden>
-        💬
-      </span>
-      <h1 className="mt-4 text-xl font-extrabold text-mboa-text">Messagerie</h1>
-      <p className="mt-2 text-sm leading-relaxed text-mboa-text-muted">
-        La messagerie en temps réel arrive bientôt sur le web. En attendant, utilise l&apos;app
-        mobile Mboa pour discuter avec les propriétaires et vendeurs.
-      </p>
-    </div>
-  );
+  if (!user) {
+    return (
+      <div className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center px-8 text-center">
+        <span className="text-6xl" aria-hidden>
+          💬
+        </span>
+        <h1 className="mt-4 text-lg font-bold text-mboa-text">Vos conversations</h1>
+        <p className="mt-2 text-sm leading-relaxed text-mboa-text-muted">
+          Connectez-vous pour envoyer des messages aux vendeurs et propriétaires
+        </p>
+      </div>
+    );
+  }
+
+  const conversations = await getConversations(user.id);
+
+  return <ChatList conversations={conversations} />;
 }

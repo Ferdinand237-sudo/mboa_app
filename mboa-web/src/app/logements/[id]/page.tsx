@@ -251,7 +251,6 @@ export default async function LogementDetailPage({
         destinataireId={logement.proprietaireId}
         annonceId={logement.id}
         annonceType="logement"
-        annonceTitre={logement.titre}
         isLoggedIn={!!user}
       />
     </div>

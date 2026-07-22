@@ -215,7 +215,6 @@ export default async function ArticleDetailPage({
         destinataireId={article.vendeurId}
         annonceId={article.id}
         annonceType="article"
-        annonceTitre={article.titre}
         isLoggedIn={!!user}
       />
     </div>
