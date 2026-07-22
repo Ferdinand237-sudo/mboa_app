@@ -99,14 +99,17 @@ export default async function LogementDetailPage({
             </p>
             <p className="text-xs text-mboa-text-muted">par mois</p>
           </div>
-          <div className="flex items-center gap-1.5 text-mboa-text">
-            <span className="text-lg text-mboa-boost">⭐</span>
-            <span className="text-lg font-extrabold">
-              {logement.proprietaireNoteGlobale.toFixed(1)}
-            </span>
-            <span className="text-sm text-mboa-text-muted">
-              ({logement.proprietaireNbAvis} avis)
-            </span>
+          <div className="text-right">
+            <div className="flex items-center gap-1.5 text-mboa-text">
+              <span className="text-lg text-mboa-boost">⭐</span>
+              <span className="text-lg font-extrabold">
+                {logement.proprietaireNoteGlobale.toFixed(1)}
+              </span>
+              <span className="text-sm text-mboa-text-muted">
+                ({logement.proprietaireNbAvis} avis)
+              </span>
+            </div>
+            <p className="text-[10px] text-mboa-text-muted">Note globale du vendeur</p>
           </div>
         </div>
 

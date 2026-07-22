@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 
 const VARIANTS = {
-  verified: "bg-mboa-verified/15 text-mboa-verified",
+  // Miroir de _buildBadge (logement_detail_screen.dart) : pastille pleine
+  // couleur, pas un chip pâle — c'est ce qui fait "vrai badge" sur mobile.
+  verified: "bg-mboa-verified/90 text-white",
   boost: "bg-mboa-boost/15 text-mboa-boost",
   neutral: "bg-mboa-background text-mboa-text-muted border border-mboa-border",
   danger: "bg-mboa-danger/15 text-mboa-danger",
