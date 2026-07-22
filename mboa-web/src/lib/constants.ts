@@ -81,3 +81,14 @@ export const CATEGORIES_LIEUX_PUBLICS: Record<string, { label: string; icon: str
 
 // Miroir de AppConstants.rayonsRechercheKm.
 export const RAYONS_RECHERCHE_KM = [0.5, 1, 1.5, 2, 3, 5];
+
+// Miroir de AppConstants.typesJustificatif.
+export const TYPES_JUSTIFICATIF = [
+  "Carte Nationale d'Identité",
+  "Passeport",
+  "Titre de propriété",
+  "Acte de vente",
+  "Autre document officiel",
+];
+
+export const BUCKET_ATTESTATIONS = "attestations-proprietaires";
