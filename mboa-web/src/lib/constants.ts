@@ -48,6 +48,11 @@ export const ETATS_ARTICLE = ["Neuf", "Très bon état", "Bon état", "Correct"]
 export const PRIX_MIN = 5000;
 export const PRIX_MAX = 200000;
 
+export const MAX_PHOTOS_LOGEMENT = 10;
+export const MIN_PHOTOS_LOGEMENT = 3;
+export const MAX_PHOTOS_ARTICLE = 5;
+export const MIN_PHOTOS_ARTICLE = 1;
+
 export const ROLE_VISITEUR = "visiteur";
 export const ROLE_VENDEUR = "vendeur";
 export const ROLE_ADMIN = "admin";

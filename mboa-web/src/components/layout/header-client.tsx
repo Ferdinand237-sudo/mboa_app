@@ -7,9 +7,14 @@ import { createClient } from "@/lib/supabase/client";
 import type { UserModel } from "@/lib/types/models";
 import { initiales } from "@/lib/utils/format";
 
-const NAV_LINKS = [
+const NAV_LINKS_VISITEUR = [
   { href: "/logements", label: "Logement" },
   { href: "/marketplace", label: "Market" },
+];
+
+const NAV_LINKS_VENDEUR = [
+  { href: "/vendeur/annonces", label: "Mes annonces" },
+  { href: "/vendeur/publier", label: "Publier" },
 ];
 
 export function HeaderClient({ user }: { user: UserModel | null }) {
@@ -23,6 +28,10 @@ export function HeaderClient({ user }: { user: UserModel | null }) {
     router.push("/");
     router.refresh();
   }
+
+  // Miroir de _navItemsVendeur (main_screen.dart) : Gestion + Publier
+  // remplacent Logement + Market une fois connecté comme vendeur.
+  const NAV_LINKS = user?.role === "vendeur" ? NAV_LINKS_VENDEUR : NAV_LINKS_VISITEUR;
 
   return (
     <header className="sticky top-0 z-50 border-b border-mboa-border bg-mboa-card/95 backdrop-blur">
