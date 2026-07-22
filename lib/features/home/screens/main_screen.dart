@@ -13,6 +13,7 @@ import '../../ambassadeur/screens/ambassadeur_dashboard_screen.dart';
 import '../../ambassadeur/screens/ambassadeur_liste_screen.dart';
 import '../../../app/router.dart';
 import '../../../core/mixins/refreshable_state.dart';
+import '../../../core/services/unread_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -25,6 +26,12 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   String _userRole = 'visiteur';
   bool _isLoading = true;
+  int _nbMessagesNonLus = 0;
+
+  // Un seul canal pour toute la durée de vie de l'écran racine (pas un
+  // par item de liste) : coût négligeable, contrairement au realtime sur
+  // les listes publiques à fort trafic évité ailleurs (voir CLAUDE.md).
+  RealtimeChannel? _canalConversations;
 
   // Clés utilisées pour déclencher un rafraîchissement explicite au
   // changement d'onglet : IndexedStack garde tous les onglets montés en
@@ -42,6 +49,33 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _chargerRole();
+    _chargerNbMessagesNonLus();
+    _ecouterConversations();
+  }
+
+  @override
+  void dispose() {
+    if (_canalConversations != null) {
+      Supabase.instance.client.removeChannel(_canalConversations!);
+    }
+    super.dispose();
+  }
+
+  Future<void> _chargerNbMessagesNonLus() async {
+    final nb = await UnreadService.nbMessagesNonLus();
+    if (mounted) setState(() => _nbMessagesNonLus = nb);
+  }
+
+  void _ecouterConversations() {
+    _canalConversations = Supabase.instance.client
+        .channel('main_screen_conversations')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'conversations',
+          callback: (_) => _chargerNbMessagesNonLus(),
+        )
+        .subscribe();
   }
 
   Future<void> _chargerRole() async {
@@ -165,6 +199,7 @@ class _MainScreenState extends State<MainScreen> {
     setState(() => _currentIndex = index);
     final state = _refreshKeys[index]?.currentState;
     if (state is RefreshableState) (state as RefreshableState).refresh();
+    _chargerNbMessagesNonLus();
   }
 
   @override
@@ -276,12 +311,45 @@ class _MainScreenState extends State<MainScreen> {
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Icon(
-                          item.icon,
-                          color: isActive
-                              ? MboaColors.primary
-                              : MboaColors.textMuted,
-                          size: 24,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              item.icon,
+                              color: isActive
+                                  ? MboaColors.primary
+                                  : MboaColors.textMuted,
+                              size: 24,
+                            ),
+                            // Onglet Chat/Messages : index 3 chez visiteur
+                            // et vendeur, absent chez ambassadeur (3 items).
+                            if (index == 3 && _nbMessagesNonLus > 0)
+                              Positioned(
+                                top: -4,
+                                right: -6,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                  decoration: BoxDecoration(
+                                    color: MboaColors.danger,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.white, width: 1.5),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      _nbMessagesNonLus > 9 ? '9+' : '$_nbMessagesNonLus',
+                                      style: const TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 2),

@@ -100,6 +100,53 @@ class _AdminSignalementsScreenState extends State<AdminSignalementsScreen>
     }
   }
 
+  // Boutons "Résoudre" / "Ignorer" : contrairement à Suspendre/Supprimer,
+  // l'admin ne prend ici aucune autre action sur l'annonce — il juge le
+  // signalement infondé (souvent une détection IA en a_verifier/bloque).
+  // Sans republication explicite, logements.statut_moderation /
+  // articles.statut_moderation restait bloqué pour toujours : l'annonce
+  // n'apparaissait plus jamais côté app ni dans le tableau de gestion du
+  // vendeur, alors même que le signalement affichait "Traité".
+  Future<void> _resoudreOuIgnorerSignalement(
+      Map<String, dynamic> signalement, String statut) async {
+    await _traiterSignalement(signalement['id'], statut);
+    if (signalement['cible_type'] == 'annonce') {
+      await _republierAnnonceSiBloquee(signalement['cible_id']);
+    }
+  }
+
+  Future<void> _republierAnnonceSiBloquee(String cibleId) async {
+    try {
+      final logement = await _supabase
+          .from('logements')
+          .select('id, statut_moderation')
+          .eq('id', cibleId)
+          .maybeSingle();
+      if (logement != null) {
+        if (logement['statut_moderation'] != 'publie') {
+          await _supabase
+              .from('logements')
+              .update({'statut_moderation': 'publie'})
+              .eq('id', cibleId);
+        }
+        return;
+      }
+    } catch (_) {}
+    try {
+      final article = await _supabase
+          .from('articles')
+          .select('id, statut_moderation')
+          .eq('id', cibleId)
+          .maybeSingle();
+      if (article != null && article['statut_moderation'] != 'publie') {
+        await _supabase
+            .from('articles')
+            .update({'statut_moderation': 'publie'})
+            .eq('id', cibleId);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _supprimerAnnonce(
       String cibleId, String cibleType, String signalementId) async {
     final confirm = await showDialog<bool>(
@@ -662,8 +709,8 @@ class _AdminSignalementsScreenState extends State<AdminSignalementsScreen>
                 // Rejeter le signalement
                 Expanded(
                   child: GestureDetector(
-                    onTap: () => _traiterSignalement(
-                        signalement['id'], 'rejete'),
+                    onTap: () => _resoudreOuIgnorerSignalement(
+                        signalement, 'rejete'),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           vertical: 9),
@@ -706,8 +753,8 @@ class _AdminSignalementsScreenState extends State<AdminSignalementsScreen>
                 // Traiter sans supprimer
                 Expanded(
                   child: GestureDetector(
-                    onTap: () => _traiterSignalement(
-                        signalement['id'], 'traite'),
+                    onTap: () => _resoudreOuIgnorerSignalement(
+                        signalement, 'traite'),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           vertical: 9),

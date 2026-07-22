@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,6 +27,11 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
   int _noteMin = 0;
   bool _showFiltres = false;
 
+  // Voir logement_screen.dart : évite qu'une réponse réseau partie plus
+  // tôt mais arrivée plus tard écrase des résultats plus récents.
+  int _requestId = 0;
+  Timer? _debounce;
+
   @override
   void initState() {
     super.initState();
@@ -35,6 +41,7 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
   @override
   void dispose() {
     _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
@@ -42,6 +49,7 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
   Future<void> refresh() => _chargerArticles();
 
   Future<void> _chargerArticles() async {
+    final requestId = ++_requestId;
     setState(() => _isLoading = true);
     try {
       var query = _supabase
@@ -69,6 +77,9 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
           .order('boosted', ascending: false)
           .order('date_publication', ascending: false);
 
+      // Réponse obsolète : une requête plus récente a déjà répondu.
+      if (requestId != _requestId) return;
+
       if (mounted) {
         setState(() {
           _articles =
@@ -77,8 +88,14 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
         });
       }
     } catch (e) {
+      if (requestId != _requestId) return;
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _onSearchChanged() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), _chargerArticles);
   }
 
   String _formatPrix(dynamic prix) {
@@ -205,7 +222,7 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
                                   controller:
                                       _searchController,
                                   onChanged: (_) =>
-                                      _chargerArticles(),
+                                      _onSearchChanged(),
                                   decoration:
                                       const InputDecoration(
                                     hintText:
@@ -227,6 +244,7 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
                                   .text.isNotEmpty)
                                 GestureDetector(
                                   onTap: () {
+                                    _debounce?.cancel();
                                     _searchController.clear();
                                     _chargerArticles();
                                   },
@@ -542,7 +560,7 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
                       child: CircularProgressIndicator(
                           color: MboaColors.secondary),
                     )
-                  : _articles.isEmpty
+                  : _displayedArticles.isEmpty
                       ? _buildEmpty()
                       : RefreshIndicator(
                           color: MboaColors.secondary,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -27,6 +28,14 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
   int _noteMin = 0;
   bool _showFiltres = false;
 
+  // Incrémenté à chaque nouvel appel réseau : une réponse dont le numéro
+  // ne correspond plus au dernier appel lancé (slider glissé rapidement,
+  // frappe clavier pendant la recherche...) est ignorée, sinon une requête
+  // partie plus tôt mais qui répond plus tard écrase des résultats plus
+  // récents et fait apparaître des annonces hors des filtres actifs.
+  int _requestId = 0;
+  Timer? _debounce;
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +45,7 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
   @override
   void dispose() {
     _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
@@ -43,6 +53,7 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
   Future<void> refresh() => _chargerLogements();
 
   Future<void> _chargerLogements() async {
+    final requestId = ++_requestId;
     setState(() => _isLoading = true);
     try {
       var query = _supabase
@@ -68,6 +79,10 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
           .order('note_globale', ascending: false)
           .order('date_publication', ascending: false);
 
+      // Une requête plus récente a déjà répondu entre-temps : ne pas
+      // écraser ses résultats avec ceux, obsolètes, de celle-ci.
+      if (requestId != _requestId) return;
+
       if (mounted) {
         setState(() {
           _logements = List<Map<String, dynamic>>.from(data);
@@ -75,8 +90,14 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
         });
       }
     } catch (e) {
+      if (requestId != _requestId) return;
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _onSearchChanged() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), _chargerLogements);
   }
 
   Future<void> _enregistrerAlerte() async {
@@ -192,7 +213,7 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
                                   controller:
                                       _searchController,
                                   onChanged: (_) =>
-                                      _chargerLogements(),
+                                      _onSearchChanged(),
                                   decoration:
                                       const InputDecoration(
                                     hintText:
@@ -214,6 +235,7 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
                                   .text.isNotEmpty)
                                 GestureDetector(
                                   onTap: () {
+                                    _debounce?.cancel();
                                     _searchController.clear();
                                     _chargerLogements();
                                   },
@@ -369,7 +391,7 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
                         divisions: 39,
                         onChanged: (v) {
                           setState(() => _prixMax = v);
-                          _chargerLogements();
+                          _onSearchChanged();
                         },
                       ),
                     ),
@@ -517,7 +539,7 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
                       child: CircularProgressIndicator(
                           color: MboaColors.primary),
                     )
-                  : _logements.isEmpty
+                  : _displayedLogements.isEmpty
                       ? _buildEmpty()
                       : RefreshIndicator(
                           color: MboaColors.primary,

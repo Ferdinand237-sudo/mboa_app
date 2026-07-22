@@ -35,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
   bool _isLoadingArticles = true;
   bool _isLoadingContributeurs = true;
   String? _userName = Supabase.instance.client.auth.currentUser?.userMetadata?['nom'];
-  bool _hasNotifications = false;
+  int _nbNotifications = 0;
 
   // ── Trouve ton Mboa ──────────────────────────────────────
   double? _refLat;
@@ -82,23 +82,9 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
   }
 
   Future<void> _verifierNotifications() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return;
-    try {
-      final conversations = await _supabase
-          .from('conversations')
-          .select('non_lu')
-          .contains('participants', [user.id]);
-      var trouve = false;
-      for (final conv in List<Map<String, dynamic>>.from(conversations)) {
-        final nonLu = conv['non_lu'];
-        if (nonLu is Map && ((nonLu[user.id] ?? 0) as num) > 0) {
-          trouve = true;
-          break;
-        }
-      }
-      if (mounted) setState(() => _hasNotifications = trouve);
-    } catch (_) {}
+    if (_supabase.auth.currentUser == null) return;
+    final nb = await NotificationsScreen.compterNonLues();
+    if (mounted) setState(() => _nbNotifications = nb);
   }
 
   Future<void> _chargerLogements() async {
@@ -345,10 +331,13 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
                                 ],
                               ),
                               GestureDetector(
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                                ),
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                                  );
+                                  _verifierNotifications();
+                                },
                                 child: Stack(
                                   clipBehavior: Clip.none,
                                   children: [
@@ -361,14 +350,30 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
                                       ),
                                       child: const Icon(Icons.notifications_rounded, color: Colors.white, size: 22),
                                     ),
-                                    if (_hasNotifications)
+                                    if (_nbNotifications > 0)
                                       Positioned(
-                                        top: 8,
-                                        right: 8,
+                                        top: -4,
+                                        right: -4,
                                         child: Container(
-                                          width: 10,
-                                          height: 10,
-                                          decoration: const BoxDecoration(color: MboaColors.secondary, shape: BoxShape.circle),
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                          constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                                          decoration: BoxDecoration(
+                                            color: MboaColors.secondary,
+                                            borderRadius: BorderRadius.circular(9),
+                                            border: Border.all(color: MboaColors.primary, width: 1.5),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              _nbNotifications > 9 ? '9+' : '$_nbNotifications',
+                                              style: const TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: Colors.white,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                   ],

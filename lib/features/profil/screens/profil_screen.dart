@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/services/unread_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../app/router.dart';
 import 'edit_profil_screen.dart';
@@ -94,22 +95,8 @@ class _ProfilScreenState extends State<ProfilScreen> with RefreshableState {
   }
 
   Future<void> _chargerNbMessagesNonLus() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return;
-    try {
-      final data = await _supabase
-          .from('conversations')
-          .select('non_lu')
-          .contains('participants', [user.id]);
-      int total = 0;
-      for (final conv in List<Map<String, dynamic>>.from(data)) {
-        final nonLu = conv['non_lu'];
-        if (nonLu is Map && nonLu[user.id] != null) {
-          total += (nonLu[user.id] as num).toInt();
-        }
-      }
-      if (mounted) setState(() => _nbMessagesNonLus = total);
-    } catch (_) {}
+    final total = await UnreadService.nbMessagesNonLus();
+    if (mounted) setState(() => _nbMessagesNonLus = total);
   }
 
   Future<void> _chargerNbFavoris() async {

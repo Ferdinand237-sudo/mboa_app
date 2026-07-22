@@ -1,10 +1,49 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/unread_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../chat/screens/chat_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
+
+  // Horodatage de la dernière visite de cet écran : les avis reçus après
+  // cette date sont considérés "nouveaux". Les messages n'ont pas besoin
+  // de ce repère, leur propre compteur non_lu suffit à les qualifier.
+  static const _prefsKeyDerniereVisite = 'notifications_derniere_visite';
+
+  static Future<String> _obtenirOuInitialiserWatermark(SharedPreferences prefs) async {
+    final existante = prefs.getString(_prefsKeyDerniereVisite);
+    if (existante != null) return existante;
+    final maintenant = DateTime.now().toIso8601String();
+    await prefs.setString(_prefsKeyDerniereVisite, maintenant);
+    return maintenant;
+  }
+
+  /// Messages non lus + avis reçus depuis la dernière visite de cet écran.
+  /// Utilisé pour la pastille sur la cloche (Home). N'avance pas le
+  /// repère : seule l'ouverture effective de l'écran marque les avis
+  /// comme vus.
+  static Future<int> compterNonLues() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return 0;
+
+    final nbMessages = await UnreadService.nbMessagesNonLus();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final watermark = await _obtenirOuInitialiserWatermark(prefs);
+      final avis = await supabase
+          .from('avis')
+          .select('id')
+          .eq('cible_id', user.id)
+          .gt('date_publication', watermark);
+      return nbMessages + List.from(avis).length;
+    } catch (_) {
+      return nbMessages;
+    }
+  }
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -28,6 +67,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final watermarkAvant = await NotificationsScreen._obtenirOuInitialiserWatermark(prefs);
+      final dateWatermark = DateTime.tryParse(watermarkAvant);
+
       final resultats = <Map<String, dynamic>>[];
 
       // Messages non lus
@@ -44,6 +87,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             'texte': '$nb nouveau${nb > 1 ? 'x' : ''} message${nb > 1 ? 's' : ''} : ${conv['dernier_message'] ?? ''}',
             'date': conv['dernier_message_date'],
             'conversationId': conv['id'],
+            'nouveau': true,
           });
         }
       }
@@ -57,10 +101,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           .limit(10);
       for (final a in List<Map<String, dynamic>>.from(avis)) {
         final auteur = a['auteur'] as Map<String, dynamic>?;
+        final dateAvis = DateTime.tryParse(a['date_publication']?.toString() ?? '');
         resultats.add({
           'type': 'avis',
           'texte': '${auteur?['nom'] ?? 'Un utilisateur'} vous a donné ${a['note']} ⭐',
           'date': a['date_publication'],
+          'nouveau': dateWatermark != null && dateAvis != null && dateAvis.isAfter(dateWatermark),
         });
       }
 
@@ -69,6 +115,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         final dy = DateTime.tryParse(y['date']?.toString() ?? '') ?? DateTime(2000);
         return dy.compareTo(dx);
       });
+
+      // La liste vient d'être consultée : tout ce qui suit est considéré vu.
+      await prefs.setString(
+        NotificationsScreen._prefsKeyDerniereVisite,
+        DateTime.now().toIso8601String(),
+      );
 
       if (mounted) {
         setState(() {
@@ -135,6 +187,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     itemBuilder: (context, index) {
                       final n = _notifications[index];
                       final isMessage = n['type'] == 'message';
+                      final estNouveau = n['nouveau'] == true;
                       return GestureDetector(
                         onTap: isMessage
                             ? () => Navigator.push(
@@ -145,8 +198,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: estNouveau ? MboaColors.primary.withValues(alpha: 0.04) : Colors.white,
                             borderRadius: BorderRadius.circular(MboaSizes.radiusMd),
+                            border: estNouveau ? Border.all(color: MboaColors.primary.withValues(alpha: 0.15)) : null,
                             boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
                           ),
                           child: Row(
@@ -168,12 +222,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(n['texte'] ?? '',
-                                        style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w600, color: MboaColors.text)),
+                                        style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 13,
+                                          fontWeight: estNouveau ? FontWeight.w700 : FontWeight.w600,
+                                          color: MboaColors.text,
+                                        )),
                                     const SizedBox(height: 2),
                                     Text(_formatDate(n['date']?.toString()), style: MboaTextStyles.caption),
                                   ],
                                 ),
                               ),
+                              if (estNouveau)
+                                Container(
+                                  width: 9,
+                                  height: 9,
+                                  margin: const EdgeInsets.only(left: 8),
+                                  decoration: const BoxDecoration(color: MboaColors.secondary, shape: BoxShape.circle),
+                                ),
                             ],
                           ),
                         ),
