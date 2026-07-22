@@ -8,7 +8,7 @@ import { LogoutIcon } from "@/components/ui/icons";
 
 // Miroir de _showLogoutDialog (profil_screen.dart) : confirmation avant
 // déconnexion, la déconnexion locale est forcée même si l'appel réseau échoue.
-export function LogoutButton({ variant = "card" }: { variant?: "card" | "simple" }) {
+export function LogoutButton({ variant = "card" }: { variant?: "card" | "simple" | "icon" }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -34,6 +34,14 @@ export function LogoutButton({ variant = "card" }: { variant?: "card" | "simple"
         >
           <LogoutIcon className="h-5 w-5" />
           Déconnexion
+        </button>
+      ) : variant === "icon" ? (
+        <button
+          onClick={() => setOpen(true)}
+          aria-label="Déconnexion"
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white"
+        >
+          <LogoutIcon className="h-5 w-5" />
         </button>
       ) : (
         <button
