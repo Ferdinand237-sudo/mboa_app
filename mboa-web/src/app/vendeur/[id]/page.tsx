@@ -40,12 +40,24 @@ export default async function VendeurPage({
     <div>
       <div className="bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light">
         <div className="mx-auto flex max-w-4xl flex-col items-center px-4 py-12 text-center sm:px-6">
-          <span className="flex h-24 w-24 items-center justify-center rounded-full bg-white/15 text-3xl font-extrabold text-white ring-4 ring-white/20">
-            {initiales(user.nom)}
-          </span>
-          <h1 className="mt-4 flex items-center gap-1.5 text-xl font-extrabold text-white">
+          <div className="relative">
+            <span className="flex h-24 w-24 items-center justify-center rounded-full bg-white/15 text-3xl font-extrabold text-white ring-4 ring-white/20">
+              {initiales(user.nom)}
+            </span>
+            {/* Miroir du badge rond sur l'avatar (profil_vendeur_screen.dart) :
+                le ✓ nu à côté du nom était invisible en blanc sur fond vert. */}
+            {user.verified && (
+              <span
+                className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-mboa-verified text-sm text-white ring-2 ring-white"
+                title="Vérifié"
+                aria-label="Vérifié"
+              >
+                ✓
+              </span>
+            )}
+          </div>
+          <h1 className="mt-4 text-xl font-extrabold text-white">
             {user.nomCommerce ?? user.nom}
-            {user.verified && <span title="Vérifié">✓</span>}
           </h1>
           {user.nomCommerce && (
             <p className="text-sm text-white/80">{user.nom}</p>
