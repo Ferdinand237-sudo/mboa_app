@@ -1,0 +1,48 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/*
+ * Design tokens Mboa — portés depuis lib/core/theme/app_theme.dart
+ * (MboaColors / MboaSizes) pour garder le web et l'app mobile
+ * visuellement cohérents. Thème clair unique, pas de dark mode
+ * (comme dans l'app Flutter).
+ */
+@theme {
+  --color-mboa-primary: #2d6a4f;
+  --color-mboa-primary-dark: #1b4332;
+  --color-mboa-primary-light: #52b788;
+
+  --color-mboa-secondary: #f4a261;
+  --color-mboa-accent: #e76f51;
+
+  --color-mboa-background: #f8f6f0;
+  --color-mboa-card: #ffffff;
+  --color-mboa-text: #1a1a2e;
+  --color-mboa-text-muted: #6b7280;
+  --color-mboa-border: #e5e7eb;
+
+  --color-mboa-boost: #f59e0b;
+  --color-mboa-verified: #10b981;
+  --color-mboa-danger: #ef4444;
+  --color-mboa-success: #22c55e;
+  --color-mboa-warning: #f59e0b;
+
+  --radius-mboa-sm: 8px;
+  --radius-mboa-md: 12px;
+  --radius-mboa-lg: 16px;
+  --radius-mboa-xl: 24px;
+  --radius-mboa-full: 999px;
+
+  --font-poppins: var(--font-poppins);
+}
+
+:root {
+  --background: var(--color-mboa-background);
+  --foreground: var(--color-mboa-text);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-poppins), Arial, Helvetica, sans-serif;
+}
