@@ -67,3 +67,17 @@ export const CATEGORIE_STYLE_PROXIMITE: Record<string, { icon: string; color: st
   eglise: { icon: "⛪", color: "#6B7280" },
   autre: { icon: "📍", color: "#1A1A2E" },
 };
+
+// Miroir de AppConstants.categoriesLieuxPublics (map_screen.dart).
+export const CATEGORIES_LIEUX_PUBLICS: Record<string, { label: string; icon: string; color: string }> = {
+  ecole: { label: "École", icon: "🎓", color: "#2D6A4F" },
+  eglise: { label: "Église", icon: "⛪", color: "#F4A261" },
+  hopital: { label: "Hôpital", icon: "🏥", color: "#EF4444" },
+  marche: { label: "Marché", icon: "🛒", color: "#F4A261" },
+  pharmacie: { label: "Pharmacie", icon: "💊", color: "#10B981" },
+  commissariat: { label: "Commissariat", icon: "🚔", color: "#1A1A2E" },
+  autre: { label: "Autre", icon: "📍", color: "#6B7280" },
+};
+
+// Miroir de AppConstants.rayonsRechercheKm.
+export const RAYONS_RECHERCHE_KM = [0.5, 1, 1.5, 2, 3, 5];

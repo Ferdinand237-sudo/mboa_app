@@ -145,7 +145,7 @@ export default async function LogementDetailPage({
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold text-mboa-text">📍 Points de proximité</h2>
               <Link
-                href={`/carte?lat=${logement.lat}&lng=${logement.lng}`}
+                href={`/carte?logement=${logement.id}`}
                 className="text-xs font-semibold text-mboa-primary"
               >
                 Voir sur la carte →
