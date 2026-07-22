@@ -143,7 +143,10 @@ export function ConversationView({
 
   return (
     <div>
-      <div className="bg-white px-4 py-3">
+      {/* Fixé sous le header du site (h-16) pour garder le nom et
+          l'intitulé de l'annonce visibles sans devoir remonter tout en
+          haut des messages — comportement déjà présent sur mobile. */}
+      <div className="sticky top-16 z-40 bg-white px-4 py-3 shadow-sm">
         <div className="mx-auto flex max-w-2xl items-center gap-3">
           {/* router.push (pas router.back) : le retour navigateur restaure
               toujours la liste des conversations depuis le cache client
