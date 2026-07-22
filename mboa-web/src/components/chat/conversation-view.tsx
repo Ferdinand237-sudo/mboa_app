@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { BackButton } from "@/components/ui/back-button";
 import { Dialog } from "@/components/ui/dialog";
 import { Photo } from "@/components/ui/photo";
 import { StarIcon, SendIcon, ChevronRightIcon } from "@/components/ui/icons";
@@ -46,6 +46,7 @@ export function ConversationView({
   initialMessages: MessageRow[];
   currentUserId: string;
 }) {
+  const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [texte, setTexte] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -144,7 +145,19 @@ export function ConversationView({
     <div>
       <div className="bg-white px-4 py-3">
         <div className="mx-auto flex max-w-2xl items-center gap-3">
-          <BackButton />
+          {/* router.push (pas router.back) : le retour navigateur restaure
+              toujours la liste des conversations depuis le cache client
+              même après staleTimes.dynamic=0, ce qui laissait le badge
+              non-lu affiché après lecture. push('/chat') redéclenche un
+              vrai rendu serveur de la liste. */}
+          <button
+            type="button"
+            onClick={() => router.push("/chat")}
+            aria-label="Retour"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-mboa-text shadow"
+          >
+            ←
+          </button>
           <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-mboa-primary">
             {conversation.autrePhotoUrl ? (
               <Photo src={conversation.autrePhotoUrl} alt={conversation.autreNom} className="rounded-full" />

@@ -12,14 +12,17 @@ export const metadata: Metadata = {
 // (utilisée aussi depuis logement_detail/article_detail), mais nécessite
 // tout de même une session pour identifier l'utilisateur courant.
 export default async function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
+  const { id } = await params;
+
+  // getMessages ne dépend pas de l'utilisateur : on la lance en parallèle
+  // de getCurrentUser au lieu d'enchaîner les allers-retours Supabase un
+  // par un (c'est cette latence en série qui donnait l'impression que le
+  // clic sur une conversation ne répondait pas).
+  const [user, messages] = await Promise.all([getCurrentUser(), getMessages(id)]);
   if (!user) redirect("/login");
 
-  const { id } = await params;
   const conversation = await getConversationDetail(id, user.id);
   if (!conversation) notFound();
-
-  const messages = await getMessages(id);
 
   return <ConversationView conversation={conversation} initialMessages={messages} currentUserId={user.id} />;
 }
