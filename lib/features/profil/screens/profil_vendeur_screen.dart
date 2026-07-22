@@ -462,6 +462,9 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
           children: [
             Expanded(
               child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                ),
                 onPressed: _appeler,
                 icon: const Icon(Icons.phone_rounded, size: 18),
                 label: const Text('Appeler', maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -471,6 +474,9 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
             Expanded(
               flex: 2,
               child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
                 onPressed: _envoyerMessage,
                 icon: const Icon(Icons.chat_bubble_rounded, size: 18),
                 label: const Text('Envoyer un message', maxLines: 1, overflow: TextOverflow.ellipsis),

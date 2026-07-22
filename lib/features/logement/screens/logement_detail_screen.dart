@@ -26,6 +26,21 @@ class _LogementDetailScreenState
   final PageController _photoPageController = PageController();
   Timer? _autoScrollTimer;
 
+  // Le bouton retour et le bouton favori flottent en position fixe
+  // au-dessus de la galerie photo (280px) : sans ça, une fois la galerie
+  // scrollée hors de vue, ils restent plaqués sur le texte en dessous
+  // (titre, équipements, points de proximité...) et le chevauchent en
+  // permanence. On les masque donc au-delà de ce seuil.
+  final ScrollController _scrollController = ScrollController();
+  bool _boutonsFlottantsVisibles = true;
+
+  void _onScroll() {
+    final visible = _scrollController.offset < 220;
+    if (visible != _boutonsFlottantsVisibles) {
+      setState(() => _boutonsFlottantsVisibles = visible);
+    }
+  }
+
   List<Map<String, dynamic>> _proximite = [];
   bool _isLoadingProximite = true;
 
@@ -52,6 +67,7 @@ class _LogementDetailScreenState
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _chargerAvis();
     _chargerNoteProprietaire();
     _verifierFavori();
@@ -74,6 +90,8 @@ class _LogementDetailScreenState
   void dispose() {
     _autoScrollTimer?.cancel();
     _photoPageController.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -492,6 +510,7 @@ class _LogementDetailScreenState
       body: Stack(
         children: [
           SingleChildScrollView(
+            controller: _scrollController,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1046,6 +1065,9 @@ class _LogementDetailScreenState
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                      ),
                       onPressed: _appelerProprietaire,
                       icon: const Icon(
                           Icons.phone_rounded,
@@ -1057,6 +1079,9 @@ class _LogementDetailScreenState
                   Expanded(
                     flex: 2,
                     child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
                       onPressed: _ouvrirChat,
                       icon: const Icon(
                           Icons.chat_bubble_rounded,
@@ -1071,29 +1096,39 @@ class _LogementDetailScreenState
           ),
 
           // ── Back button ───────────────────────────
+          // Masqué au-delà de la galerie (voir _onScroll) : sinon ce
+          // bouton flottant reste plaqué sur le texte qui défile en
+          // dessous une fois la photo scrollée hors de vue.
           Positioned(
             top: MediaQuery.of(context).padding.top + 10,
             left: 16,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black
-                          .withValues(alpha: 0.1),
-                      blurRadius: 8,
+            child: IgnorePointer(
+              ignoring: !_boutonsFlottantsVisibles,
+              child: AnimatedOpacity(
+                opacity: _boutonsFlottantsVisibles ? 1 : 0,
+                duration: const Duration(milliseconds: 200),
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black
+                              .withValues(alpha: 0.1),
+                          blurRadius: 8,
+                        ),
+                      ],
                     ),
-                  ],
+                    child: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        size: 16,
+                        color: MboaColors.text),
+                  ),
                 ),
-                child: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    size: 16,
-                    color: MboaColors.text),
               ),
             ),
           ),
@@ -1102,28 +1137,35 @@ class _LogementDetailScreenState
           Positioned(
             top: MediaQuery.of(context).padding.top + 10,
             right: 16,
-            child: GestureDetector(
-              onTap: _toggleFavori,
-              child: Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black
-                          .withValues(alpha: 0.1),
-                      blurRadius: 8,
+            child: IgnorePointer(
+              ignoring: !_boutonsFlottantsVisibles,
+              child: AnimatedOpacity(
+                opacity: _boutonsFlottantsVisibles ? 1 : 0,
+                duration: const Duration(milliseconds: 200),
+                child: GestureDetector(
+                  onTap: _toggleFavori,
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black
+                              .withValues(alpha: 0.1),
+                          blurRadius: 8,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: Icon(
-                  _isFavori
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_border_rounded,
-                  size: 18,
-                  color: MboaColors.danger,
+                    child: Icon(
+                      _isFavori
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      size: 18,
+                      color: MboaColors.danger,
+                    ),
+                  ),
                 ),
               ),
             ),

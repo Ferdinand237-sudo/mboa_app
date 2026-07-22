@@ -686,6 +686,10 @@ class ConversationScreenState extends State<ConversationScreen> {
           .eq('conversation_id',
               widget.conversationId)
           .neq('expediteur_id', userId);
+      // RPC plutôt qu'un update direct du JSON non_lu : évite d'écraser
+      // l'incrément d'un message qui viendrait d'arriver entre-temps.
+      await _supabase.rpc('marquer_conversation_lue',
+          params: {'p_conversation_id': widget.conversationId});
     } catch (_) {}
   }
 

@@ -939,6 +939,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                      ),
                       onPressed: _appelerVendeur,
                       icon: const Icon(Icons.phone_rounded, size: 18),
                       label: const Text('Appeler', maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -948,6 +951,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
                       onPressed: () => _ouvrirChat(),
                       icon: const Icon(Icons.chat_bubble_rounded, size: 18),
                       label: const Text('Contacter le vendeur', maxLines: 1, overflow: TextOverflow.ellipsis),
