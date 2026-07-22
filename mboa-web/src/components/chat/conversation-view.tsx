@@ -59,6 +59,23 @@ export function ConversationView({
         .update({ lu: true })
         .eq("conversation_id", conversation.id)
         .neq("expediteur_id", currentUserId);
+
+      // trg_incrementer_non_lu (déclencheur Supabase) incrémente
+      // conversations.non_lu à chaque insertion de message, mais rien ne le
+      // remet à 0 côté lecture : on le fait ici en repartant du compteur de
+      // l'autre participant pour ne pas l'écraser.
+      const { data: conv } = await supabase
+        .from("conversations")
+        .select("non_lu")
+        .eq("id", conversation.id)
+        .single();
+      const nonLu = (conv?.non_lu as Record<string, number> | null) ?? {};
+      if (nonLu[currentUserId]) {
+        await supabase
+          .from("conversations")
+          .update({ non_lu: { ...nonLu, [currentUserId]: 0 } })
+          .eq("id", conversation.id);
+      }
     }
     marquerLus();
 
