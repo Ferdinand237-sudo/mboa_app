@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import L from "leaflet";
+import "leaflet.markercluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import { Photo } from "@/components/ui/photo";
 import { distanceMetres, formatDistance } from "@/lib/utils/geo";
@@ -46,6 +49,68 @@ const userIcon = L.divIcon({
   iconAnchor: [11, 11],
 });
 
+// Miroir de _buildClusterBadge (map_screen.dart) : badge circulaire coloré,
+// bordure blanche 3px, ombre teintée, nombre centré en blanc.
+function clusterBadgeIcon(count: number, color: string, size: number): L.DivIcon {
+  return L.divIcon({
+    className: "",
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 0 8px ${color}66;display:flex;align-items:center;justify-content:center;font-family:Poppins,sans-serif;font-weight:800;font-size:13px;color:#fff;">${count}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
+// Miroir de MarkerClusterLayerWidget (map_screen.dart) : regroupe les
+// marqueurs géographiquement proches en cluster (maxClusterRadius 45px,
+// comme côté mobile) via leaflet.markercluster, piloté directement sur
+// l'instance Leaflet plutôt qu'un wrapper React (évite les soucis de
+// compatibilité de peer dependencies avec React 19).
+function ClusterGroup<T>({
+  items,
+  getPosition,
+  getIcon,
+  onItemClick,
+  clusterColor,
+  clusterSize,
+}: {
+  items: T[];
+  getPosition: (item: T) => [number, number];
+  getIcon: (item: T) => L.DivIcon;
+  onItemClick: (item: T) => void;
+  clusterColor: string;
+  clusterSize: number;
+}) {
+  const map = useMap();
+  const groupRef = useRef<L.MarkerClusterGroup | null>(null);
+
+  useEffect(() => {
+    const group = L.markerClusterGroup({
+      maxClusterRadius: 45,
+      showCoverageOnHover: false,
+      iconCreateFunction: (cluster) => clusterBadgeIcon(cluster.getChildCount(), clusterColor, clusterSize),
+    });
+    groupRef.current = group;
+    map.addLayer(group);
+    return () => {
+      map.removeLayer(group);
+      groupRef.current = null;
+    };
+  }, [map, clusterColor, clusterSize]);
+
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!group) return;
+    group.clearLayers();
+    items.forEach((item) => {
+      const marker = L.marker(getPosition(item), { icon: getIcon(item) });
+      marker.on("click", () => onItemClick(item));
+      group.addLayer(marker);
+    });
+  }, [items, getPosition, getIcon, onItemClick]);
+
+  return null;
+}
+
 function ClickCatcher({ onBackgroundClick }: { onBackgroundClick: () => void }) {
   useMapEvents({ click: onBackgroundClick });
   return null;
@@ -85,9 +150,9 @@ function MapControls({ center, hasSelection }: { center: [number, number]; hasSe
 
 type Selection = { type: "logement"; item: MapLogement } | { type: "lieu"; item: MapLieu } | null;
 
-// Miroir de map_screen.dart (sans le clustering flutter_map_marker_cluster
-// ni l'ajout de lieu par l'admin, ambassadeur/admin restant hors périmètre
-// web pour l'instant).
+// Miroir de map_screen.dart, y compris le regroupement en clusters
+// (flutter_map_marker_cluster côté mobile → leaflet.markercluster ici).
+// L'ajout de lieu par l'admin reste hors périmètre web pour l'instant.
 export default function MapView({
   logements,
   lieuxPublics,
@@ -179,28 +244,27 @@ export default function MapView({
 
           {userPosition && <Marker position={[userPosition.lat, userPosition.lng]} icon={userIcon} />}
 
-          {afficherLogements &&
-            logementsFiltres.map((l) => (
-              <Marker
-                key={l.id}
-                position={[l.lat, l.lng]}
-                icon={iconLogement(l.prix, selection?.type === "logement" && selection.item.id === l.id)}
-                eventHandlers={{ click: () => setSelection({ type: "logement", item: l }) }}
-              />
-            ))}
+          {afficherLogements && (
+            <ClusterGroup
+              items={logementsFiltres}
+              getPosition={(l) => [l.lat, l.lng]}
+              getIcon={(l) => iconLogement(l.prix, selection?.type === "logement" && selection.item.id === l.id)}
+              onItemClick={(l) => setSelection({ type: "logement", item: l })}
+              clusterColor="#2D6A4F"
+              clusterSize={36}
+            />
+          )}
 
-          {afficherLieux &&
-            lieuxPublics.map((lieu) => {
-              const cat = CATEGORIES_LIEUX_PUBLICS[lieu.categorie] ?? CATEGORIES_LIEUX_PUBLICS.autre;
-              return (
-                <Marker
-                  key={lieu.id}
-                  position={[lieu.lat, lieu.lng]}
-                  icon={iconLieu(cat)}
-                  eventHandlers={{ click: () => setSelection({ type: "lieu", item: lieu }) }}
-                />
-              );
-            })}
+          {afficherLieux && (
+            <ClusterGroup
+              items={lieuxPublics}
+              getPosition={(lieu) => [lieu.lat, lieu.lng]}
+              getIcon={(lieu) => iconLieu(CATEGORIES_LIEUX_PUBLICS[lieu.categorie] ?? CATEGORIES_LIEUX_PUBLICS.autre)}
+              onItemClick={(lieu) => setSelection({ type: "lieu", item: lieu })}
+              clusterColor="#E76F51"
+              clusterSize={32}
+            />
+          )}
 
           <MapControls center={center} hasSelection={selection !== null} />
         </MapContainer>
