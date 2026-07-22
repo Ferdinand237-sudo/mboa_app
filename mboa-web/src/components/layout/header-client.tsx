@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -7,14 +8,21 @@ import { createClient } from "@/lib/supabase/client";
 import type { UserModel } from "@/lib/types/models";
 import { initiales } from "@/lib/utils/format";
 
+// Miroir de _navItemsVisiteur (main_screen.dart) : Home | Logement | Market
+// | Chat | Profil. Home et Profil sont déjà dans le header (logo + menu
+// compte), donc seuls Logement/Market/Chat restent dans NAV_LINKS.
 const NAV_LINKS_VISITEUR = [
   { href: "/logements", label: "Logement" },
   { href: "/marketplace", label: "Market" },
+  { href: "/chat", label: "Chat" },
 ];
 
+// Miroir de _navItemsVendeur (main_screen.dart) : Home | Gestion | Publier
+// | Messages | Profil.
 const NAV_LINKS_VENDEUR = [
   { href: "/vendeur/annonces", label: "Mes annonces" },
   { href: "/vendeur/publier", label: "Publier" },
+  { href: "/chat", label: "Messages" },
 ];
 
 export function HeaderClient({ user }: { user: UserModel | null }) {
@@ -37,9 +45,7 @@ export function HeaderClient({ user }: { user: UserModel | null }) {
     <header className="sticky top-0 z-50 border-b border-mboa-border bg-mboa-card/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2 shrink-0">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-mboa-primary text-lg" aria-hidden>
-            🏠
-          </span>
+          <Image src="/logo-mboa.png" alt="Mboa" width={36} height={36} className="h-9 w-9 rounded-lg object-contain" priority />
           <span className="text-lg font-extrabold tracking-tight text-mboa-text">
             Mboa
           </span>
