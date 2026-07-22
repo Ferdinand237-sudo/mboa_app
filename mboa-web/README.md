@@ -34,31 +34,41 @@ npm run dev
 
 ## Ce qui est fait
 
-- **Accueil** (`/`) — hero, recherche, logements et articles récents
-- **Logements** (`/logements`, `/logements/[id]`) — liste avec filtres
-  (type, prix, recherche texte), détail avec galerie/équipements/règles
-- **Marketplace** (`/marketplace`, `/marketplace/[id]`) — idem pour les
-  articles (catégorie, état)
-- **Auth** (`/login`, `/register`) — connexion et inscription étudiant via
-  Supabase Auth (email/mot de passe), miroir de `auth_service.dart`
-- **Profil** (`/profil`) — infos du compte connecté, déconnexion
+L'ensemble des écrans de l'app Flutter est reproduit côté web, connecté à la
+même base Supabase :
+
+- **Public / visiteur** — accueil, logements (liste + détail), marketplace
+  (liste + détail), profil public vendeur, recherche instantanée
+  (`/recherche`), liste des contributeurs (`/contributeurs`), carte
+  interactive OpenStreetMap avec regroupement en clusters (`/carte`,
+  `/carte/autour`)
+- **Auth** — connexion, inscription étudiant, inscription commerçant/
+  propriétaire, mot de passe oublié/réinitialisation
+- **Espace étudiant connecté** — profil (favoris, alertes de recherche,
+  devenir contributeur, avis à modérer, notifications, modification du
+  profil), messagerie temps réel (`/chat`, Supabase Realtime)
+- **Espace vendeur** — publier une annonce (logement/article, upload
+  photos, position GPS, modération IA), gestion des annonces, modification
+  logement/article
+- **Espace admin** (`/admin`) — dashboard, utilisateurs, annonces,
+  signalements, demandes Pro, vérifications terrain
+- **Espace ambassadeur** (`/ambassadeur`) — dashboard, propriétaires
+  assignés, formulaire de visite terrain
 - **Limite visiteur** : un visiteur non connecté ne voit que 4 annonces par
   liste (`PAGE_SIZE_VISITEUR`, même règle que le mobile) avec une bannière
   d'invitation à se connecter
 - Toutes les pages de liste/détail sont rendues côté serveur (SSR) pour le
   référencement (`generateMetadata` par annonce)
 
-## Ce qui n'est PAS encore fait (prochaines étapes suggérées)
+## Ce qui n'est PAS encore fait
 
-- **Chat** : pas de messagerie web pour l'instant — la fiche annonce invite
-  à contacter via l'app mobile. Implémenter la messagerie temps réel
-  (Supabase Realtime, comme `chat_screen.dart`) est le chantier suivant le
-  plus utile.
-- **Publication d'annonces** (vendeur) — `publier_screen.dart` n'a pas
-  d'équivalent web
-- **Espace admin / ambassadeur** — resté mobile-only pour l'instant
-- **Favoris, avis, carte OSM** — non portés
 - Pas de tests automatisés
+- Regroupement de marqueurs uniquement sur `/carte` (pas de clustering
+  ailleurs, ça n'a pas de sens ailleurs de toute façon)
+- Le brouillon hors-ligne du formulaire de visite ambassadeur (pensé pour
+  le terrain sans réseau côté mobile) n'a pas d'équivalent web fiable :
+  l'envoi échoue simplement avec un message si la connexion coupe pendant
+  l'envoi, à réessayer manuellement
 
 ## Note sur le détail des annonces et les visiteurs non connectés
 
@@ -71,7 +81,62 @@ strictement identique au mobile.
 
 ## Déploiement
 
-Le projet est un Next.js standard, déployable tel quel sur Vercel (ou tout
-hébergeur Node). Il suffit de renseigner les variables d'environnement
-`NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` (voir
-`.env.local.example`) dans la configuration de la plateforme cible.
+Le projet est déployé sur Vercel (équipe **Teka3**, projet **mboa-web**),
+connecté au dépôt GitHub `Ferdinand237-sudo/mboa_app`. Chaque merge sur
+`main` déclenche automatiquement un build + déploiement en production —
+plus besoin de déployer manuellement.
+
+### Réglages du projet Vercel
+
+Le dépôt contient à la fois l'app Flutter (racine) et l'app web
+(`mboa-web/`), donc trois réglages sont indispensables dans
+**Settings → Build and Deployment** et **Settings → Environments →
+Production** du projet Vercel :
+
+- **Root Directory** : `mboa-web` (sinon Next.js ne trouve pas de dossier
+  `app/` à la racine du dépôt et le build échoue avec `Couldn't find any
+  pages or app directory`)
+- **Production Branch** : `main`
+- **Environment Variables** (Production, et idéalement Preview/
+  Development aussi) :
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+  (voir `.env.local.example` pour les valeurs du projet Supabase actuel)
+
+### Images distantes autorisées (`next.config.ts`)
+
+`next/image` bloque tout domaine non listé dans `images.remotePatterns`.
+Les photos en base viennent de deux origines (vérifié en SQL sur les
+tables `logements`, `articles`, `users.photo_url`, `users.photo_commerce`) :
+Supabase Storage (`vodmsndqahmxdsqpayrd.supabase.co`) et des photos de
+démo Unsplash (`images.unsplash.com`). Si un nouveau domaine de photos
+apparaît un jour (ex. changement de bucket, nouvelles photos de seed), il
+faudra l'ajouter ici — sans ça, les images de ce domaine retombent
+silencieusement sur le repli 🏠 et cassent la mise en page des cartes.
+
+### Incidents rencontrés au premier déploiement (2026-07-22)
+
+Deux bugs ont bloqué le tout premier déploiement automatique après
+connexion de Vercel à GitHub, tous deux diagnostiqués via
+`get_runtime_errors`/`get_deployment_build_logs` (MCP Vercel) :
+
+1. **Build en échec, dossier `app` introuvable** — le Root Directory du
+   projet Vercel n'était pas configuré sur `mboa-web` (déploiements
+   précédents faits manuellement en CLI depuis ce dossier, donc jamais
+   remarqué). Fix : réglage Root Directory ci-dessus.
+2. **Site déployé mais aucune donnée nulle part** (`getHomeLogements`,
+   `getArticles`, etc. en erreur silencieuse) — l'erreur runtime exacte :
+   `TypeError: Cannot convert argument to a ByteString because the
+   character at index 8 has a value of 8226 which is greater than 255`.
+   Le caractère 8226 est `•` (point de masquage) : la valeur collée dans
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` sur le dashboard Vercel contenait un
+   caractère parasite (interférence probable avec un gestionnaire de mots
+   de passe du navigateur au moment du collage), invalide comme valeur
+   d'en-tête HTTP (`apikey`/`Authorization`) envoyé par le client
+   Supabase. Fix : supprimer la variable et la recréer en collant la
+   valeur directement, sans passer par un champ pré-rempli.
+
+Après ces deux correctifs, troisième déploiement automatique (suite au
+merge de la PR ajoutant `images.unsplash.com`) : propre, `0` erreur
+runtime, données et images affichées normalement.
