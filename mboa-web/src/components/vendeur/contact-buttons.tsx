@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-// Miroir de _appeler / _envoyerMessage dans profil_vendeur_screen.dart —
-// le chat web n'existe pas encore, donc "Message" redirige vers la
-// connexion (visiteur) ou explique que la messagerie est mobile-only.
+// Miroir de _appeler / _envoyerMessage dans profil_vendeur_screen.dart.
 export function ContactButtons({
   vendeurId,
   isLoggedIn,
@@ -16,7 +15,9 @@ export function ContactButtons({
   isLoggedIn: boolean;
   isSelf: boolean;
 }) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   if (isSelf) return null;
 
@@ -36,6 +37,46 @@ export function ContactButtons({
     window.location.assign(`tel:${tel}`);
   }
 
+  async function handleMessage() {
+    setError(null);
+    setSending(true);
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user || user.id === vendeurId) {
+      setSending(false);
+      return;
+    }
+
+    const { data: existing } = await supabase
+      .from("conversations")
+      .select("id")
+      .contains("participants", [user.id, vendeurId])
+      .maybeSingle();
+
+    let conversationId = existing?.id as string | undefined;
+    if (!conversationId) {
+      const { data: created } = await supabase
+        .from("conversations")
+        .insert({
+          participants: [user.id, vendeurId],
+          non_lu: { [user.id]: 0, [vendeurId]: 0 },
+        })
+        .select("id")
+        .single();
+      conversationId = created?.id;
+    }
+
+    setSending(false);
+    if (conversationId) {
+      router.push(`/chat/${conversationId}`);
+    } else {
+      setError("Impossible de démarrer la conversation. Réessaie.");
+    }
+  }
+
   return (
     <div>
       {error && (
@@ -52,10 +93,11 @@ export function ContactButtons({
         </button>
         {isLoggedIn ? (
           <button
-            onClick={() => setError("La messagerie web arrive bientôt — utilise l'app mobile pour l'instant.")}
-            className="flex-1 rounded-mboa-lg bg-white py-2.5 text-sm font-bold text-mboa-primary"
+            onClick={handleMessage}
+            disabled={sending}
+            className="flex-1 rounded-mboa-lg bg-white py-2.5 text-sm font-bold text-mboa-primary disabled:opacity-60"
           >
-            💬 Message
+            {sending ? "..." : "💬 Message"}
           </button>
         ) : (
           <Link
