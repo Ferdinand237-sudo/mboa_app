@@ -33,7 +33,7 @@ export function ContributeursClient({ contributeurs }: { contributeurs: UserMode
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-5 py-5 pb-10">
+      <div className="mx-auto max-w-7xl px-5 py-5 pb-10">
         {filtres.length === 0 ? (
           <p className="py-16 text-center text-sm text-mboa-text-muted">Aucun contributeur trouvé</p>
         ) : (

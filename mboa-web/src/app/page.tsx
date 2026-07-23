@@ -27,7 +27,7 @@ export default async function HomePage() {
     <div>
       <HeroHeader prenom={prenom} hasNotifications={hasNotifications} />
 
-      <div className="mx-auto max-w-6xl px-5 py-6 sm:px-6">
+      <div className="mx-auto max-w-7xl px-5 py-6 sm:px-6">
         {/* Explorer */}
         <SectionTitle title="Explorer" />
         <div className="mt-3.5">
@@ -100,7 +100,7 @@ export default async function HomePage() {
                 Aucun contributeur pour le moment
               </div>
             ) : (
-              <div className="flex gap-3 overflow-x-auto pb-1">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                 {contributeurs.map((c) => (
                   <ContributeurCard key={c.id} contributeur={c} />
                 ))}

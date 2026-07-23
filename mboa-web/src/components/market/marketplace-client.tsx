@@ -82,7 +82,7 @@ export function MarketplaceClient({
   return (
     <div>
       <div className="border-b border-mboa-border bg-mboa-card px-5 py-4 sm:px-6">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-7xl">
           <h1 className="text-xl font-extrabold text-mboa-text sm:text-2xl">
             🛒 Market
           </h1>
@@ -198,7 +198,7 @@ export function MarketplaceClient({
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-5 py-4 sm:px-6">
+      <div className="mx-auto max-w-7xl px-5 py-4 sm:px-6">
         <p className="text-xs text-mboa-text-muted">
           {loading
             ? "Chargement..."
