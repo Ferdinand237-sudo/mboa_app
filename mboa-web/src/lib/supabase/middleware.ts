@@ -11,6 +11,19 @@ import { NextResponse, type NextRequest } from "next/server";
 // aussi un onglet déjà ouvert, un lien direct, ou un simple clic sur le
 // logo qui ramènerait sinon un admin vers les pages étudiant/visiteur.
 export async function updateSession(request: NextRequest) {
+  // Filet de sécurité OAuth : si le ?code=... PKCE atterrit ailleurs que sur
+  // /auth/callback (ex. Supabase retombe sur le Site URL du dashboard faute
+  // d'un motif générique dans Redirect URLs, comme *.vercel.app/**), on le
+  // redirige nous-mêmes vers la route qui sait l'échanger, plutôt que de
+  // dépendre uniquement d'un réglage dashboard correctement renseigné.
+  const code = request.nextUrl.searchParams.get("code");
+  if (code && request.nextUrl.pathname !== "/auth/callback") {
+    const callbackUrl = new URL("/auth/callback", request.url);
+    callbackUrl.searchParams.set("code", code);
+    callbackUrl.searchParams.set("next", request.nextUrl.pathname);
+    return NextResponse.redirect(callbackUrl);
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
