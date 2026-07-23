@@ -25,6 +25,12 @@ const NAV_LINKS_VENDEUR = [
   { href: "/chat", label: "Messages" },
 ];
 
+// Admin et ambassadeur ont leur propre barre d'onglets dédiée juste sous ce
+// header (AdminNav / AmbassadeurNav) — les liens Logement/Market/Chat n'ont
+// pas leur place ici pour ces rôles, exactement comme _navItemsAmbassadeur
+// et AdminScreen côté mobile n'incluent aucun de ces onglets.
+const NAV_LINKS_SILOTE: { href: string; label: string }[] = [];
+
 export function HeaderClient({ user }: { user: UserModel | null }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -39,7 +45,12 @@ export function HeaderClient({ user }: { user: UserModel | null }) {
 
   // Miroir de _navItemsVendeur (main_screen.dart) : Gestion + Publier
   // remplacent Logement + Market une fois connecté comme vendeur.
-  const NAV_LINKS = user?.role === "vendeur" ? NAV_LINKS_VENDEUR : NAV_LINKS_VISITEUR;
+  const NAV_LINKS =
+    user?.role === "vendeur"
+      ? NAV_LINKS_VENDEUR
+      : user?.role === "admin" || user?.role === "ambassadeur"
+        ? NAV_LINKS_SILOTE
+        : NAV_LINKS_VISITEUR;
 
   return (
     <header className="sticky top-0 z-50 border-b border-mboa-border bg-mboa-card/95 backdrop-blur">

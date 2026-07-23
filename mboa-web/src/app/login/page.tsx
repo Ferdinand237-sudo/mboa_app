@@ -51,7 +51,7 @@ export default function LoginPage() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
@@ -68,7 +68,18 @@ export default function LoginPage() {
       window.localStorage.removeItem(REMEMBER_EMAIL_KEY);
     }
 
-    router.push("/");
+    // Miroir de MainScreen.initState (mobile) : admin/ambassadeur atterrissent
+    // directement sur leur interface dédiée plutôt que sur l'accueil visiteur.
+    const { data: profil } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", authData.user.id)
+      .single();
+
+    const destination =
+      profil?.role === "admin" ? "/admin" : profil?.role === "ambassadeur" ? "/ambassadeur" : "/";
+
+    router.push(destination);
     router.refresh();
   }
 
