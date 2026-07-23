@@ -25,11 +25,24 @@ const NAV_LINKS_VENDEUR = [
   { href: "/chat", label: "Messages" },
 ];
 
-// Admin et ambassadeur ont leur propre barre d'onglets dédiée juste sous ce
-// header (AdminNav / AmbassadeurNav) — les liens Logement/Market/Chat n'ont
-// pas leur place ici pour ces rôles, exactement comme _navItemsAmbassadeur
-// et AdminScreen côté mobile n'incluent aucun de ces onglets.
-const NAV_LINKS_SILOTE: { href: string; label: string }[] = [];
+// Miroir de la bottom nav de AdminScreen (admin_screen.dart). Intégrés
+// directement au header (au lieu d'une barre horizontale séparée en
+// dessous) pour réutiliser le même mécanisme que les autres rôles : pastilles
+// en ligne sur desktop, menu hamburger à déplier sur mobile.
+const NAV_LINKS_ADMIN = [
+  { href: "/admin", label: "Dashboard" },
+  { href: "/admin/utilisateurs", label: "Utilisateurs" },
+  { href: "/admin/annonces", label: "Annonces" },
+  { href: "/admin/signalements", label: "Signalements" },
+  { href: "/admin/demandes", label: "Demandes" },
+  { href: "/admin/verifications", label: "Vérifs" },
+];
+
+// Miroir de _navItemsAmbassadeur (main_screen.dart) : Dashboard / Assignés.
+const NAV_LINKS_AMBASSADEUR = [
+  { href: "/ambassadeur", label: "Dashboard" },
+  { href: "/ambassadeur/assignes", label: "Assignés" },
+];
 
 export function HeaderClient({ user }: { user: UserModel | null }) {
   const [open, setOpen] = useState(false);
@@ -48,9 +61,16 @@ export function HeaderClient({ user }: { user: UserModel | null }) {
   const NAV_LINKS =
     user?.role === "vendeur"
       ? NAV_LINKS_VENDEUR
-      : user?.role === "admin" || user?.role === "ambassadeur"
-        ? NAV_LINKS_SILOTE
-        : NAV_LINKS_VISITEUR;
+      : user?.role === "admin"
+        ? NAV_LINKS_ADMIN
+        : user?.role === "ambassadeur"
+          ? NAV_LINKS_AMBASSADEUR
+          : NAV_LINKS_VISITEUR;
+
+  // Admin (6 onglets) et ambassadeur passent uniquement par le menu à
+  // déplier plutôt que des pastilles en ligne dans le header, même sur
+  // desktop : plus simple qu'une barre horizontale chargée.
+  const menuSeulement = user?.role === "admin" || user?.role === "ambassadeur";
 
   return (
     <header className="sticky top-0 z-50 border-b border-mboa-border bg-mboa-card/95 backdrop-blur">
@@ -62,17 +82,19 @@ export function HeaderClient({ user }: { user: UserModel | null }) {
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="rounded-mboa-md px-4 py-2 text-sm font-semibold text-mboa-text-muted transition-colors hover:bg-mboa-background hover:text-mboa-primary"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+        {!menuSeulement && (
+          <nav className="hidden items-center gap-1 md:flex">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded-mboa-md px-4 py-2 text-sm font-semibold text-mboa-text-muted transition-colors hover:bg-mboa-background hover:text-mboa-primary"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        )}
 
         <div className="hidden items-center gap-3 md:flex">
           {user ? (
@@ -112,7 +134,7 @@ export function HeaderClient({ user }: { user: UserModel | null }) {
         </div>
 
         <button
-          className="flex h-10 w-10 items-center justify-center rounded-mboa-md text-mboa-text md:hidden"
+          className={`flex h-10 w-10 items-center justify-center rounded-mboa-md text-mboa-text ${menuSeulement ? "" : "md:hidden"}`}
           onClick={() => setOpen((v) => !v)}
           aria-label="Menu"
         >
@@ -127,7 +149,7 @@ export function HeaderClient({ user }: { user: UserModel | null }) {
       </div>
 
       {open && (
-        <div className="border-t border-mboa-border bg-mboa-card px-4 py-3 md:hidden">
+        <div className={`border-t border-mboa-border bg-mboa-card px-4 py-3 ${menuSeulement ? "" : "md:hidden"}`}>
           <nav className="flex flex-col gap-1">
             {NAV_LINKS.map((link) => (
               <Link
@@ -139,41 +161,47 @@ export function HeaderClient({ user }: { user: UserModel | null }) {
                 {link.label}
               </Link>
             ))}
-            <div className="my-2 h-px bg-mboa-border" />
-            {user ? (
-              <>
-                <Link
-                  href="/profil"
-                  onClick={() => setOpen(false)}
-                  className="rounded-mboa-md px-3 py-2.5 text-sm font-semibold text-mboa-text hover:bg-mboa-background"
-                >
-                  Mon profil
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="rounded-mboa-md px-3 py-2.5 text-left text-sm font-semibold text-mboa-danger hover:bg-mboa-background"
-                >
-                  Déconnexion
-                </button>
-              </>
-            ) : (
-              <>
-                <Link
-                  href="/login"
-                  onClick={() => setOpen(false)}
-                  className="rounded-mboa-md px-3 py-2.5 text-sm font-semibold text-mboa-text hover:bg-mboa-background"
-                >
-                  Connexion
-                </Link>
-                <Link
-                  href="/register"
-                  onClick={() => setOpen(false)}
-                  className="rounded-mboa-lg bg-mboa-primary px-3 py-2.5 text-center text-sm font-bold text-white"
-                >
-                  S&apos;inscrire
-                </Link>
-              </>
-            )}
+            {/* Le menu du hamburger reste ouvert en permanence pour
+                admin/ambassadeur (menuSeulement) : profil/déconnexion sont
+                déjà visibles inline juste à côté sur desktop, inutile de les
+                dupliquer ici hors du vrai contexte mobile. */}
+            <div className={`my-2 h-px bg-mboa-border ${menuSeulement ? "md:hidden" : ""}`} />
+            <div className={menuSeulement ? "flex flex-col gap-1 md:hidden" : "contents"}>
+              {user ? (
+                <>
+                  <Link
+                    href="/profil"
+                    onClick={() => setOpen(false)}
+                    className="rounded-mboa-md px-3 py-2.5 text-sm font-semibold text-mboa-text hover:bg-mboa-background"
+                  >
+                    Mon profil
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="rounded-mboa-md px-3 py-2.5 text-left text-sm font-semibold text-mboa-danger hover:bg-mboa-background"
+                  >
+                    Déconnexion
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    onClick={() => setOpen(false)}
+                    className="rounded-mboa-md px-3 py-2.5 text-sm font-semibold text-mboa-text hover:bg-mboa-background"
+                  >
+                    Connexion
+                  </Link>
+                  <Link
+                    href="/register"
+                    onClick={() => setOpen(false)}
+                    className="rounded-mboa-lg bg-mboa-primary px-3 py-2.5 text-center text-sm font-bold text-white"
+                  >
+                    S&apos;inscrire
+                  </Link>
+                </>
+              )}
+            </div>
           </nav>
         </div>
       )}

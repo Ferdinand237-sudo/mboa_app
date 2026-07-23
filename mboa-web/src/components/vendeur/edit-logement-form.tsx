@@ -171,7 +171,7 @@ export function EditLogementForm({ logement }: { logement: LogementAModifier }) 
       </label>
 
       <div className="flex gap-3">
-        <label className="flex flex-1 flex-col gap-2">
+        <label className="flex min-w-0 flex-1 flex-col gap-2">
           <span className="text-[13px] font-bold text-mboa-text">Prix / mois (FCFA)</span>
           <input
             inputMode="numeric"
@@ -180,7 +180,7 @@ export function EditLogementForm({ logement }: { logement: LogementAModifier }) 
             className="min-w-0 rounded-mboa-md border-[1.5px] border-mboa-border bg-mboa-background px-4 py-3.5 text-sm text-mboa-text outline-none focus:border-2 focus:border-mboa-primary"
           />
         </label>
-        <label className="flex flex-1 flex-col gap-2">
+        <label className="flex min-w-0 flex-1 flex-col gap-2">
           <span className="text-[13px] font-bold text-mboa-text">Surface (m²)</span>
           <input
             inputMode="numeric"
