@@ -60,6 +60,12 @@ export default function RegisterEtudiantPage() {
       email: email.trim(),
       password,
       options: {
+        // Sans ça, le lien de confirmation par email retombe sur le "Site
+        // URL" par défaut du projet Supabase — configuré pour le schéma
+        // mobile (com.mboa.app://), donc inutilisable depuis un navigateur.
+        // Miroir de resetPasswordForEmail (mot-de-passe-oublie/page.tsx),
+        // qui fixe déjà explicitement son propre redirectTo.
+        emailRedirectTo: `${window.location.origin}/login`,
         data: {
           nom: `${prenom.trim()} ${nom.trim()}`,
           telephone: telephone.trim() || null,
