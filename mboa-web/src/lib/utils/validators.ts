@@ -20,9 +20,6 @@ export function validateTelephone(value: string, required = true): string | null
 
 export function validateMotDePasse(value: string): string | null {
   if (!value) return "Veuillez entrer un mot de passe";
-  if (value.length < 8) return "Minimum 8 caractères";
-  if (!/[a-zA-Z]/.test(value) || !/[0-9]/.test(value)) {
-    return "Le mot de passe doit contenir au moins une lettre et un chiffre";
-  }
+  if (value.length < 6) return "Minimum 6 caractères";
   return null;
 }
