@@ -49,14 +49,11 @@ class Validators {
   static bool estTelephoneValide(String value) =>
       _telephoneRegex.hasMatch(value.replaceAll(' ', '').trim());
 
-  /// Mot de passe : au moins 8 caractères, une lettre et un chiffre.
+  /// Mot de passe : au moins 6 caractères, sans contrainte de composition.
   static String? motDePasse(String? value) {
     final v = value ?? '';
     if (v.isEmpty) return 'Veuillez entrer un mot de passe';
-    if (v.length < 8) return 'Minimum 8 caractères';
-    if (!RegExp(r'[a-zA-Z]').hasMatch(v) || !RegExp(r'[0-9]').hasMatch(v)) {
-      return 'Le mot de passe doit contenir au moins une lettre et un chiffre';
-    }
+    if (v.length < 6) return 'Minimum 6 caractères';
     return null;
   }
 }

@@ -19,7 +19,7 @@ const STEPS = [
 // Miroir exact de register_etudiant_screen.dart : header dégradé + indicateur
 // d'étapes, nom/prénom côte à côte (min-w-0 sur les inputs pour éviter le
 // débordement horizontal sur petits écrans), champs à icônes, règle de mot
-// de passe alignée sur Validators.motDePasse (8 caractères, lettre + chiffre).
+// de passe alignée sur Validators.motDePasse (6 caractères minimum).
 export default function RegisterEtudiantPage() {
   const router = useRouter();
   const [nom, setNom] = useState("");
