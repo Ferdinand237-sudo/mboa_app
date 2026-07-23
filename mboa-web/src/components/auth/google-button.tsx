@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/client";
 
 // Miroir de _connexionGoogle (login_screen.dart / register_screen.dart).
 // Sur mobile la redirection utilise un schéma custom (com.mboa.app://) ;
-// sur web on redirige vers l'origine courante, gérée par le callback OAuth
-// standard de Supabase (échange de session côté client via detectSessionInUrl).
+// sur web elle pointe vers /auth/callback, qui échange le code PKCE contre
+// une session côté serveur (@supabase/ssr utilise des cookies, pas
+// detectSessionInUrl côté client comme supabase-js seul).
 export function GoogleButton() {
   const [loading, setLoading] = useState(false);
 
@@ -15,7 +16,7 @@ export function GoogleButton() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/` },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
     if (error) setLoading(false);
   }
