@@ -58,7 +58,7 @@ export default async function AdminDashboardPage() {
   return (
     <div>
       <div className="bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light px-5 py-6">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-7xl">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[13px] text-white/80">Bonjour Admin 👋</p>
@@ -75,7 +75,7 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-5 py-5">
+      <div className="mx-auto max-w-7xl px-5 py-5">
         {hasAlertes && (
           <div className="mb-6">
             <p className="text-base font-bold text-mboa-text">🚨 Actions requises</p>
