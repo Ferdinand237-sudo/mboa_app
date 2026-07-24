@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { searchArticles, enregistrerAlerteArticle } from "@/app/marketplace/actions";
 import { ArticleCard } from "@/components/market/article-card";
 import { LimitBanner } from "@/components/ui/limit-banner";
+import { TuneIcon } from "@/components/ui/icons";
 import type { ArticleModel } from "@/lib/types/models";
 import { CATEGORIES_MARKET, ETATS_ARTICLE, PAGE_SIZE_VISITEUR } from "@/lib/constants";
 
@@ -115,7 +116,7 @@ export function MarketplaceClient({
               }`}
               aria-label="Filtres"
             >
-              ⚙️
+              <TuneIcon className="h-[18px] w-[18px]" />
             </button>
           </div>
 

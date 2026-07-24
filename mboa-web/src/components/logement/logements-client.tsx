@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { searchLogements, enregistrerAlerteLogement } from "@/app/logements/actions";
 import { LogementTile } from "@/components/logement/logement-tile";
 import { LimitBanner } from "@/components/ui/limit-banner";
+import { TuneIcon } from "@/components/ui/icons";
 import type { LogementModel } from "@/lib/types/models";
 import { TYPES_LOGEMENT, PRIX_MIN, PRIX_MAX, PAGE_SIZE_VISITEUR } from "@/lib/constants";
 import { formatPrix } from "@/lib/utils/format";
@@ -118,7 +119,7 @@ export function LogementsClient({
               }`}
               aria-label="Filtres"
             >
-              ⚙️
+              <TuneIcon className="h-[18px] w-[18px]" />
             </button>
           </div>
 

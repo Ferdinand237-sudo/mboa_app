@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TuneIcon } from "@/components/ui/icons";
 
 // Le badge de notifications non lues vit désormais dans le header persistant
 // (NotificationBell, présent sur toutes les pages, live via Supabase
@@ -38,7 +39,7 @@ export function HeroHeader({ prenom }: { prenom: string }) {
             Chambre, studio, meublé...
           </span>
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-mboa-primary text-white">
-            ⚙️
+            <TuneIcon className="h-[18px] w-[18px]" />
           </span>
         </Link>
       </div>

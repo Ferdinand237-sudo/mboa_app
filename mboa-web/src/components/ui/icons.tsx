@@ -259,3 +259,18 @@ export function SearchIcon({ className = base }: IconProps) {
     </svg>
   );
 }
+
+// Miroir de Icons.tune_rounded (Flutter) : bouton filtres à côté de la
+// recherche (logement_screen.dart, market_screen.dart, home_screen.dart) —
+// pas une roue crantée de paramètres, qui suggère "réglages" plutôt que
+// "filtrer".
+export function TuneIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path d="M4 6h9M17 6h3M4 12h3M9 12h11M4 18h13M21 18h-1" strokeLinecap="round" />
+      <circle cx="13" cy="6" r="2" fill="currentColor" stroke="none" />
+      <circle cx="6" cy="12" r="2" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="18" r="2" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
