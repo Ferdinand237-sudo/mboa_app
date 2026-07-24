@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Contributeur } from "@/lib/data/home";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { initiales } from "@/lib/utils/format";
 
 // Carte de grille (pas de largeur fixe) : occupe toute sa cellule, comme
@@ -14,9 +15,7 @@ export function ContributeurCard({ contributeur }: { contributeur: Contributeur 
       <span className="relative flex h-12 w-12 items-center justify-center rounded-full bg-mboa-primary text-sm font-extrabold text-white">
         {initiales(contributeur.nom)}
         {contributeur.verified && (
-          <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-mboa-verified text-[8px] text-white ring-2 ring-white">
-            ✓
-          </span>
+          <VerifiedBadge className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-white" />
         )}
       </span>
       <p className="line-clamp-1 w-full text-[11px] font-bold text-mboa-text">

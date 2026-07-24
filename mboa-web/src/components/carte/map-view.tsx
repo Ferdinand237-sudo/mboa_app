@@ -8,6 +8,7 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import { Photo } from "@/components/ui/photo";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { distanceMetres, formatDistance } from "@/lib/utils/geo";
 import { CATEGORIES_LIEUX_PUBLICS, DEFAULT_LAT, DEFAULT_LNG } from "@/lib/constants";
 import type { MapLogement, MapLieu } from "@/lib/data/map";
@@ -309,11 +310,7 @@ function FicheLogement({ logement, onItineraire }: { logement: MapLogement; onIt
                 🔥
               </span>
             )}
-            {logement.proprietaireVerified && (
-              <span className="rounded-full bg-mboa-verified/15 px-1.5 py-0.5 text-[9px] font-bold text-mboa-verified">
-                ✅
-              </span>
-            )}
+            {logement.proprietaireVerified && <VerifiedBadge className="h-3.5 w-3.5" />}
           </div>
         </div>
       </div>

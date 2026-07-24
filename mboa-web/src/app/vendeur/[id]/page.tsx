@@ -5,6 +5,7 @@ import { getAvisUtilisateur } from "@/lib/data/avis";
 import { getCurrentUser } from "@/lib/data/auth";
 import { initiales, formatDateFr } from "@/lib/utils/format";
 import { Badge } from "@/components/ui/badge";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { LogementCard } from "@/components/logement/logement-card";
 import { ArticleCard } from "@/components/market/article-card";
 import { ContactButtons } from "@/components/vendeur/contact-buttons";
@@ -44,16 +45,8 @@ export default async function VendeurPage({
             <span className="flex h-24 w-24 items-center justify-center rounded-full bg-white/15 text-3xl font-extrabold text-white ring-4 ring-white/20">
               {initiales(user.nom)}
             </span>
-            {/* Miroir du badge rond sur l'avatar (profil_vendeur_screen.dart) :
-                le ✓ nu à côté du nom était invisible en blanc sur fond vert. */}
             {user.verified && (
-              <span
-                className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-mboa-verified text-sm text-white ring-2 ring-white"
-                title="Vérifié"
-                aria-label="Vérifié"
-              >
-                ✓
-              </span>
+              <VerifiedBadge className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-white" />
             )}
           </div>
           <h1 className="mt-4 text-xl font-extrabold text-white">
