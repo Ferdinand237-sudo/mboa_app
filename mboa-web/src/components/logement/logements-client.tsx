@@ -20,7 +20,12 @@ export function LogementsClient({
 }) {
   const [search, setSearch] = useState("");
   const [type, setType] = useState("Tous");
-  const [prixMax, setPrixMax] = useState(60000);
+  // Démarre sans plafond (PRIX_MAX) : un budget par défaut à 60 000 FCFA
+  // masquait silencieusement les logements plus chers dès le chargement,
+  // sans qu'aucun indice visible ne le signale (le curseur "Budget maximum"
+  // est caché dans le panneau de filtres, fermé par défaut) — contrairement
+  // à la carte, qui n'applique aucun filtre de prix.
+  const [prixMax, setPrixMax] = useState(PRIX_MAX);
   const [noteMin, setNoteMin] = useState(0);
   const [showFiltres, setShowFiltres] = useState(false);
   const [result, setResult] = useState({ key: "", data: initialLogements });
@@ -58,7 +63,7 @@ export function LogementsClient({
 
   function reinitialiser() {
     setType("Tous");
-    setPrixMax(60000);
+    setPrixMax(PRIX_MAX);
     setNoteMin(0);
     setSearch("");
     setShowFiltres(false);
