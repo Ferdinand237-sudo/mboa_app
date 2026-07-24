@@ -57,7 +57,7 @@ export default async function AdminDashboardPage() {
 
   return (
     <div>
-      <div className="bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light px-5 py-6">
+      <div className="rounded-b-[32px] bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light px-5 py-6">
         <div className="mx-auto max-w-7xl">
           <div className="flex items-center justify-between">
             <div>

@@ -46,7 +46,7 @@ export function ProfilConnected({ user, stats }: { user: UserModel; stats: Profi
   return (
     <div className="pb-8">
       {/* Header */}
-      <div className="bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light pb-6 pt-4">
+      <div className="rounded-b-[32px] bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light pb-6 pt-4">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-5">
           <h1 className="text-xl font-extrabold text-white">Mon Profil</h1>
           <Link
