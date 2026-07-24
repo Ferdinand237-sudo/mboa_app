@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { UserModel } from "@/lib/types/models";
 import { initiales } from "@/lib/utils/format";
@@ -44,9 +44,17 @@ const NAV_LINKS_AMBASSADEUR = [
   { href: "/ambassadeur/assignes", label: "Assignés" },
 ];
 
+// Un lien est actif sur sa propre page ainsi que sur ses sous-pages
+// (ex. Chat reste actif sur /chat/[id]), sauf "/" traité à part pour ne
+// pas allumer tous les onglets en même temps.
+function estActif(pathname: string, href: string): boolean {
+  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function HeaderClient({ user }: { user: UserModel | null }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
   async function handleLogout() {
     const supabase = createClient();
@@ -88,7 +96,11 @@ export function HeaderClient({ user }: { user: UserModel | null }) {
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-mboa-md px-4 py-2 text-sm font-semibold text-mboa-text-muted transition-colors hover:bg-mboa-background hover:text-mboa-primary"
+                className={`rounded-mboa-md px-4 py-2 text-sm font-semibold transition-colors ${
+                  estActif(pathname, link.href)
+                    ? "bg-mboa-primary-light/8 text-mboa-primary"
+                    : "text-mboa-text-muted hover:bg-mboa-background hover:text-mboa-primary"
+                }`}
               >
                 {link.label}
               </Link>
@@ -101,7 +113,11 @@ export function HeaderClient({ user }: { user: UserModel | null }) {
             <>
               <Link
                 href="/profil"
-                className="flex items-center gap-2 rounded-mboa-full py-1 pl-1 pr-3 text-sm font-semibold text-mboa-text transition-colors hover:bg-mboa-background"
+                className={`flex items-center gap-2 rounded-mboa-full py-1 pl-1 pr-3 text-sm font-semibold transition-colors ${
+                  estActif(pathname, "/profil")
+                    ? "bg-mboa-primary-light/8 text-mboa-primary"
+                    : "text-mboa-text hover:bg-mboa-background"
+                }`}
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-mboa-primary text-xs font-bold text-white">
                   {initiales(user.nom)}
@@ -156,7 +172,11 @@ export function HeaderClient({ user }: { user: UserModel | null }) {
                 key={link.href}
                 href={link.href}
                 onClick={() => setOpen(false)}
-                className="rounded-mboa-md px-3 py-2.5 text-sm font-semibold text-mboa-text hover:bg-mboa-background"
+                className={`rounded-mboa-md px-3 py-2.5 text-sm font-semibold ${
+                  estActif(pathname, link.href)
+                    ? "bg-mboa-primary-light/8 text-mboa-primary"
+                    : "text-mboa-text hover:bg-mboa-background"
+                }`}
               >
                 {link.label}
               </Link>
@@ -172,7 +192,11 @@ export function HeaderClient({ user }: { user: UserModel | null }) {
                   <Link
                     href="/profil"
                     onClick={() => setOpen(false)}
-                    className="rounded-mboa-md px-3 py-2.5 text-sm font-semibold text-mboa-text hover:bg-mboa-background"
+                    className={`rounded-mboa-md px-3 py-2.5 text-sm font-semibold ${
+                      estActif(pathname, "/profil")
+                        ? "bg-mboa-primary-light/8 text-mboa-primary"
+                        : "text-mboa-text hover:bg-mboa-background"
+                    }`}
                   >
                     Mon profil
                   </Link>

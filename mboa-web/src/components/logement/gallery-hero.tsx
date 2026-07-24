@@ -25,7 +25,7 @@ export function GalleryHero({
   }, [photos.length]);
 
   return (
-    <div className="relative h-[280px] w-full overflow-hidden bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light sm:h-[380px]">
+    <div className="relative h-[280px] w-full overflow-hidden rounded-b-[32px] bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light sm:h-[380px]">
       <Photo src={photos[index]} alt={alt} />
 
       {photos.length > 1 && (
