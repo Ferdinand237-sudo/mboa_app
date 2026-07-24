@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { UserModel } from "@/lib/types/models";
 import { initiales } from "@/lib/utils/format";
+import { NotificationBell } from "@/components/layout/notification-bell";
 
 // Miroir de _navItemsVisiteur (main_screen.dart) : Home | Logement | Market
 // | Chat | Profil. Home et Profil sont déjà dans le header (logo + menu
@@ -51,7 +52,7 @@ function estActif(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function HeaderClient({ user }: { user: UserModel | null }) {
+export function HeaderClient({ user, unreadCount }: { user: UserModel | null; unreadCount: number }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -107,6 +108,8 @@ export function HeaderClient({ user }: { user: UserModel | null }) {
             ))}
           </nav>
         )}
+
+        {user && <NotificationBell userId={user.id} initialCount={unreadCount} />}
 
         <div className="hidden items-center gap-3 md:flex">
           {user ? (

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { SearchIcon } from "@/components/ui/icons";
 import { Photo } from "@/components/ui/photo";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { initiales } from "@/lib/utils/format";
 import type { UserModel } from "@/lib/types/models";
 
@@ -53,9 +54,7 @@ export function ContributeursClient({ contributeurs }: { contributeurs: UserMode
                     </span>
                   )}
                   {c.verified && (
-                    <span className="absolute bottom-0 right-0 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-mboa-verified text-[9px] text-white ring-[1.5px] ring-white">
-                      ✓
-                    </span>
+                    <VerifiedBadge className="absolute bottom-0 right-0 h-[18px] w-[18px] rounded-full bg-white" />
                   )}
                 </div>
                 <p className="mt-2 line-clamp-1 w-full text-xs font-bold text-mboa-text">{c.nom}</p>

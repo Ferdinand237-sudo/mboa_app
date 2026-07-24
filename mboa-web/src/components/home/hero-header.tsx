@@ -1,12 +1,10 @@
 import Link from "next/link";
 
-export function HeroHeader({
-  prenom,
-  hasNotifications,
-}: {
-  prenom: string;
-  hasNotifications: boolean;
-}) {
+// Le badge de notifications non lues vit désormais dans le header persistant
+// (NotificationBell, présent sur toutes les pages, live via Supabase
+// Realtime) : la cloche ici redevient un simple raccourci, sans dupliquer
+// un second indicateur qui pourrait afficher un état différent.
+export function HeroHeader({ prenom }: { prenom: string }) {
   return (
     <section className="rounded-b-[32px] bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light">
       <div className="mx-auto max-w-7xl px-5 pb-8 pt-6 sm:px-6">
@@ -22,13 +20,10 @@ export function HeroHeader({
           </div>
           <Link
             href="/notifications"
-            className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-lg"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-lg"
             aria-label="Notifications"
           >
             🔔
-            {hasNotifications && (
-              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-mboa-secondary" />
-            )}
           </Link>
         </div>
 

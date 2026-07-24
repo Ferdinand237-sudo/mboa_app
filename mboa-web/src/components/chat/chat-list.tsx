@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Photo } from "@/components/ui/photo";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { initiales } from "@/lib/utils/format";
 import type { ConversationItem } from "@/lib/data/chat";
 
@@ -114,11 +115,7 @@ export function ChatList({ conversations }: { conversations: ConversationItem[] 
                     >
                       {c.autreNom}
                     </span>
-                    {c.autreVerified && (
-                      <span className="shrink-0 text-mboa-verified" aria-label="Vérifié">
-                        ✅
-                      </span>
-                    )}
+                    {c.autreVerified && <VerifiedBadge className="h-3.5 w-3.5 shrink-0" />}
                   </span>
                   <span
                     className={`shrink-0 text-[11px] ${c.nbNonLu > 0 ? "font-semibold text-mboa-primary" : "text-mboa-text-muted"}`}

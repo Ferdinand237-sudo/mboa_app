@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { CreateAmbassadeurDialog } from "@/components/admin/create-ambassadeur-dialog";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { initiales } from "@/lib/utils/format";
 import type { AdminUser } from "@/lib/data/admin";
 
@@ -112,7 +113,7 @@ export function UsersClient({ users: initial }: { users: AdminUser[] }) {
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-1 text-sm font-bold text-mboa-text">
                       <span className="truncate">{u.nom}</span>
-                      {u.verified && <span className="shrink-0 text-mboa-verified">✅</span>}
+                      {u.verified && <VerifiedBadge className="h-3.5 w-3.5 shrink-0" />}
                     </p>
                     <p className="truncate text-xs text-mboa-text-muted">{u.email}</p>
                     <div className="mt-1 flex flex-wrap gap-1.5">

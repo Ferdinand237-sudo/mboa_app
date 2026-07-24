@@ -105,18 +105,3 @@ export async function getLieuxPublics(): Promise<LieuPublic[]> {
     lng: Number(row.lng ?? 0),
   }));
 }
-
-export async function getHasNotifications(userId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("conversations")
-    .select("non_lu")
-    .contains("participants", [userId]);
-
-  if (error || !data) return false;
-
-  return data.some((conv) => {
-    const nonLu = conv.non_lu as Record<string, number> | null;
-    return nonLu != null && (nonLu[userId] ?? 0) > 0;
-  });
-}

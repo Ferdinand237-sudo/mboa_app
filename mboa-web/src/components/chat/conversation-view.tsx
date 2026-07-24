@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog } from "@/components/ui/dialog";
 import { Photo } from "@/components/ui/photo";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { StarIcon, SendIcon, ChevronRightIcon } from "@/components/ui/icons";
 import { initiales } from "@/lib/utils/format";
 import type { ConversationDetail, MessageRow } from "@/lib/data/chat";
@@ -150,8 +151,9 @@ export function ConversationView({
     // disponible sous le header (h-16) plutôt qu'un pourcentage fixe (75vh
     // rendait la zone de messages étriquée sur un écran de portable avec
     // barre d'outils du navigateur) : calc(100vh - hauteur header - marges
-    // haut/bas de la carte). Mobile inchangé.
-    <div className="lg:mx-auto lg:my-6 lg:flex lg:h-[calc(100vh-7rem)] lg:max-w-2xl lg:flex-col lg:overflow-hidden lg:rounded-2xl lg:border lg:border-mboa-border lg:shadow-sm">
+    // haut/bas de la carte (marges resserrées à my-3 pour laisser un peu
+    // plus de place aux messages, comme demandé). Mobile inchangé.
+    <div className="lg:mx-auto lg:my-3 lg:flex lg:h-[calc(100vh-5.5rem)] lg:max-w-2xl lg:flex-col lg:overflow-hidden lg:rounded-2xl lg:border lg:border-mboa-border lg:shadow-sm">
       {/* Fixé sous le header du site (h-16) pour garder le nom et
           l'intitulé de l'annonce visibles sans devoir remonter tout en
           haut des messages — comportement déjà présent sur mobile. */}
@@ -182,7 +184,7 @@ export function ConversationView({
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-1 truncate text-sm font-bold text-mboa-text">
               {conversation.autreNom}
-              {conversation.autreVerified && <span className="text-mboa-verified">✅</span>}
+              {conversation.autreVerified && <VerifiedBadge className="h-3.5 w-3.5 shrink-0" />}
             </p>
             <p className="text-[11px] font-medium text-mboa-verified">● En ligne</p>
           </div>

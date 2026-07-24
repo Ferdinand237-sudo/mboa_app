@@ -1,4 +1,4 @@
-import { getHomeLogements, getHomeArticles, getContributeurs, getLieuxPublics, getHasNotifications } from "@/lib/data/home";
+import { getHomeLogements, getHomeArticles, getContributeurs, getLieuxPublics } from "@/lib/data/home";
 import { getCurrentUser } from "@/lib/data/auth";
 import { HeroHeader } from "@/components/home/hero-header";
 import { CategoryCards } from "@/components/home/category-cards";
@@ -12,20 +12,18 @@ import { TrouveTonMboaLocked } from "@/components/home/trouve-ton-mboa-locked";
 export default async function HomePage() {
   const user = await getCurrentUser();
 
-  const [logements, articles, contributeurs, lieuxPublics, hasNotifications] =
-    await Promise.all([
-      getHomeLogements(),
-      getHomeArticles(),
-      getContributeurs(),
-      getLieuxPublics(),
-      user ? getHasNotifications(user.id) : Promise.resolve(false),
-    ]);
+  const [logements, articles, contributeurs, lieuxPublics] = await Promise.all([
+    getHomeLogements(),
+    getHomeArticles(),
+    getContributeurs(),
+    getLieuxPublics(),
+  ]);
 
   const prenom = user ? user.nom.split(" ")[0] : "Visiteur";
 
   return (
     <div>
-      <HeroHeader prenom={prenom} hasNotifications={hasNotifications} />
+      <HeroHeader prenom={prenom} />
 
       <div className="mx-auto max-w-7xl px-5 py-6 sm:px-6">
         {/* Explorer */}
