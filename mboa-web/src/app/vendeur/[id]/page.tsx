@@ -38,7 +38,7 @@ export default async function VendeurPage({
 
   return (
     <div>
-      <div className="bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light">
+      <div className="rounded-b-[32px] bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light">
         <div className="mx-auto flex max-w-4xl flex-col items-center px-4 py-12 text-center sm:px-6">
           <div className="relative">
             <span className="flex h-24 w-24 items-center justify-center rounded-full bg-white/15 text-3xl font-extrabold text-white ring-4 ring-white/20">

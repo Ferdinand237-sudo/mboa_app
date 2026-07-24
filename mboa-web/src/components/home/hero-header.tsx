@@ -8,7 +8,7 @@ export function HeroHeader({
   hasNotifications: boolean;
 }) {
   return (
-    <section className="bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light">
+    <section className="rounded-b-[32px] bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light">
       <div className="mx-auto max-w-7xl px-5 pb-8 pt-6 sm:px-6">
         <div className="flex items-start justify-between">
           <div>

@@ -38,7 +38,7 @@ export function ChatList({ conversations }: { conversations: ConversationItem[] 
   );
 
   return (
-    <div>
+    <div className="lg:mx-auto lg:mb-10 lg:mt-6 lg:max-w-2xl lg:overflow-hidden lg:rounded-2xl lg:border lg:border-mboa-border lg:shadow-sm">
       <div className="bg-white px-5 pb-4 pt-4">
         <div className="mx-auto flex max-w-2xl items-center justify-between">
           <h1 className="text-[22px] font-extrabold text-mboa-text">💬 Messages</h1>
