@@ -67,7 +67,7 @@ export function RechercheClient() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 bg-white px-3 py-2.5">
+      <div className="flex items-center gap-2 rounded-b-[32px] bg-white px-3 py-2.5 shadow-sm">
         <BackButton />
         <div className="flex h-[46px] flex-1 items-center gap-2 rounded-xl border border-mboa-border bg-mboa-background px-3">
           <SearchIcon className="h-5 w-5 shrink-0 text-mboa-text-muted" />

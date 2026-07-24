@@ -86,7 +86,7 @@ export function VerificationsClient({ verifications: initial }: { verifications:
 
   return (
     <div>
-      <div className="bg-white px-5 pt-4">
+      <div className="rounded-b-[32px] bg-white px-5 pt-4 shadow-sm">
         <div className="mx-auto max-w-4xl">
           <h1 className="text-[22px] font-extrabold text-mboa-text">🧭 Vérifications terrain</h1>
           <div className="mt-3 pb-3">

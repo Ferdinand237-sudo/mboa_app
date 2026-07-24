@@ -39,7 +39,7 @@ export default async function PublierPage() {
 
   return (
     <div>
-      <div className="bg-mboa-card px-5 py-5">
+      <div className="rounded-b-[32px] bg-mboa-card px-5 py-5 shadow-sm">
         <div className="mx-auto max-w-lg">
           <h1 className="text-xl font-extrabold text-mboa-text">{title}</h1>
           {permissions.peutLogement && permissions.peutArticle && (

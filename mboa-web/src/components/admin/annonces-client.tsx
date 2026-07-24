@@ -55,7 +55,7 @@ export function AnnoncesClient({
 
   return (
     <div>
-      <div className="bg-white px-5 pt-4">
+      <div className="rounded-b-[32px] bg-white px-5 pt-4 shadow-sm">
         <div className="mx-auto max-w-4xl">
           <h1 className="text-[22px] font-extrabold text-mboa-text">📋 Annonces</h1>
           <p className="mt-1 text-sm text-mboa-text-muted">

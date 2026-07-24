@@ -205,7 +205,7 @@ export default function MapView({
 
   return (
     <div>
-      <div className="bg-white px-5 pb-3 pt-4">
+      <div className="rounded-b-[32px] bg-white px-5 pb-3 pt-4 shadow-sm">
         <div className="mx-auto max-w-7xl">
           <h1 className="text-[22px] font-extrabold text-mboa-text">🗺️ Carte</h1>
           <p className="mt-1 text-xs text-mboa-text-muted">

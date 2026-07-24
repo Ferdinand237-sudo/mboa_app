@@ -43,7 +43,7 @@ export function DemandesClient({ demandes: initial }: { demandes: AdminDemande[]
 
   return (
     <div>
-      <div className="bg-white px-5 pt-4">
+      <div className="rounded-b-[32px] bg-white px-5 pt-4 shadow-sm">
         <div className="mx-auto max-w-4xl">
           <div className="flex items-center justify-between">
             <h1 className="text-[22px] font-extrabold text-mboa-text">📨 Demandes Pro</h1>

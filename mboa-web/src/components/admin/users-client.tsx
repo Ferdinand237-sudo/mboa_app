@@ -70,7 +70,7 @@ export function UsersClient({ users: initial }: { users: AdminUser[] }) {
 
   return (
     <div>
-      <div className="bg-white px-5 py-4">
+      <div className="rounded-b-[32px] bg-white px-5 py-4 shadow-sm">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
           <h1 className="text-[22px] font-extrabold text-mboa-text">👥 Utilisateurs</h1>
           <div className="flex gap-2">

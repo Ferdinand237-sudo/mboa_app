@@ -14,7 +14,7 @@ export default async function AssignesPage() {
 
   return (
     <div>
-      <div className="bg-white px-5 py-4">
+      <div className="rounded-b-[32px] bg-white px-5 py-4 shadow-sm">
         <h1 className="mx-auto max-w-3xl text-lg font-extrabold text-mboa-text">📋 Propriétaires assignés</h1>
       </div>
       <AssignationsList assignations={assignations} userId={user!.id} />

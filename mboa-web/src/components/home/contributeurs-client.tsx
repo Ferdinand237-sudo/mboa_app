@@ -21,7 +21,7 @@ export function ContributeursClient({ contributeurs }: { contributeurs: UserMode
 
   return (
     <div>
-      <div className="bg-white px-5 pb-4 pt-1">
+      <div className="rounded-b-[32px] bg-white px-5 pb-4 pt-1 shadow-sm">
         <div className="mx-auto flex h-[46px] max-w-2xl items-center gap-2 rounded-xl border border-mboa-border bg-mboa-background px-3">
           <SearchIcon className="h-5 w-5 shrink-0 text-mboa-text-muted" />
           <input

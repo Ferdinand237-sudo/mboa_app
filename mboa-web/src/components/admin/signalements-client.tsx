@@ -114,7 +114,7 @@ export function SignalementsClient({ signalements: initial }: { signalements: Ad
 
   return (
     <div>
-      <div className="bg-white px-5 pt-4">
+      <div className="rounded-b-[32px] bg-white px-5 pt-4 shadow-sm">
         <div className="mx-auto max-w-4xl">
           <div className="flex items-center justify-between">
             <h1 className="text-[22px] font-extrabold text-mboa-text">🚨 Signalements</h1>
