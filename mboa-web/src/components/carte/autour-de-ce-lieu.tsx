@@ -74,7 +74,7 @@ export function AutourDeCeLieu({ lieuNom, lat, lng }: { lieuNom: string; lat: nu
         </div>
       </div>
 
-      <div className="bg-white px-5 pb-3 pt-1">
+      <div className="rounded-b-[32px] bg-white px-5 pb-3 pt-1 shadow-sm">
         <div className="mx-auto max-w-2xl">
           <p className="text-xs font-semibold text-mboa-text">Rayon de recherche : {formatRayon(rayonKm)}</p>
           <input

@@ -81,7 +81,7 @@ export function MarketplaceClient({
 
   return (
     <div>
-      <div className="border-b border-mboa-border bg-mboa-card px-5 py-4 sm:px-6">
+      <div className="rounded-b-[32px] bg-mboa-card px-5 py-4 shadow-sm sm:px-6">
         <div className="mx-auto max-w-7xl">
           <h1 className="text-xl font-extrabold text-mboa-text sm:text-2xl">
             🛒 Market

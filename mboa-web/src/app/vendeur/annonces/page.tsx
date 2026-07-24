@@ -27,7 +27,7 @@ export default async function AnnoncesPage() {
 
   return (
     <div>
-      <div className="bg-mboa-card px-5 py-5">
+      <div className="rounded-b-[32px] bg-mboa-card px-5 py-5 shadow-sm">
         <h1 className="mx-auto max-w-2xl text-xl font-extrabold text-mboa-text">📋 Gestion</h1>
       </div>
       <GestionTabs
