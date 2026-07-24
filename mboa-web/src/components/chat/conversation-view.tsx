@@ -142,11 +142,16 @@ export function ConversationView({
   }
 
   return (
-    <div>
+    // Sur desktop (lg+), la conversation devient une carte de hauteur fixe
+    // avec défilement interne (header/saisie ancrés à la carte, plus au
+    // viewport) : sans ça, une conversation courte laissait un grand vide
+    // blanc sans limite claire sous les messages (min-h-[55vh] pensé pour
+    // occuper l'écran mobile en entier, comme l'app). Mobile inchangé.
+    <div className="lg:mx-auto lg:my-6 lg:flex lg:h-[75vh] lg:max-w-2xl lg:flex-col lg:overflow-hidden lg:rounded-2xl lg:border lg:border-mboa-border lg:shadow-sm">
       {/* Fixé sous le header du site (h-16) pour garder le nom et
           l'intitulé de l'annonce visibles sans devoir remonter tout en
           haut des messages — comportement déjà présent sur mobile. */}
-      <div className="sticky top-16 z-40 bg-white px-4 py-3 shadow-sm">
+      <div className="sticky top-16 z-40 bg-white px-4 py-3 shadow-sm lg:static lg:z-auto">
         <div className="mx-auto flex max-w-2xl items-center gap-3">
           {/* router.push (pas router.back) : le retour navigateur restaure
               toujours la liste des conversations depuis le cache client
@@ -191,7 +196,7 @@ export function ConversationView({
         )}
       </div>
 
-      <div className="mx-auto min-h-[55vh] max-w-2xl px-4 py-4">
+      <div className="mx-auto min-h-[55vh] max-w-2xl px-4 py-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
         {messages.length === 0 ? (
           <p className="py-16 text-center text-sm text-mboa-text-muted">Démarrez la conversation 👋</p>
         ) : (
@@ -240,7 +245,7 @@ export function ConversationView({
 
       <form
         onSubmit={envoyer}
-        className="sticky bottom-0 flex items-center gap-2.5 border-t border-mboa-border bg-white px-4 py-3"
+        className="sticky bottom-0 flex items-center gap-2.5 border-t border-mboa-border bg-white px-4 py-3 lg:static"
       >
         <div className="mx-auto flex w-full max-w-2xl items-center gap-2.5">
           <input
