@@ -13,6 +13,7 @@ export function CategoryCards() {
         <Link
           key={cat.label}
           href={cat.href}
+          data-tour={cat.href === "/carte" ? "cat-carte" : undefined}
           className="flex flex-col items-center gap-2 rounded-mboa-lg bg-mboa-card py-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <span

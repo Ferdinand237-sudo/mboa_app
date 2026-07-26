@@ -30,6 +30,7 @@ export function HeroHeader({ prenom }: { prenom: string }) {
 
         <Link
           href="/recherche"
+          data-tour="recherche"
           className="mt-4 flex h-12 items-center rounded-2xl bg-white pl-4 pr-1.5 shadow-lg"
         >
           <span className="text-lg" aria-hidden>
