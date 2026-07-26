@@ -9,6 +9,16 @@ const ICONES: Record<NotificationRow["type"], string> = {
   message: "💬",
   avis: "⭐",
   annonce: "🏘",
+  demande: "📨",
+  signalement: "🚨",
+};
+
+const ICONE_BG: Record<NotificationRow["type"], string> = {
+  message: "bg-mboa-primary/12",
+  avis: "bg-mboa-boost/12",
+  annonce: "bg-mboa-secondary/12",
+  demande: "bg-mboa-secondary/12",
+  signalement: "bg-mboa-danger/12",
 };
 
 // Miroir de _formatDate (notifications_screen.dart).
@@ -63,9 +73,7 @@ export function NotificationsList({ notifications }: { notifications: Notificati
           }`}
         >
           <span
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg ${
-              n.type === "message" ? "bg-mboa-primary/12" : n.type === "avis" ? "bg-mboa-boost/12" : "bg-mboa-secondary/12"
-            }`}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg ${ICONE_BG[n.type]}`}
           >
             {ICONES[n.type]}
           </span>

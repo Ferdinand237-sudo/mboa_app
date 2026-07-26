@@ -12,6 +12,8 @@ const ICONES: Record<NotificationRow["type"], string> = {
   message: "💬",
   avis: "⭐",
   annonce: "🏘",
+  demande: "📨",
+  signalement: "🚨",
 };
 
 function formatRelatif(dateStr: string): string {

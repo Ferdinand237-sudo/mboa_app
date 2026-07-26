@@ -1,6 +1,7 @@
-// Edge Function déclenchée par un Database Webhook Supabase sur INSERT
-// dans public.messages. Envoie une notification push (Firebase Cloud
-// Messaging) au destinataire de la conversation via son fcm_token.
+// Edge Function déclenchée par des Database Webhooks Supabase (net.http_post
+// depuis des triggers SQL) sur INSERT dans public.messages, ainsi que sur
+// public.demandes_compte et public.signalements (diffusion à tous les
+// admins) — envoie une notification push (Firebase Cloud Messaging).
 //
 // Secrets requis (à configurer dans le dashboard Supabase, Edge Functions
 // > send-notification > Secrets, ou via `supabase secrets set`) :
@@ -62,55 +63,98 @@ async function envoyerPush(
   return res.json();
 }
 
+// Diffusion à tous les administrateurs disposant d'un jeton FCM (même
+// principe que le push individuel, un envoi par admin).
+async function notifierTousAdmins(
+  titre: string,
+  corps: string,
+  data: Record<string, string> = {},
+) {
+  const { data: admins } = await supabaseAdmin
+    .from("users")
+    .select("fcm_token")
+    .eq("role", "admin")
+    .not("fcm_token", "is", null);
+
+  const resultats = [];
+  for (const admin of admins ?? []) {
+    if (admin.fcm_token) {
+      resultats.push(await envoyerPush(admin.fcm_token, titre, corps, data));
+    }
+  }
+  return resultats;
+}
+
+async function gererNouveauMessage(record: Record<string, unknown>) {
+  const conversationId = record.conversation_id;
+  const expediteurId = record.expediteur_id as string;
+  const texte = String(record.texte ?? "");
+
+  const { data: conversation } = await supabaseAdmin
+    .from("conversations")
+    .select("participants")
+    .eq("id", conversationId)
+    .single();
+
+  const participants: string[] = conversation?.participants ?? [];
+  const destinataireId = participants.find((id) => id !== expediteurId);
+  if (!destinataireId) return { skipped: "no_recipient" };
+
+  const [{ data: expediteur }, { data: destinataire }] = await Promise.all([
+    supabaseAdmin.from("users").select("nom").eq("id", expediteurId).single(),
+    supabaseAdmin.from("users").select("fcm_token").eq("id", destinataireId)
+      .single(),
+  ]);
+
+  if (!destinataire?.fcm_token) return { skipped: "no_token" };
+
+  const resultat = await envoyerPush(
+    destinataire.fcm_token,
+    expediteur?.nom ?? "Nouveau message",
+    texte.length > 100 ? `${texte.slice(0, 100)}…` : texte,
+    { type: "message", conversation_id: String(conversationId) },
+  );
+  return { sent: true, resultat };
+}
+
+async function gererNouvelleDemandeCompte(record: Record<string, unknown>) {
+  const nom = String(record.nom ?? "Un utilisateur");
+  const typeActivite = String(record.type_activite ?? "vendeur");
+  const resultats = await notifierTousAdmins(
+    "📨 Nouvelle demande de compte",
+    `${nom} souhaite devenir ${typeActivite}`,
+    { type: "demande", demande_id: String(record.id) },
+  );
+  return { sent: true, resultats };
+}
+
+async function gererNouveauSignalement(record: Record<string, unknown>) {
+  const estIa = record.raison === "detection_ia";
+  const resultats = await notifierTousAdmins(
+    estIa ? "🤖 Détection IA — annonce à vérifier" : "🚩 Nouveau signalement",
+    String(record.description ?? record.raison ?? "À vérifier"),
+    { type: "signalement", signalement_id: String(record.id) },
+  );
+  return { sent: true, resultats };
+}
+
 serve(async (req) => {
   try {
     const payload = await req.json();
-    // Le Database Webhook Supabase envoie { type, table, record, ... }
+    // Le trigger SQL envoie { table, record }.
+    const table: string | undefined = payload.table;
     const record = payload.record ?? payload;
 
-    const conversationId = record.conversation_id;
-    const expediteurId = record.expediteur_id;
-    const texte: string = record.texte ?? "";
-
-    const { data: conversation } = await supabaseAdmin
-      .from("conversations")
-      .select("participants")
-      .eq("id", conversationId)
-      .single();
-
-    const participants: string[] = conversation?.participants ?? [];
-    const destinataireId = participants.find((id) => id !== expediteurId);
-    if (!destinataireId) {
-      return new Response(JSON.stringify({ skipped: "no_recipient" }), {
-        status: 200,
-      });
+    let resultat: Record<string, unknown>;
+    if (table === "demandes_compte") {
+      resultat = await gererNouvelleDemandeCompte(record);
+    } else if (table === "signalements") {
+      resultat = await gererNouveauSignalement(record);
+    } else {
+      resultat = await gererNouveauMessage(record);
     }
 
-    const [{ data: expediteur }, { data: destinataire }] = await Promise.all([
-      supabaseAdmin.from("users").select("nom").eq("id", expediteurId)
-        .single(),
-      supabaseAdmin.from("users").select("fcm_token").eq(
-        "id",
-        destinataireId,
-      ).single(),
-    ]);
-
-    if (!destinataire?.fcm_token) {
-      return new Response(JSON.stringify({ skipped: "no_token" }), {
-        status: 200,
-      });
-    }
-
-    const resultat = await envoyerPush(
-      destinataire.fcm_token,
-      expediteur?.nom ?? "Nouveau message",
-      texte.length > 100 ? `${texte.slice(0, 100)}…` : texte,
-      { type: "message", conversation_id: String(conversationId) },
-    );
-
-    return new Response(JSON.stringify({ sent: true, resultat }), {
-      status: 200,
-    });
+    return new Response(JSON.stringify(resultat), { status: 200 });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500,

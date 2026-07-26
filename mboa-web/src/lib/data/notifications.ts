@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 // (lib/core/services/notification_service.dart côté app).
 export type NotificationRow = {
   id: string;
-  type: "message" | "avis" | "annonce";
+  type: "message" | "avis" | "annonce" | "demande" | "signalement";
   titre: string;
   corps: string | null;
   lien: string | null;

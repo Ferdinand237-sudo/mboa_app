@@ -60,6 +60,23 @@ export function SignalementsClient({ signalements: initial }: { signalements: Ad
     if (!error) patch(id, statut);
   }
 
+  // Miroir de _republierAnnonceSiBloquee (admin_signalements_screen.dart) :
+  // sans cette republication explicite, statut_moderation restait bloqué à
+  // a_verifier/bloque pour toujours après un simple "Résoudre"/"Ignorer" —
+  // l'annonce disparaissait du site et de la gestion du vendeur alors même
+  // que le signalement affichait "Traité".
+  async function republierAnnonceSiBloquee(cibleId: string) {
+    const supabase = createClient();
+    const annonce = await trouverAnnonce(cibleId);
+    if (!annonce) return;
+    await supabase.from(annonce.table).update({ statut_moderation: "publie" }).eq("id", cibleId);
+  }
+
+  async function resoudreOuIgnorer(s: AdminSignalement, statut: "traite" | "rejete") {
+    await traiter(s.id, statut);
+    if (s.cibleType === "annonce") await republierAnnonceSiBloquee(s.cibleId);
+  }
+
   async function supprimerAnnonce() {
     if (!deleteTarget) return;
     setBusy(true);
@@ -203,14 +220,14 @@ export function SignalementsClient({ signalements: initial }: { signalements: Ad
                   <div className="mt-3 flex gap-2 border-t border-mboa-border pt-2.5">
                     <button
                       type="button"
-                      onClick={() => traiter(s.id, "rejete")}
+                      onClick={() => resoudreOuIgnorer(s, "rejete")}
                       className="flex-1 rounded-mboa-md border border-mboa-border bg-mboa-text-muted/8 py-2 text-[11px] font-bold text-mboa-text-muted"
                     >
                       👎 Ignorer
                     </button>
                     <button
                       type="button"
-                      onClick={() => traiter(s.id, "traite")}
+                      onClick={() => resoudreOuIgnorer(s, "traite")}
                       className="flex-1 rounded-mboa-md border border-mboa-verified/30 bg-mboa-verified/8 py-2 text-[11px] font-bold text-mboa-verified"
                     >
                       ✔ Résoudre
