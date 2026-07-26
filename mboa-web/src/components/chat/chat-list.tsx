@@ -103,7 +103,7 @@ export function ChatList({ conversations }: { conversations: ConversationItem[] 
                   )}
                 </div>
                 <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-mboa-border bg-white text-[10px]">
-                  💬
+                  {c.isSupport ? "🤖" : "💬"}
                 </span>
               </div>
 

@@ -24,5 +24,12 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   const conversation = await getConversationDetail(id, user.id);
   if (!conversation) notFound();
 
-  return <ConversationView conversation={conversation} initialMessages={messages} currentUserId={user.id} />;
+  return (
+    <ConversationView
+      conversation={conversation}
+      initialMessages={messages}
+      currentUserId={user.id}
+      currentUserRole={user.role}
+    />
+  );
 }

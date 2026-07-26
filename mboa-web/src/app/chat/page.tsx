@@ -25,7 +25,7 @@ export default async function ChatPage() {
     );
   }
 
-  const conversations = await getConversations(user.id);
+  const conversations = await getConversations(user.id, user.role);
 
   return <ChatList conversations={conversations} />;
 }
