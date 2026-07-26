@@ -111,13 +111,18 @@ export function HeaderClient({ user, unreadCount }: { user: UserModel | null; un
           </nav>
         )}
 
-        {user && <NotificationBell userId={user.id} initialCount={unreadCount} />}
+        {user && (
+          <span data-tour="notifications">
+            <NotificationBell userId={user.id} initialCount={unreadCount} />
+          </span>
+        )}
 
         <div className="hidden items-center gap-3 md:flex">
           {user ? (
             <>
               <Link
                 href="/profil"
+                data-tour="profil"
                 className={`flex items-center gap-2 rounded-mboa-full py-1 pl-1 pr-3 text-sm font-semibold transition-colors ${
                   estActif(pathname, "/profil")
                     ? "bg-mboa-primary-light/8 text-mboa-primary"
@@ -199,6 +204,7 @@ export function HeaderClient({ user, unreadCount }: { user: UserModel | null; un
                 <>
                   <Link
                     href="/profil"
+                    data-tour="profil"
                     onClick={() => setOpen(false)}
                     className={`rounded-mboa-md px-3 py-2.5 text-sm font-semibold ${
                       estActif(pathname, "/profil")
