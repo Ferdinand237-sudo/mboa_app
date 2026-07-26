@@ -8,6 +8,7 @@ import { HomeArticleCard } from "@/components/home/home-article-card";
 import { ContributeurCard } from "@/components/home/contributeur-card";
 import { TrouveTonMboa } from "@/components/home/trouve-ton-mboa";
 import { TrouveTonMboaLocked } from "@/components/home/trouve-ton-mboa-locked";
+import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
 
 export default async function HomePage() {
   const user = await getCurrentUser();
@@ -23,6 +24,7 @@ export default async function HomePage() {
 
   return (
     <div>
+      <OnboardingTour anonyme={!user} />
       <HeroHeader prenom={prenom} />
 
       <div className="mx-auto max-w-7xl px-5 py-6 sm:px-6">
