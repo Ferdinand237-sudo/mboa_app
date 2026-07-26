@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { CreateAmbassadeurDialog } from "@/components/admin/create-ambassadeur-dialog";
+import { FilterPills } from "@/components/admin/filter-pills";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { initiales } from "@/lib/utils/format";
 import type { AdminUser } from "@/lib/data/admin";
@@ -15,6 +16,14 @@ const ROLE_STYLE: Record<string, { label: string; color: string; bg: string }> =
   ambassadeur: { label: "🧭 Ambassadeur", color: "text-mboa-primary-dark", bg: "bg-mboa-primary-dark/10" },
   visiteur: { label: "🎓 Visiteur", color: "text-mboa-primary", bg: "bg-mboa-primary/10" },
 };
+
+const FILTRES_ROLE = [
+  { value: "tous", label: "Tous" },
+  { value: "visiteur", label: "🎓 Visiteurs" },
+  { value: "vendeur", label: "🏪 Vendeurs" },
+  { value: "ambassadeur", label: "🧭 Ambassadeurs" },
+  { value: "admin", label: "👑 Admins" },
+] as const;
 
 const VERIF_STYLE: Record<string, { label: string; color: string }> = {
   en_attente_assignation: { label: "🕓 À assigner", color: "text-mboa-text-muted" },
@@ -29,9 +38,12 @@ type ToggleField = "actif" | "verified";
 // Miroir de AdminUsersScreen (admin_users_screen.dart).
 export function UsersClient({ users: initial }: { users: AdminUser[] }) {
   const [users, setUsers] = useState(initial);
+  const [filtreRole, setFiltreRole] = useState<(typeof FILTRES_ROLE)[number]["value"]>("tous");
   const [ambassadeurOpen, setAmbassadeurOpen] = useState(false);
   const [confirm, setConfirm] = useState<{ userId: string; field: ToggleField; current: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const affiches = filtreRole === "tous" ? users : users.filter((u) => u.role === filtreRole);
 
   async function appliquer() {
     if (!confirm) return;
@@ -90,11 +102,17 @@ export function UsersClient({ users: initial }: { users: AdminUser[] }) {
             </Link>
           </div>
         </div>
+        <div className="mx-auto mt-3 max-w-4xl pb-3">
+          <FilterPills options={FILTRES_ROLE.slice()} value={filtreRole} onChange={setFiltreRole} />
+        </div>
       </div>
 
       <div className="mx-auto max-w-4xl px-4 py-4 pb-10">
+        {affiches.length === 0 ? (
+          <p className="py-16 text-center text-sm text-mboa-text-muted">Aucun utilisateur dans ce filtre</p>
+        ) : (
         <div className="flex flex-col gap-2.5">
-          {users.map((u) => {
+          {affiches.map((u) => {
             const roleStyle = ROLE_STYLE[u.role] ?? ROLE_STYLE.visiteur;
             const verifStyle = u.statutVerification ? VERIF_STYLE[u.statutVerification] : null;
             return (
@@ -155,6 +173,7 @@ export function UsersClient({ users: initial }: { users: AdminUser[] }) {
             );
           })}
         </div>
+        )}
       </div>
 
       <ConfirmDialog
