@@ -89,15 +89,40 @@ async function gererNouveauMessage(record: Record<string, unknown>) {
   const conversationId = record.conversation_id;
   const expediteurId = record.expediteur_id as string;
   const texte = String(record.texte ?? "");
+  const corps = texte.length > 100 ? `${texte.slice(0, 100)}…` : texte;
 
   const { data: conversation } = await supabaseAdmin
     .from("conversations")
-    .select("participants")
+    .select("participants, is_support, assigned_admin_id")
     .eq("id", conversationId)
     .single();
 
   const participants: string[] = conversation?.participants ?? [];
   const destinataireId = participants.find((id) => id !== expediteurId);
+
+  // Conversation Assistant Mboa : participants ne contient que l'étudiant,
+  // donc un message envoyé par l'étudiant lui-même ne trouve "personne
+  // d'autre" via la logique habituelle. Route vers l'admin déjà assigné, ou
+  // diffuse à tous les admins tant que personne n'a répondu.
+  if (!destinataireId && conversation?.is_support) {
+    const { data: expediteur } = await supabaseAdmin.from("users").select(
+      "nom",
+    ).eq("id", expediteurId).single();
+    const titre = `💬 ${expediteur?.nom ?? "Un étudiant"} (Assistant Mboa)`;
+    const data = { type: "message", conversation_id: String(conversationId) };
+
+    if (conversation.assigned_admin_id) {
+      const { data: admin } = await supabaseAdmin.from("users").select(
+        "fcm_token",
+      ).eq("id", conversation.assigned_admin_id).single();
+      if (!admin?.fcm_token) return { skipped: "no_token" };
+      const resultat = await envoyerPush(admin.fcm_token, titre, corps, data);
+      return { sent: true, resultat };
+    }
+    const resultats = await notifierTousAdmins(titre, corps, data);
+    return { sent: true, resultats };
+  }
+
   if (!destinataireId) return { skipped: "no_recipient" };
 
   const [{ data: expediteur }, { data: destinataire }] = await Promise.all([
@@ -111,7 +136,7 @@ async function gererNouveauMessage(record: Record<string, unknown>) {
   const resultat = await envoyerPush(
     destinataire.fcm_token,
     expediteur?.nom ?? "Nouveau message",
-    texte.length > 100 ? `${texte.slice(0, 100)}…` : texte,
+    corps,
     { type: "message", conversation_id: String(conversationId) },
   );
   return { sent: true, resultat };

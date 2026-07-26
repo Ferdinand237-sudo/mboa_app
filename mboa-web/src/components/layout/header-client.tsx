@@ -37,6 +37,7 @@ const NAV_LINKS_ADMIN = [
   { href: "/admin/signalements", label: "Signalements" },
   { href: "/admin/demandes", label: "Demandes" },
   { href: "/admin/verifications", label: "Vérifs" },
+  { href: "/chat", label: "🤖 Assistant Mboa" },
 ];
 
 // Miroir de _navItemsAmbassadeur (main_screen.dart) : Dashboard / Assignés.

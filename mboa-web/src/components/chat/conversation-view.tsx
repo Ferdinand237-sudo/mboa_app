@@ -42,14 +42,18 @@ export function ConversationView({
   conversation,
   initialMessages,
   currentUserId,
+  currentUserRole,
 }: {
   conversation: ConversationDetail;
   initialMessages: MessageRow[];
   currentUserId: string;
+  currentUserRole: string;
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [texte, setTexte] = useState("");
+  const [assignedAdminId, setAssignedAdminId] = useState(conversation.assignedAdminId);
+  const estAdmin = currentUserRole === "admin";
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,17 +69,23 @@ export function ConversationView({
       // trg_incrementer_non_lu (déclencheur Supabase) incrémente
       // conversations.non_lu à chaque insertion de message, mais rien ne le
       // remet à 0 côté lecture : on le fait ici en repartant du compteur de
-      // l'autre participant pour ne pas l'écraser.
+      // l'autre participant pour ne pas l'écraser. Pour Assistant Mboa vu
+      // par un admin non assigné, le compteur collectif 'non_assigne' n'est
+      // remis à zéro qu'à la prise en charge (premier message envoyé), pas
+      // à la simple lecture — sinon la conversation semblerait traitée aux
+      // yeux des autres admins sans qu'aucun n'ait encore répondu.
+      const cle = estAdmin ? (assignedAdminId === currentUserId ? currentUserId : null) : currentUserId;
+      if (!cle) return;
       const { data: conv } = await supabase
         .from("conversations")
         .select("non_lu")
         .eq("id", conversation.id)
         .single();
       const nonLu = (conv?.non_lu as Record<string, number> | null) ?? {};
-      if (nonLu[currentUserId]) {
+      if (nonLu[cle]) {
         await supabase
           .from("conversations")
-          .update({ non_lu: { ...nonLu, [currentUserId]: 0 } })
+          .update({ non_lu: { ...nonLu, [cle]: 0 } })
           .eq("id", conversation.id);
       }
     }
@@ -119,7 +129,10 @@ export function ConversationView({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversation.id, currentUserId]);
+    // assignedAdminId/estAdmin ré-abonnent le canal avec une closure à jour
+    // dès la prise en charge (sinon marquerLus garderait l'état "non
+    // assigné" capturé au montage pour les messages reçus après coup).
+  }, [conversation.id, currentUserId, assignedAdminId, estAdmin]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -131,6 +144,23 @@ export function ConversationView({
     if (!contenu) return;
     setTexte("");
     const supabase = createClient();
+
+    // Premier admin à répondre sur Assistant Mboa : prise en charge atomique
+    // (update conditionné par assigned_admin_id is null, gagné par le
+    // premier qui l'exécute) — dès lors la conversation disparaît de la
+    // liste des autres admins et tous les prochains messages de l'étudiant
+    // ne notifient plus que celui-ci.
+    if (estAdmin && conversation.isSupport && assignedAdminId === null) {
+      const { data: pris } = await supabase
+        .from("conversations")
+        .update({ assigned_admin_id: currentUserId })
+        .eq("id", conversation.id)
+        .is("assigned_admin_id", null)
+        .select("assigned_admin_id")
+        .maybeSingle();
+      if (pris) setAssignedAdminId(pris.assigned_admin_id);
+    }
+
     await supabase.from("messages").insert({
       conversation_id: conversation.id,
       expediteur_id: currentUserId,
@@ -186,9 +216,17 @@ export function ConversationView({
               {conversation.autreNom}
               {conversation.autreVerified && <VerifiedBadge className="h-3.5 w-3.5 shrink-0" />}
             </p>
-            <p className="text-[11px] font-medium text-mboa-verified">● En ligne</p>
+            {estAdmin && conversation.isSupport ? (
+              <p className={`text-[11px] font-medium ${assignedAdminId ? "text-mboa-verified" : "text-mboa-boost"}`}>
+                {assignedAdminId === currentUserId ? "✅ Assigné à vous" : assignedAdminId ? "Pris en charge" : "🆕 Non assigné"}
+              </p>
+            ) : (
+              <p className="text-[11px] font-medium text-mboa-verified">● En ligne</p>
+            )}
           </div>
-          <AvisButton autreId={conversation.autreId} autreNom={conversation.autreNom} annonceId={conversation.annonceId} />
+          {!conversation.isSupport && (
+            <AvisButton autreId={conversation.autreId} autreNom={conversation.autreNom} annonceId={conversation.annonceId} />
+          )}
         </div>
 
         {conversation.annonceId && (
