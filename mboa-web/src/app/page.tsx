@@ -8,7 +8,9 @@ import { HomeArticleCard } from "@/components/home/home-article-card";
 import { ContributeurCard } from "@/components/home/contributeur-card";
 import { TrouveTonMboa } from "@/components/home/trouve-ton-mboa";
 import { TrouveTonMboaLocked } from "@/components/home/trouve-ton-mboa-locked";
-import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
+import { TOUR_HOME_VISITEUR, TOUR_HOME_ETUDIANT, TOUR_HOME_VENDEUR } from "@/components/onboarding/tours";
+
+const SEEN_KEY_HOME_VISITEUR = "mboa_tour_seen";
 
 export default async function HomePage() {
   const user = await getCurrentUser();
@@ -22,10 +24,20 @@ export default async function HomePage() {
 
   const prenom = user ? user.nom.split(" ")[0] : "Visiteur";
 
+  // Visiteur non connecté : visite guidée générale + lancement automatique
+  // (une fois) pour accueillir les tout nouveaux arrivants. Étudiant connecté
+  // et vendeur : même bouton dans le hero, mais uniquement au clic — ce ne
+  // sont pas de nouveaux venus sur le site.
+  const tourSteps = !user
+    ? TOUR_HOME_VISITEUR
+    : user.role === "vendeur"
+      ? TOUR_HOME_VENDEUR
+      : TOUR_HOME_ETUDIANT;
+  const tourAutoOpenKey = !user ? SEEN_KEY_HOME_VISITEUR : undefined;
+
   return (
     <div>
-      <OnboardingTour anonyme={!user} />
-      <HeroHeader prenom={prenom} />
+      <HeroHeader prenom={prenom} tourSteps={tourSteps} tourAutoOpenKey={tourAutoOpenKey} />
 
       <div className="mx-auto max-w-7xl px-5 py-6 sm:px-6">
         {/* Explorer */}

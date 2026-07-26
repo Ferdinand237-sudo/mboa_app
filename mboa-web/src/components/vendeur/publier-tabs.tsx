@@ -22,7 +22,7 @@ export function PublierTabs({
 
   return (
     <div>
-      <div className="mx-auto flex max-w-lg gap-1 border-b border-mboa-border px-5">
+      <div data-tour="publier-tabs" className="mx-auto flex max-w-lg gap-1 border-b border-mboa-border px-5">
         <button
           type="button"
           onClick={() => setTab("logement")}

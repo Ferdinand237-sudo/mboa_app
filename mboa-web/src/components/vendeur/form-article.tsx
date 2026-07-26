@@ -139,7 +139,7 @@ export function FormArticle() {
       {error && <ResultBanner message={error} tone="danger" />}
       {result && <ResultBanner message={result.message} tone={result.tone} />}
 
-      <div>
+      <div data-tour="publier-photos">
         <p className="text-[13px] font-bold text-mboa-text">📷 Photos de l&apos;article</p>
         <p className="mt-1 text-xs text-mboa-text-muted">
           <span className="text-mboa-danger">Minimum 1 photo · </span>
@@ -252,6 +252,7 @@ export function FormArticle() {
 
       <button
         type="submit"
+        data-tour="publier-submit"
         disabled={loading}
         className="mt-2 flex h-[52px] items-center justify-center gap-2 rounded-mboa-lg bg-mboa-secondary text-sm font-bold text-white disabled:opacity-60"
       >

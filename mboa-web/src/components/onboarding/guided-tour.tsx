@@ -1,57 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
-
-const SEEN_KEY = "mboa_tour_seen";
-
-type TourStep = {
-  target: string;
-  title: string;
-  body: string;
-};
-
-// Chaque target correspond à un attribut data-tour posé sur l'élément réel
-// (header-client.tsx, hero-header.tsx, category-cards.tsx). Certains onglets
-// existent en double dans le DOM (nav desktop + menu mobile) : cibleVisible
-// prend celui qui est réellement affiché selon la largeur d'écran.
-const STEPS: TourStep[] = [
-  {
-    target: "logo",
-    title: "Bienvenue sur Mboa 👋",
-    body: "Ton premier ami dans une nouvelle ville. Fais un tour rapide pour découvrir comment ça marche, ça prend 30 secondes.",
-  },
-  {
-    target: "recherche",
-    title: "🔍 Cherche un logement",
-    body: "Tape ce que tu cherches — chambre, studio, meublé — pour lancer une recherche en un instant.",
-  },
-  {
-    target: "nav-logements",
-    title: "🏠 Logement",
-    body: "Trouve un logement avant même d'arriver à Sangmelima : photos, prix, commerces et équipements autour.",
-  },
-  {
-    target: "nav-marketplace",
-    title: "🛒 Market",
-    body: "Achète ou vends du matériel entre étudiants : lits, bureaux, livres, électroménager...",
-  },
-  {
-    target: "cat-carte",
-    title: "🗺️ Carte",
-    body: "Repère les logements, le campus, l'hôpital et le marché directement sur la carte.",
-  },
-  {
-    target: "nav-chat",
-    title: "💬 Chat",
-    body: "Discute en direct avec les propriétaires et les vendeurs, dès que tu as un compte.",
-  },
-  {
-    target: "register",
-    title: "Crée ton compte",
-    body: "Inscris-toi gratuitement pour débloquer le détail des annonces, le chat et les avis. On y va ?",
-  },
-];
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { TourStep } from "@/components/onboarding/tours";
 
 function attendre(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -70,44 +20,25 @@ function dansMenuMobile(el: HTMLElement): boolean {
   return el.closest("[data-tour-mobile-menu]") !== null;
 }
 
-// Guide de prise en main pour les nouveaux visiteurs non connectés : une
-// bulle pointe successivement vers la recherche, les onglets clés et
-// l'inscription, avec Suivant / Précédent / Passer. Limité au visiteur
-// anonyme (voir CLAUDE.md, "Visiteur Non Inscrit") : les navigations
-// vendeur/admin/ambassadeur sont trop différentes pour une liste d'étapes
-// générique, et l'objectif ici est l'accueil des tout nouveaux arrivants.
-export function OnboardingTour({ anonyme }: { anonyme: boolean }) {
-  const pathname = usePathname();
-  const [actif, setActif] = useState(false);
+// Moteur générique de visite guidée : une bulle pointe vers l'élément
+// data-tour de chaque étape (halo + flèche), avec Suivant/Précédent/Passer.
+// Monté/démonté par l'appelant (TourButton) plutôt que piloté par un prop
+// "open" : ça réinitialise l'étape à 0 gratuitement à chaque ouverture, sans
+// effet dédié à ce reset.
+export function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () => void }) {
   const [index, setIndex] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const menuOuvertParLeTour = useRef(false);
-
-  const fermerMenuSiOuvertParLeTour = useCallback(async () => {
-    if (!menuOuvertParLeTour.current) return;
-    document.querySelector<HTMLElement>("[data-tour-menu-toggle]")?.click();
-    menuOuvertParLeTour.current = false;
-    await attendre(80);
-  }, []);
-
-  // Lancement automatique une seule fois, uniquement sur l'accueil (seule
-  // page qui contient tous les éléments ciblés : recherche, catégories...).
-  useEffect(() => {
-    if (!anonyme || pathname !== "/") return;
-    if (localStorage.getItem(SEEN_KEY) === "1") return;
-    const t = setTimeout(() => setActif(true), 900);
-    return () => clearTimeout(t);
-  }, [anonyme, pathname]);
 
   // Fonction async déclarée à l'intérieur de l'effet (et non via useCallback
   // référencé de l'extérieur) : c'est le seul moyen que le linter accepte
   // pour une mesure DOM asynchrone qui se termine par un setState, cf.
   // react.dev/link/hooks-data-fetching.
   useEffect(() => {
-    if (!actif) return;
     let annule = false;
     async function positionner() {
-      let el = cibleVisible(STEPS[index].target);
+      const cible = steps[index].target;
+      let el = cibleVisible(cible);
       if (!el) {
         // Sur mobile, l'onglet visé est peut-être caché dans le menu
         // hamburger (rendu uniquement quand il est ouvert) : on l'ouvre
@@ -117,18 +48,27 @@ export function OnboardingTour({ anonyme }: { anonyme: boolean }) {
           toggle.click();
           menuOuvertParLeTour.current = true;
           await attendre(80);
-          el = cibleVisible(STEPS[index].target);
+          el = cibleVisible(cible);
         }
-      } else if (!dansMenuMobile(el)) {
+      } else if (menuOuvertParLeTour.current && !dansMenuMobile(el)) {
         // Trouvé sans avoir besoin du menu (desktop, ou élément hors menu) :
-        // si une étape précédente l'avait ouvert, on peut le refermer.
-        // Si l'élément trouvé est lui-même DANS le menu encore ouvert
-        // (deux étapes mobiles consécutives), on le laisse tel quel.
-        await fermerMenuSiOuvertParLeTour();
+        // si une étape précédente l'avait ouvert, on peut le refermer. Si
+        // l'élément trouvé est lui-même DANS le menu encore ouvert (deux
+        // étapes mobiles consécutives), on le laisse tel quel.
+        document.querySelector<HTMLElement>("[data-tour-menu-toggle]")?.click();
+        menuOuvertParLeTour.current = false;
+        await attendre(80);
       }
       if (annule) return;
       if (!el) {
-        setRect(null);
+        // Cible absente pour ce rôle/ces permissions (onglet non affiché,
+        // formulaire différent...) : on saute l'étape plutôt que de bloquer
+        // la visite sur une bulle vide.
+        if (index < steps.length - 1) {
+          setIndex((i) => i + 1);
+        } else {
+          onClose();
+        }
         return;
       }
       el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -139,29 +79,29 @@ export function OnboardingTour({ anonyme }: { anonyme: boolean }) {
     return () => {
       annule = true;
     };
-  }, [actif, index, fermerMenuSiOuvertParLeTour]);
+  }, [index, steps, onClose]);
 
   // Recalcule la position si la fenêtre est redimensionnée pendant la visite.
   useEffect(() => {
-    if (!actif) return;
     function recalc() {
-      const el = cibleVisible(STEPS[index].target);
+      const el = cibleVisible(steps[index].target);
       if (el) setRect(el.getBoundingClientRect());
     }
     window.addEventListener("resize", recalc);
     return () => window.removeEventListener("resize", recalc);
-  }, [actif, index]);
+  }, [index, steps]);
 
-  function terminer() {
-    localStorage.setItem(SEEN_KEY, "1");
-    fermerMenuSiOuvertParLeTour();
-    setActif(false);
-    setIndex(0);
+  function fermer() {
+    if (menuOuvertParLeTour.current) {
+      document.querySelector<HTMLElement>("[data-tour-menu-toggle]")?.click();
+      menuOuvertParLeTour.current = false;
+    }
+    onClose();
   }
 
   function suivant() {
-    if (index === STEPS.length - 1) {
-      terminer();
+    if (index === steps.length - 1) {
+      fermer();
       return;
     }
     setIndex((i) => i + 1);
@@ -171,39 +111,19 @@ export function OnboardingTour({ anonyme }: { anonyme: boolean }) {
     setIndex((i) => Math.max(0, i - 1));
   }
 
-  function relancer() {
-    setIndex(0);
-    setActif(true);
-  }
-
-  if (!anonyme || pathname !== "/") return null;
+  if (!rect) return null;
 
   return (
-    <>
-      {!actif && (
-        <button
-          type="button"
-          onClick={relancer}
-          className="fixed bottom-24 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-mboa-primary text-xl text-white shadow-lg md:bottom-6"
-          aria-label="Revoir la visite guidée"
-          title="Revoir la visite guidée"
-        >
-          🧭
-        </button>
-      )}
-      {actif && rect && (
-        <TourBulle
-          rect={rect}
-          index={index}
-          total={STEPS.length}
-          title={STEPS[index].title}
-          body={STEPS[index].body}
-          onSuivant={suivant}
-          onPrecedent={index > 0 ? precedent : undefined}
-          onPasser={terminer}
-        />
-      )}
-    </>
+    <TourBulle
+      rect={rect}
+      index={index}
+      total={steps.length}
+      title={steps[index].title}
+      body={steps[index].body}
+      onSuivant={suivant}
+      onPrecedent={index > 0 ? precedent : undefined}
+      onPasser={fermer}
+    />
   );
 }
 
@@ -318,7 +238,11 @@ function TourBulle({
           </div>
         </div>
         {index < total - 1 && (
-          <button type="button" onClick={onPasser} className="mt-2 w-full text-center text-[11px] font-semibold text-mboa-text-muted">
+          <button
+            type="button"
+            onClick={onPasser}
+            className="mt-2 w-full text-center text-[11px] font-semibold text-mboa-text-muted"
+          >
             Passer la visite
           </button>
         )}

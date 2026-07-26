@@ -28,12 +28,14 @@ export function AnnonceCard({
   detailHref,
   editHref,
   onRemoved,
+  premiere = false,
 }: {
   item: MonLogement | MonArticle;
   table: "logements" | "articles";
   detailHref: string;
   editHref: string;
   onRemoved: () => void;
+  premiere?: boolean;
 }) {
   const [statut, setStatut] = useState(item.statut);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -59,7 +61,7 @@ export function AnnonceCard({
   }
 
   return (
-    <div className="rounded-mboa-lg bg-mboa-card p-3 shadow-sm">
+    <div data-tour={premiere ? "gestion-annonce" : undefined} className="rounded-mboa-lg bg-mboa-card p-3 shadow-sm">
       <Link href={detailHref} className="flex items-center gap-3">
         <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] bg-gradient-to-br from-mboa-primary to-mboa-primary-light">
           <Photo src={item.photos[0]} alt={item.titre} />
@@ -85,7 +87,10 @@ export function AnnonceCard({
           </div>
         </div>
       </Link>
-      <div className="mt-2.5 flex divide-x divide-mboa-border border-t border-mboa-border pt-2">
+      <div
+        data-tour={premiere ? "gestion-actions" : undefined}
+        className="mt-2.5 flex divide-x divide-mboa-border border-t border-mboa-border pt-2"
+      >
         <Link
           href={editHref}
           className="flex flex-1 items-center justify-center gap-1 py-2 text-[11.5px] font-semibold text-mboa-primary"

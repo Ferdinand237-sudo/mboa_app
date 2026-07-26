@@ -37,7 +37,7 @@ export function GestionTabs({
       <Vide emoji="🏠" message="Aucun logement publié" />
     ) : (
       <div className="flex flex-col gap-2.5">
-        {logements.map((l) => (
+        {logements.map((l, i) => (
           <AnnonceCard
             key={l.id}
             item={l}
@@ -45,6 +45,7 @@ export function GestionTabs({
             detailHref={`/logements/${l.id}`}
             editHref={`/vendeur/logements/${l.id}/edit`}
             onRemoved={() => setLogements((prev) => prev.filter((x) => x.id !== l.id))}
+            premiere={i === 0}
           />
         ))}
       </div>
@@ -55,7 +56,7 @@ export function GestionTabs({
       <Vide emoji="📦" message="Aucun article publié" />
     ) : (
       <div className="flex flex-col gap-2.5">
-        {articles.map((a) => (
+        {articles.map((a, i) => (
           <AnnonceCard
             key={a.id}
             item={a}
@@ -63,6 +64,7 @@ export function GestionTabs({
             detailHref={`/marketplace/${a.id}`}
             editHref={`/vendeur/articles/${a.id}/edit`}
             onRemoved={() => setArticles((prev) => prev.filter((x) => x.id !== a.id))}
+            premiere={i === 0}
           />
         ))}
       </div>
@@ -77,7 +79,7 @@ export function GestionTabs({
 
   return (
     <div>
-      <div className="mx-auto flex max-w-2xl gap-1 border-b border-mboa-border px-4">
+      <div data-tour="gestion-tabs" className="mx-auto flex max-w-2xl gap-1 border-b border-mboa-border px-4">
         <button
           type="button"
           onClick={() => setTab("logements")}

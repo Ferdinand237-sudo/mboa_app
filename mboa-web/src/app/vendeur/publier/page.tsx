@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/data/auth";
 import { getVendeurPermissions } from "@/lib/data/vendeur-annonces";
 import { PublierTabs } from "@/components/vendeur/publier-tabs";
+import { TourButton } from "@/components/onboarding/tour-button";
+import { TOUR_PUBLIER } from "@/components/onboarding/tours";
 
 export const metadata: Metadata = {
   title: "Publier une annonce",
@@ -39,12 +41,15 @@ export default async function PublierPage() {
 
   return (
     <div>
-      <div className="rounded-b-[32px] bg-mboa-card px-5 py-5 shadow-sm">
-        <div className="mx-auto max-w-lg">
-          <h1 className="text-xl font-extrabold text-mboa-text">{title}</h1>
-          {permissions.peutLogement && permissions.peutArticle && (
-            <p className="mt-1 text-sm text-mboa-text-muted">Choisis le type d&apos;annonce à publier</p>
-          )}
+      <div data-tour="publier-hero" className="rounded-b-[32px] bg-mboa-card px-5 py-5 shadow-sm">
+        <div className="mx-auto flex max-w-lg items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-xl font-extrabold text-mboa-text">{title}</h1>
+            {permissions.peutLogement && permissions.peutArticle && (
+              <p className="mt-1 text-sm text-mboa-text-muted">Choisis le type d&apos;annonce à publier</p>
+            )}
+          </div>
+          <TourButton steps={TOUR_PUBLIER} variant="light" />
         </div>
       </div>
       <PublierTabs
