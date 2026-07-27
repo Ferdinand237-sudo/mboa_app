@@ -87,6 +87,31 @@ export function ProfilConnected({ user, stats }: { user: UserModel; stats: Profi
       </div>
 
       <div className="mx-auto mt-4 flex max-w-2xl flex-col gap-3">
+        {(user.estAdmin || user.estAmbassadeur) && (
+          <MenuSection title="Espaces privilégiés">
+            {user.estAdmin && (
+              <MenuItem
+                icon={<ShieldIcon />}
+                iconColorClass="text-mboa-accent"
+                iconBgClass="bg-mboa-accent/12"
+                label="Administration"
+                subtitle="Dashboard, utilisateurs, annonces, signalements..."
+                href="/admin"
+              />
+            )}
+            {user.estAmbassadeur && (
+              <MenuItem
+                icon={<span className="text-base leading-none">🧭</span>}
+                iconColorClass="text-mboa-primary-dark"
+                iconBgClass="bg-mboa-primary-dark/12"
+                label="Espace ambassadeur"
+                subtitle="Vérifications terrain assignées"
+                href="/ambassadeur"
+              />
+            )}
+          </MenuSection>
+        )}
+
         <MenuSection title="Mes activités">
           <MenuItem
             icon={<HeartIcon />}
@@ -209,6 +234,8 @@ export function ProfilConnected({ user, stats }: { user: UserModel; stats: Profi
             <p className="text-[11px] text-mboa-text-muted">Type de compte</p>
             <p className="text-[13px] font-bold text-mboa-primary">
               {ROLE_LABELS[user.role] ?? ROLE_LABELS.visiteur}
+              {user.estAdmin && " · 👑 Administrateur"}
+              {user.estAmbassadeur && " · 🧭 Ambassadeur"}
             </p>
           </div>
         </div>

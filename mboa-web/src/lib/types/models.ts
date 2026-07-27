@@ -46,6 +46,14 @@ export type UserModel = {
   emplacementCommerce: string | null;
   lat: number | null;
   lng: number | null;
+  // Privilèges superposés au compte de base (role reste 'visiteur' ou
+  // 'vendeur') : un utilisateur promu administrateur ou ambassadeur garde
+  // l'expérience de son compte initial, avec ces droits en plus. `role`
+  // peut encore valoir historiquement 'admin'/'ambassadeur' pour d'anciens
+  // comptes non migrés ; toujours combiner avec ces flags (voir estAdmin()
+  // / estAmbassadeur() ci-dessous plutôt que de tester role directement).
+  estAdmin: boolean;
+  estAmbassadeur: boolean;
 };
 
 export function userFromRow(row: SupabaseRow): UserModel {
@@ -69,6 +77,8 @@ export function userFromRow(row: SupabaseRow): UserModel {
     emplacementCommerce: strOrNull(row.emplacement_commerce),
     lat: numOrNull(row.lat),
     lng: numOrNull(row.lng),
+    estAdmin: str(row.role) === "admin" || bool(row.est_admin),
+    estAmbassadeur: str(row.role) === "ambassadeur" || bool(row.est_ambassadeur),
   };
 }
 

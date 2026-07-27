@@ -28,12 +28,16 @@ export async function getAdminStats(): Promise<AdminStats> {
   };
 }
 
-// Miroir de _chargerUsers (admin_users_screen.dart).
+// Miroir de _chargerUsers (admin_users_screen.dart). role reste l'identité
+// de base (visiteur/vendeur) ; estAdmin/estAmbassadeur sont des privilèges
+// superposables — voir la migration roles_multiples_admin_ambassadeur.
 export type AdminUser = {
   id: string;
   nom: string;
   email: string;
   role: string;
+  estAdmin: boolean;
+  estAmbassadeur: boolean;
   verified: boolean;
   actif: boolean;
   statutVerification: string | null;
@@ -44,7 +48,7 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
   const [usersRes, verifsRes] = await Promise.all([
     supabase
       .from("users")
-      .select("id, nom, email, role, verified, actif")
+      .select("id, nom, email, role, est_admin, est_ambassadeur, verified, actif")
       .order("date_inscription", { ascending: false }),
     supabase.from("verifications_terrain").select("user_id, statut"),
   ]);
@@ -56,6 +60,8 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
     nom: u.nom ?? "Inconnu",
     email: u.email ?? "",
     role: u.role ?? "visiteur",
+    estAdmin: u.role === "admin" || u.est_admin === true,
+    estAmbassadeur: u.role === "ambassadeur" || u.est_ambassadeur === true,
     verified: u.verified === true,
     actif: u.actif !== false,
     statutVerification: mapVerif.get(u.id) ?? null,

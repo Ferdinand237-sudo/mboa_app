@@ -29,7 +29,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       conversation={conversation}
       initialMessages={messages}
       currentUserId={user.id}
-      currentUserRole={user.role}
+      estAdmin={user.estAdmin}
     />
   );
 }

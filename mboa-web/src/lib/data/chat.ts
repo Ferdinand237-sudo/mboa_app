@@ -171,8 +171,10 @@ async function getConversationsAdmin(adminId: string): Promise<ConversationItem[
   });
 }
 
-export async function getConversations(userId: string, role: string): Promise<ConversationItem[]> {
-  return role === "admin" ? getConversationsAdmin(userId) : getConversationsMembre(userId);
+// estAdmin (UserModel.estAdmin) plutôt que role : "admin" n'est plus un rôle
+// exclusif, un compte visiteur/vendeur normal peut porter ce privilège.
+export async function getConversations(userId: string, estAdmin: boolean): Promise<ConversationItem[]> {
+  return estAdmin ? getConversationsAdmin(userId) : getConversationsMembre(userId);
 }
 
 // Miroir des données passées à ConversationScreen (chat_screen.dart) : sur

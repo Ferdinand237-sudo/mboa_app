@@ -42,18 +42,17 @@ export function ConversationView({
   conversation,
   initialMessages,
   currentUserId,
-  currentUserRole,
+  estAdmin,
 }: {
   conversation: ConversationDetail;
   initialMessages: MessageRow[];
   currentUserId: string;
-  currentUserRole: string;
+  estAdmin: boolean;
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [texte, setTexte] = useState("");
   const [assignedAdminId, setAssignedAdminId] = useState(conversation.assignedAdminId);
-  const estAdmin = currentUserRole === "admin";
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

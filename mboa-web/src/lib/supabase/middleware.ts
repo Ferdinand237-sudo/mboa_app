@@ -1,15 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Rafraîchit la session Supabase à chaque requête, propage les cookies mis à
-// jour vers le navigateur, et redirige un admin connecté vers /admin.
+// Rafraîchit la session Supabase à chaque requête et propage les cookies mis
+// à jour vers le navigateur.
 //
-// Miroir de MainScreen.initState côté mobile (role === 'admin' ->
-// context.go(AppRoutes.admin)) : sur le web il n'y a pas d'IndexedStack
-// unique à rediriger en interne au login, donc c'est fait ici, en amont de
-// CHAQUE requête — pas seulement juste après la connexion — pour couvrir
-// aussi un onglet déjà ouvert, un lien direct, ou un simple clic sur le
-// logo qui ramènerait sinon un admin vers les pages étudiant/visiteur.
+// Ne redirige plus systématiquement un admin/ambassadeur vers /admin ou
+// /ambassadeur : depuis que ces rôles sont des privilèges superposables
+// (estAdmin/estAmbassadeur) plutôt qu'un rôle exclusif, un compte promu
+// garde l'expérience de son compte initial par défaut et entre dans son
+// espace dédié via le lien "Administration"/"Espace ambassadeur" du profil
+// (voir profil/page.tsx et header-client.tsx pour la navigation devenue
+// sensible au chemin courant).
 export async function updateSession(request: NextRequest) {
   // Filet de sécurité OAuth : si le ?code=... PKCE atterrit ailleurs que sur
   // /auth/callback (ex. Supabase retombe sur le Site URL du dashboard faute
@@ -47,16 +48,9 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (user && !request.nextUrl.pathname.startsWith("/admin")) {
-    const { data } = await supabase.from("users").select("role").eq("id", user.id).single();
-    if (data?.role === "admin") {
-      return NextResponse.redirect(new URL("/admin", request.url));
-    }
-  }
+  // Garde la session à jour côté cookies ; ne fait plus de lecture ni de
+  // redirection basée sur le rôle ici (voir commentaire de fonction).
+  await supabase.auth.getUser();
 
   return supabaseResponse;
 }
