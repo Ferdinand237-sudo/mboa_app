@@ -6,6 +6,9 @@ import '../../market/screens/article_detail_screen.dart';
 import 'edit_logement_screen.dart';
 import '../../market/screens/edit_article_screen.dart';
 import '../../../core/mixins/refreshable_state.dart';
+import '../../../core/onboarding/tour_step.dart';
+import '../../../core/onboarding/tour_texts.dart';
+import '../../../core/onboarding/tour_button.dart';
 
 class GestionScreen extends StatefulWidget {
   const GestionScreen({super.key});
@@ -23,6 +26,25 @@ class _GestionScreenState extends State<GestionScreen>
   bool _peutArticle = false;
   List<Map<String, dynamic>> _logements = [];
   List<Map<String, dynamic>> _articles = [];
+
+  final _tourHeroKey = GlobalKey();
+  final _tourTabsKey = GlobalKey();
+  final _tourAnnonceKey = GlobalKey();
+  final _tourActionsKey = GlobalKey();
+
+  List<TourStep> get _tourSteps => buildTourSteps(
+        [_tourHeroKey, _tourTabsKey, _tourAnnonceKey, _tourActionsKey],
+        tourGestionTexts,
+      );
+
+  // Le tour ne met en avant que la première annonce de l'onglet affiché par
+  // défaut (Logements si l'utilisateur peut en publier, sinon Articles) —
+  // suffisant pour illustrer le pattern, pas besoin de cibler chaque carte.
+  GlobalKey? _tourKeyPourItem(bool estLogement, int index) {
+    if (index != 0) return null;
+    final estListePrincipale = _peutLogement ? estLogement : !estLogement;
+    return estListePrincipale ? _tourAnnonceKey : null;
+  }
 
   @override
   void initState() {
@@ -167,8 +189,17 @@ class _GestionScreenState extends State<GestionScreen>
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
-          title: const Text('📋 Gestion',
-              style: TextStyle(fontFamily: 'Poppins', fontSize: 18, fontWeight: FontWeight.w800, color: MboaColors.text)),
+          title: KeyedSubtree(
+            key: _tourHeroKey,
+            child: const Text('📋 Gestion',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 18, fontWeight: FontWeight.w800, color: MboaColors.text)),
+          ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: TourButton(steps: _tourSteps),
+            ),
+          ],
         ),
         body: RefreshIndicator(
           color: MboaColors.primary,
@@ -183,18 +214,33 @@ class _GestionScreenState extends State<GestionScreen>
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text('📋 Gestion',
-            style: TextStyle(fontFamily: 'Poppins', fontSize: 18, fontWeight: FontWeight.w800, color: MboaColors.text)),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: MboaColors.primary,
-          unselectedLabelColor: MboaColors.textMuted,
-          indicatorColor: MboaColors.primary,
-          labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w700),
-          tabs: [
-            Tab(text: '🏠 Logements (${_logements.length})'),
-            Tab(text: '🛒 Articles (${_articles.length})'),
-          ],
+        title: KeyedSubtree(
+          key: _tourHeroKey,
+          child: const Text('📋 Gestion',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 18, fontWeight: FontWeight.w800, color: MboaColors.text)),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: TourButton(steps: _tourSteps),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(kTextTabBarHeight),
+          child: KeyedSubtree(
+            key: _tourTabsKey,
+            child: TabBar(
+              controller: _tabController,
+              labelColor: MboaColors.primary,
+              unselectedLabelColor: MboaColors.textMuted,
+              indicatorColor: MboaColors.primary,
+              labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w700),
+              tabs: [
+                Tab(text: '🏠 Logements (${_logements.length})'),
+                Tab(text: '🛒 Articles (${_articles.length})'),
+              ],
+            ),
+          ),
         ),
       ),
       body: RefreshIndicator(
@@ -224,6 +270,8 @@ class _GestionScreenState extends State<GestionScreen>
               context, MaterialPageRoute(builder: (_) => EditLogementScreen(logement: _logements[index])));
           if (modifie == true) _charger();
         },
+        tourKey: _tourKeyPourItem(true, index),
+        actionsTourKey: _tourKeyPourItem(true, index) != null ? _tourActionsKey : null,
       ),
     );
   }
@@ -244,6 +292,8 @@ class _GestionScreenState extends State<GestionScreen>
               context, MaterialPageRoute(builder: (_) => EditArticleScreen(article: _articles[index])));
           if (modifie == true) _charger();
         },
+        tourKey: _tourKeyPourItem(false, index),
+        actionsTourKey: _tourKeyPourItem(false, index) != null ? _tourActionsKey : null,
       ),
     );
   }
@@ -254,11 +304,15 @@ class _GestionScreenState extends State<GestionScreen>
     required String emoji,
     required VoidCallback onTap,
     required VoidCallback onEdit,
+    GlobalKey? tourKey,
+    GlobalKey? actionsTourKey,
   }) {
     final photos = item['photos'] as List? ?? [];
     final estDisponible = item['statut'] == 'disponible';
     final statutModeration = item['statut_moderation'] as String? ?? 'publie';
-    return Container(
+    return KeyedSubtree(
+      key: tourKey,
+      child: Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -342,7 +396,9 @@ class _GestionScreenState extends State<GestionScreen>
           const SizedBox(height: 10),
           const Divider(height: 1),
           const SizedBox(height: 8),
-          Row(
+          KeyedSubtree(
+            key: actionsTourKey,
+            child: Row(
             children: [
               Expanded(
                 child: TextButton.icon(
@@ -381,8 +437,10 @@ class _GestionScreenState extends State<GestionScreen>
                 ),
               ),
             ],
+            ),
           ),
         ],
+      ),
       ),
     );
   }

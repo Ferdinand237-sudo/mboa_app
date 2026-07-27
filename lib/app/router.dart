@@ -10,6 +10,7 @@ import '../features/auth/screens/demande_vendeur_screen.dart';
 import '../features/home/screens/main_screen.dart';
 import '../features/auth/screens/register_etudiant_screen.dart';
 import '../features/admin/screens/admin_screen.dart';
+import '../features/ambassadeur/screens/ambassadeur_screen.dart';
 import '../features/splash/screens/splash_screen.dart';
 import '../features/auth/screens/reset_password_screen.dart';
 
@@ -23,6 +24,7 @@ class AppRoutes {
   static const String main           = '/main';
   static const String registerEtudiant  = '/register/etudiant';
   static const String admin = '/admin';
+  static const String ambassadeur = '/ambassadeur';
   static const String resetPassword = '/reset-password';
 }
 
@@ -112,6 +114,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.admin,
         builder: (context, state) => const AdminScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.ambassadeur,
+        builder: (context, state) => const AmbassadeurScreen(),
       ),
       GoRoute(
         path: AppRoutes.resetPassword,

@@ -335,6 +335,13 @@ class _ProfilScreenState extends State<ProfilScreen> with RefreshableState {
 
   bool get _isConnected => _supabase.auth.currentUser != null;
 
+  // role reste l'identité de base (visiteur/vendeur) ; est_admin/
+  // est_ambassadeur sont des privilèges superposés — le || sur role garde
+  // une compatibilité défensive avec d'éventuels comptes non migrés.
+  bool get _estAdmin => _user?['role'] == 'admin' || _user?['est_admin'] == true;
+  bool get _estAmbassadeur =>
+      _user?['role'] == 'ambassadeur' || _user?['est_ambassadeur'] == true;
+
   String get _initiales {
     final nom = _user?['nom'] ?? '';
     final parts = nom.trim().split(' ');
@@ -539,6 +546,37 @@ class _ProfilScreenState extends State<ProfilScreen> with RefreshableState {
 
           const SizedBox(height: 16),
 
+          // ── Espaces privilégiés ───────────────────────────
+          // Admin/ambassadeur sont des privilèges superposés au compte
+          // visiteur/vendeur (est_admin/est_ambassadeur) plutôt qu'un rôle
+          // exclusif : ce compte garde sa navigation habituelle ci-dessous,
+          // avec ces liens en plus pour entrer dans l'espace dédié — voir
+          // roles_multiples_admin_ambassadeur et ambassadeur_screen.dart.
+          if (_estAdmin || _estAmbassadeur) ...[
+            _buildSection(
+              titre: 'Espaces privilégiés',
+              items: [
+                if (_estAdmin)
+                  _buildMenuItem(
+                    icon: Icons.shield_rounded,
+                    color: MboaColors.accent,
+                    label: 'Administration',
+                    subtitle: 'Dashboard, utilisateurs, annonces, signalements...',
+                    onTap: () => context.push(AppRoutes.admin),
+                  ),
+                if (_estAmbassadeur)
+                  _buildMenuItem(
+                    icon: Icons.explore_rounded,
+                    color: MboaColors.primaryDark,
+                    label: 'Espace ambassadeur',
+                    subtitle: 'Vérifications terrain assignées',
+                    onTap: () => context.push(AppRoutes.ambassadeur),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+
           // ── Mes activités ────────────────────────────────
           _buildSection(
             titre: 'Mes activités',
@@ -716,13 +754,11 @@ class _ProfilScreenState extends State<ProfilScreen> with RefreshableState {
                           ),
                         ),
                         Text(
-                          _user?['role'] == 'vendeur'
-                              ? '🏪 Vendeur / Commerçant'
-                              : _user?['role'] == 'admin'
-                                  ? '👑 Administrateur'
-                                  : _user?['role'] == 'ambassadeur'
-                                      ? '🧭 Ambassadeur Mboa'
-                                      : '🎓 Étudiant / Visiteur',
+                          (_user?['role'] == 'vendeur'
+                                  ? '🏪 Vendeur / Commerçant'
+                                  : '🎓 Étudiant / Visiteur') +
+                              (_estAdmin ? ' · 👑 Administrateur' : '') +
+                              (_estAmbassadeur ? ' · 🧭 Ambassadeur' : ''),
                           style: const TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 13,

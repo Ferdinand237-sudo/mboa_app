@@ -21,6 +21,11 @@ class UserModel {
   final double? lat;
   final double? lng;
 
+  // Privilèges superposés au compte de base (role reste 'visiteur' ou
+  // 'vendeur') : voir la migration roles_multiples_admin_ambassadeur.
+  final bool estAdmin;
+  final bool estAmbassadeur;
+
   UserModel({
     required this.id,
     required this.nom,
@@ -41,10 +46,15 @@ class UserModel {
     this.emplacementCommerce,
     this.lat,
     this.lng,
+    this.estAdmin = false,
+    this.estAmbassadeur = false,
   });
 
   // ── Getters utiles ────────────────────────────────────────
-  bool get isAdmin        => role == 'admin';
+  // role == 'admin'/'ambassadeur' : compatibilité défensive avec
+  // d'éventuels comptes non migrés vers le modèle de privilèges superposés.
+  bool get isAdmin        => role == 'admin' || estAdmin;
+  bool get isAmbassadeur  => role == 'ambassadeur' || estAmbassadeur;
   bool get isVendeur      => role == 'vendeur';
   bool get isVisiteur     => role == 'visiteur';
   bool get isProprietaire => sousRoles.contains('proprietaire');
@@ -85,6 +95,8 @@ class UserModel {
       emplacementCommerce: map['emplacement_commerce'],
       lat: map['lat'] != null ? (map['lat']).toDouble() : null,
       lng: map['lng'] != null ? (map['lng']).toDouble() : null,
+      estAdmin: map['est_admin'] ?? false,
+      estAmbassadeur: map['est_ambassadeur'] ?? false,
     );
   }
 
@@ -110,6 +122,8 @@ class UserModel {
       'emplacement_commerce': emplacementCommerce,
       'lat': lat,
       'lng': lng,
+      'est_admin': estAdmin,
+      'est_ambassadeur': estAmbassadeur,
     };
   }
 
@@ -131,6 +145,8 @@ class UserModel {
     String? emplacementCommerce,
     double? lat,
     double? lng,
+    bool? estAdmin,
+    bool? estAmbassadeur,
   }) {
     return UserModel(
       id: id,
@@ -152,6 +168,8 @@ class UserModel {
       emplacementCommerce: emplacementCommerce ?? this.emplacementCommerce,
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
+      estAdmin: estAdmin ?? this.estAdmin,
+      estAmbassadeur: estAmbassadeur ?? this.estAmbassadeur,
     );
   }
 }

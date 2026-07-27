@@ -36,10 +36,8 @@ final isLoggedInProvider = Provider<bool>((ref) {
 // ── Notifier pour les actions auth ───────────────────────
 class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
   final AuthService _authService;
-  final Ref _ref;
 
-  AuthNotifier(this._authService, this._ref)
-      : super(const AsyncValue.loading()) {
+  AuthNotifier(this._authService, Ref ref) : super(const AsyncValue.loading()) {
     _init();
   }
 

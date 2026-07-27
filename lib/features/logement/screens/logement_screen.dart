@@ -24,7 +24,6 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
   bool _isLoading = true;
   String _selectedType = 'Tous';
   double _prixMax = 60000;
-  String _selectedDistance = 'Toutes';
   int _noteMin = 0;
   bool _showFiltres = false;
 
@@ -466,7 +465,6 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
                           onTap: () => setState(() {
                             _selectedType = 'Tous';
                             _prixMax = 60000;
-                            _selectedDistance = 'Toutes';
                             _noteMin = 0;
                             _showFiltres = false;
                             _searchController.clear();
@@ -828,7 +826,6 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
             onTap: () => setState(() {
               _selectedType = 'Tous';
               _prixMax = 60000;
-              _selectedDistance = 'Toutes';
               _noteMin = 0;
               _searchController.clear();
               _chargerLogements();
