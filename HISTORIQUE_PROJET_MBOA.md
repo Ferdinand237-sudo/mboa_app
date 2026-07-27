@@ -1,7 +1,7 @@
 # Historique complet du projet Mboa
 
 Document généré à partir de l'historique Git réel du dépôt `mboa_app`
-(98 commits, 28 Pull Requests, du 6 juin au 27 juillet 2026) et des échanges
+(30 Pull Requests à ce jour, du 6 juin au 27 juillet 2026) et des échanges
 de cette collaboration. Sert de référence complète : ce qui a été construit,
 modifié, corrigé, et l'état actuel du projet.
 
@@ -45,6 +45,14 @@ Port complet de l'app Flutter vers le web (Next.js 16 + Supabase),
 écran par écran, jusqu'à couverture totale, puis itérations de design,
 corrections de bugs, et fonctionnalités additionnelles propres au web
 (visite guidée interactive, refonte du système de rôles admin/ambassadeur).
+
+### Phase 3 — Rattrapage mobile (27 juillet 2026)
+
+Deux fonctionnalités nées côté web pendant la Phase 2 (rôles
+admin/ambassadeur superposables, visite guidée) n'avaient pas
+d'équivalent sur l'app Flutter — migration des deux vers mobile pour
+revenir à une parité complète entre les deux versions (détail en
+section 4.10).
 
 ---
 
@@ -332,7 +340,47 @@ vers `/admin` sur chaque page pour un compte admin.
 
 ---
 
-## 5. Infrastructure technique
+## 5. Phase 3 — Rattrapage mobile : rôles superposables + visite guidée (PR #30)
+
+Après la refonte des rôles côté web (4.9), un problème concret est
+apparu : la migration base de données (`role → est_admin/est_ambassadeur`)
+avait déjà été appliquée aux comptes réels, mais le code mobile testait
+encore `role == 'admin'` littéralement (`UserModel.isAdmin`,
+`MainScreen`) — les comptes admin/ambassadeur réels étaient donc
+**verrouillés hors de leur propre espace sur mobile** depuis cette
+migration. Corrigé en portant le modèle complet, pas seulement le
+correctif minimal :
+
+- **Rôles superposables (mobile)** : `MainScreen` ne redirige plus de
+  force ; `AmbassadeurScreen` devient un espace autonome au même titre
+  qu'`AdminScreen` (route `/ambassadeur`), accessible depuis
+  "Espaces privilégiés" dans le profil, avec un retour explicite vers
+  la navigation de base ("← Mon compte", ajouté aussi à `AdminScreen`).
+  `admin_users_screen.dart` gagne les bascules **Nommer admin** /
+  **Nommer ambassadeur** et l'affichage de badges multiples.
+  `UserModel` gagne `estAdmin`/`estAmbassadeur` (getters, `fromMap`,
+  `toMap`, `copyWith`).
+- **Visite guidée (mobile)** : portage du moteur `GuidedTour` web en
+  Dart (`lib/core/onboarding/`) — même logique de halo + bulle
+  Suivant/Précédent/Passer, mais positionnée via `GlobalKey` Flutter
+  plutôt que des sélecteurs `data-tour` (pas d'équivalent DOM en
+  Flutter). Une étape dont la cible n'est pas montée pour le rôle/état
+  courant est sautée automatiquement, comme sur le web. Bouton
+  *"🧭 Comment utiliser ?"* sur l'accueil (visiteur/étudiant/vendeur),
+  Publier et Gestion ; lancement automatique unique pour le visiteur
+  non connecté sur l'accueil (`SharedPreferences`, équivalent mobile du
+  `localStorage` web).
+- **Contrainte particulière** : aucun SDK Flutter n'était disponible
+  dans l'environnement de développement au moment d'écrire ce code —
+  tout a été relu manuellement (pas de vérification par compilateur)
+  jusqu'à ce que `flutter analyze` soit installé après coup, qui n'a
+  révélé aucune erreur sur le nouveau code. À cette occasion, nettoyage
+  de code mort préexistant signalé par l'outil (3 champs jamais lus,
+  un dossier d'assets déclaré mais inexistant).
+
+---
+
+## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
 - **Tables principales** : `users`, `logements`, `articles`,
@@ -358,7 +406,7 @@ vers `/admin` sur chaque page pour un compte admin.
 
 ---
 
-## 6. Bugs notables corrigés (toutes plateformes)
+## 7. Bugs notables corrigés (toutes plateformes)
 
 | Bug | Contexte |
 |---|---|
@@ -374,10 +422,11 @@ vers `/admin` sur chaque page pour un compte admin.
 | Crash silencieux à la création d'un ambassadeur | Mobile |
 | Blocage indéfini à l'upload de photos | Mobile |
 | Realtime jamais reçu sur verifications_terrain/signalements | Tables absentes de la publication `supabase_realtime` |
+| Comptes admin/ambassadeur réels verrouillés hors de leur espace | Mobile, après la migration `est_admin`/`est_ambassadeur` côté web (4.9) — `UserModel.isAdmin`/`MainScreen` testaient encore `role == 'admin'` littéralement |
 
 ---
 
-## 7. Tableau récapitulatif des Pull Requests (mboa-web)
+## 8. Tableau récapitulatif des Pull Requests
 
 | PR | Date | Titre |
 |---|---|---|
@@ -409,21 +458,31 @@ vers `/admin` sur chaque page pour un compte admin.
 | #26 | 26/07 | Visite guidée : vendeurs, visiteurs inscrits, Publier/Gestion |
 | #27 | 27/07 | Fix : décalage du halo de la visite guidée sur mobile |
 | #28 | 27/07 | Admin/ambassadeur deviennent des privilèges superposables |
+| #29 | 27/07 | Doc : ajoute l'historique complet du projet Mboa |
+| #30 | 27/07 | Mobile : parité admin/ambassadeur + visite guidée |
 
-*Toutes fusionnées dans `main`.*
+*Toutes fusionnées dans `main`, à l'exception de la #30, ouverte au
+moment de la rédaction de cette section.*
 
 ---
 
-## 8. État actuel
+## 9. État actuel
 
 - **Mobile** : app Flutter complète — auth, logements, market, chat,
-  profil, publication, admin, ambassadeur, modération IA, vérification
-  terrain, notifications push, temps réel, mode hors ligne.
-- **Web** : couverture intégrale des écrans mobiles, plus une visite
-  guidée interactive propre au web et un modèle de rôles admin/
-  ambassadeur superposables plus flexible que sur mobile pour l'instant.
+  profil, publication, admin, ambassadeur (désormais des privilèges
+  superposables comme sur le web, voir section 5), modération IA,
+  vérification terrain, notifications push, temps réel, mode hors
+  ligne, visite guidée interactive (accueil/Publier/Gestion).
+- **Web** : couverture intégrale des écrans mobiles, plus le modèle de
+  rôles admin/ambassadeur superposables et la visite guidée — les deux
+  désormais également disponibles côté mobile (PR #30, non encore
+  vérifiée sur device réel au moment de la rédaction).
+- **Parité mobile/web** : atteinte sur le plan fonctionnel après le
+  rattrapage de la Phase 3. Reste une différence de méthode : le web
+  utilise `data-tour` + sélecteurs DOM pour la visite guidée, le mobile
+  utilise des `GlobalKey` Flutter (pas d'équivalent direct entre les
+  deux plateformes).
 - **Pistes ouvertes** (mentionnées en cours de route, non traitées) :
   clé API Gemini en quota dépassé (modération IA de contenu inopérante
   depuis plusieurs tentatives, seul le hachage perceptuel anti-fraude
-  fonctionne) ; le modèle de rôles superposables (est_admin/
-  est_ambassadeur) n'a pas encore d'équivalent côté app Flutter mobile.
+  fonctionne).
