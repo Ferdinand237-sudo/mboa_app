@@ -7,6 +7,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/services/ville_service.dart';
+import '../../../core/models/ville_model.dart';
 import '../../logement/screens/logement_detail_screen.dart';
 import 'lieux_recherche_resultats_screen.dart';
 
@@ -39,7 +41,11 @@ class _MapScreenState extends State<MapScreen> {
   final Map<Marker, Map<String, dynamic>> _markerLogementData = {};
   final Map<Marker, Map<String, dynamic>> _markerLieuData = {};
 
-  // Centre de la carte (Sangmelima ou logement ciblé)
+  // Ville actuellement sélectionnée (Home l'a déjà résolue avant que cet
+  // écran soit accessible dans le parcours normal).
+  VilleModel? get _ville => VilleService.instance.selectedVille.value;
+
+  // Centre de la carte (ville sélectionnée, ou logement ciblé s'il y en a un)
   late final LatLng _center = widget.focusLogement != null &&
           widget.focusLogement!['lat'] != null &&
           widget.focusLogement!['lng'] != null
@@ -47,9 +53,9 @@ class _MapScreenState extends State<MapScreen> {
           (widget.focusLogement!['lat'] as num).toDouble(),
           (widget.focusLogement!['lng'] as num).toDouble(),
         )
-      : const LatLng(
-          AppConstants.defaultLat,
-          AppConstants.defaultLng,
+      : LatLng(
+          _ville?.lat ?? AppConstants.defaultLat,
+          _ville?.lng ?? AppConstants.defaultLng,
         );
 
   @override
@@ -61,6 +67,11 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _chargerDonnees() async {
+    final ville = _ville;
+    if (ville == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
     try {
       final results = await Future.wait([
         _supabase
@@ -68,9 +79,10 @@ class _MapScreenState extends State<MapScreen> {
             .select('*, proprietaire:users!proprietaire_id(nom, verified)')
             .eq('statut', 'disponible')
             .eq('statut_moderation', 'publie')
+            .eq('ville', ville.nom)
             .not('lat', 'is', null)
             .not('lng', 'is', null),
-        _supabase.from('lieux_publics').select(),
+        _supabase.from('lieux_publics').select().eq('ville', ville.nom),
       ]);
 
       if (mounted) {
@@ -267,6 +279,23 @@ class _MapScreenState extends State<MapScreen> {
       final position = await Geolocator.getCurrentPosition();
       if (!mounted) return;
 
+      // Le lieu doit être tagué avec la ville couverte la plus proche de sa
+      // position réelle (pas la ville actuellement affichée sur la carte) :
+      // un admin déplacé peut ajouter un lieu ailleurs que la ville en cours.
+      final villeDetectee = VilleService.instance
+          .villeProchePosition(position.latitude, position.longitude);
+      if (villeDetectee == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cette position est hors des villes couvertes par Mboa'),
+              backgroundColor: MboaColors.danger,
+            ),
+          );
+        }
+        return;
+      }
+
       final nomController = TextEditingController();
       String categorieChoisie = 'autre';
 
@@ -368,6 +397,7 @@ class _MapScreenState extends State<MapScreen> {
         'categorie': categorieChoisie,
         'lat': position.latitude,
         'lng': position.longitude,
+        'ville': villeDetectee.nom,
         'cree_par': _supabase.auth.currentUser?.id,
       });
 
@@ -420,7 +450,7 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Sangmelima · ${_filteredLogements.length} logement${_filteredLogements.length > 1 ? 's' : ''} · ${_lieuxPublics.length} lieu${_lieuxPublics.length > 1 ? 'x' : ''}',
+                    '${_ville?.nom ?? ''} · ${_filteredLogements.length} logement${_filteredLogements.length > 1 ? 's' : ''} · ${_lieuxPublics.length} lieu${_lieuxPublics.length > 1 ? 'x' : ''}',
                     style: MboaTextStyles.muted,
                   ),
                   const SizedBox(height: 12),
@@ -971,7 +1001,7 @@ class _MapScreenState extends State<MapScreen> {
                               color: MboaColors.textMuted),
                           const SizedBox(width: 3),
                           Text(
-                            l['quartier'] ?? 'Sangmelima',
+                            l['quartier'] ?? l['ville'] ?? '',
                             style: MboaTextStyles.caption,
                           ),
                         ],

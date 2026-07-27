@@ -7,6 +7,7 @@ import '../../../core/widgets/mboa_cached_image.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../app/router.dart';
 import '../../../core/mixins/refreshable_state.dart';
+import '../../../core/services/ville_service.dart';
 import 'logement_detail_screen.dart';
 
 class LogementScreen extends StatefulWidget {
@@ -38,6 +39,7 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
   @override
   void initState() {
     super.initState();
+    VilleService.instance.selectedVille.addListener(_chargerLogements);
     _chargerLogements();
   }
 
@@ -45,6 +47,7 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
   void dispose() {
     _searchController.dispose();
     _debounce?.cancel();
+    VilleService.instance.selectedVille.removeListener(_chargerLogements);
     super.dispose();
   }
 
@@ -53,13 +56,19 @@ class _LogementScreenState extends State<LogementScreen> with RefreshableState {
 
   Future<void> _chargerLogements() async {
     final requestId = ++_requestId;
+    final ville = VilleService.instance.selectedVille.value;
+    if (ville == null) {
+      setState(() { _logements = []; _isLoading = false; });
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       var query = _supabase
           .from('logements')
           .select('*, proprietaire:users!proprietaire_id(nom, photo_url, verified, note_globale, nb_avis)')
           .eq('statut', 'disponible')
-          .eq('statut_moderation', 'publie');
+          .eq('statut_moderation', 'publie')
+          .eq('ville', ville.nom);
 
       if (_selectedType != 'Tous') {
         query = query.eq('type', _selectedType);

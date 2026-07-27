@@ -10,6 +10,7 @@ import '../../../core/mixins/refreshable_state.dart';
 import '../../../core/onboarding/tour_step.dart';
 import '../../../core/onboarding/tour_texts.dart';
 import '../../../core/onboarding/tour_button.dart';
+import '../../../core/services/ville_service.dart';
 
 // Attend le résultat de l'analyse de modération IA (moderate-annonce) sur la
 // ligne fraîchement insérée, via un canal realtime ciblé sur son id — fermé
@@ -549,6 +550,25 @@ class _FormLogementState extends State<_FormLogement> {
       return;
     }
 
+    // Ville dérivée de la position GPS captée du bien (la ville la plus
+    // proche) plutôt que de la ville actuellement parcourue par le vendeur —
+    // un logement doit être tagué avec la ville où il se trouve réellement.
+    // Repli sur la ville en cours si aucune position n'a été captée ou
+    // qu'elle tombe hors de toute ville couverte.
+    final villeLogement = (_lat != null && _lng != null
+            ? VilleService.instance.villeProchePosition(_lat!, _lng!)
+            : null) ??
+        VilleService.instance.selectedVille.value;
+    if (villeLogement == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de déterminer la ville : capturez la position GPS du logement'),
+          backgroundColor: MboaColors.danger,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -568,7 +588,7 @@ class _FormLogementState extends State<_FormLogement> {
         'photos': photoUrls,
         'equipements': _selectedEquipements,
         'quartier': _quartierController.text.trim(),
-        'ville': AppConstants.defaultVille,
+        'ville': villeLogement.nom,
         'lat': _lat,
         'lng': _lng,
         'proprietaire_id':
@@ -1239,6 +1259,20 @@ class _FormArticleState extends State<_FormArticle> {
       return;
     }
 
+    // Aucune position GPS n'est captée pour un article (contrairement à un
+    // logement) : la ville est celle actuellement sélectionnée par le
+    // vendeur au moment de la publication.
+    final villeArticle = VilleService.instance.selectedVille.value;
+    if (villeArticle == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sélectionnez d\'abord votre ville depuis l\'accueil'),
+          backgroundColor: MboaColors.danger,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -1254,6 +1288,7 @@ class _FormArticleState extends State<_FormArticle> {
         'negociable': _negociable,
         'accepte_avis': _accepteAvis,
         'photos': photoUrls,
+        'ville': villeArticle.nom,
         'vendeur_id': _supabase.auth.currentUser!.id,
         'statut': AppConstants.statutDisponible,
         'boosted': false,

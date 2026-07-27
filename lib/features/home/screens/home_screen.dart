@@ -17,6 +17,8 @@ import '../../../core/mixins/refreshable_state.dart';
 import '../../../app/router.dart';
 import '../../../core/onboarding/tour_step.dart';
 import '../../../core/onboarding/tour_button.dart';
+import '../../../core/services/ville_service.dart';
+import '../../../core/models/ville_model.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onNavigateLogement;
@@ -60,19 +62,38 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
   // ── Trouve ton Mboa ──────────────────────────────────────
   double? _refLat;
   double? _refLng;
-  String _refNom = 'Sangmelima';
+  String _refNom = '';
   double _rayonKm = 2;
   bool _isLoadingProches = false;
   List<Map<String, dynamic>> _logementsProches = [];
   List<Map<String, dynamic>> _lieuxPublics = [];
+
+  // ── Ville sélectionnée ────────────────────────────────────
+  bool _propositionVillesAffichee = false;
 
   bool get _isLoggedIn => _supabase.auth.currentUser != null;
 
   @override
   void initState() {
     super.initState();
+    VilleService.instance.selectedVille.addListener(_onVilleChanged);
+    _initVille();
+  }
+
+  @override
+  void dispose() {
+    VilleService.instance.selectedVille.removeListener(_onVilleChanged);
+    super.dispose();
+  }
+
+  Future<void> _initVille() async {
+    await VilleService.instance.init();
+    if (mounted) await _chargerDonnees();
+    _verifierProposerVilles();
+  }
+
+  void _onVilleChanged() {
     _chargerDonnees();
-    _initTrouveTonMboa();
   }
 
   @override
@@ -85,7 +106,27 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
       _chargerUser(),
       _chargerContributeurs(),
       _verifierNotifications(),
+      _chargerLieuxPublics(),
+      _resoudreReferenceProximite(),
     ]);
+  }
+
+  // Si la ville détectée automatiquement n'a encore aucune annonce (ou
+  // qu'aucune ville n'a pu être détectée), propose la liste des villes
+  // couvertes une seule fois par session — pas à chaque rechargement, et
+  // jamais quand l'utilisateur a choisi lui-même une ville vide en
+  // connaissance de cause.
+  void _verifierProposerVilles() {
+    if (_propositionVillesAffichee) return;
+    final ville = VilleService.instance.selectedVille.value;
+    final aucuneAnnonce = _logements.isEmpty && _articles.isEmpty;
+    if ((ville == null || aucuneAnnonce) &&
+        VilleService.instance.villesActives.isNotEmpty) {
+      _propositionVillesAffichee = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _choisirVille(introduction: true);
+      });
+    }
   }
 
   Future<void> _chargerUser() async {
@@ -108,12 +149,18 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
   }
 
   Future<void> _chargerLogements() async {
+    final ville = VilleService.instance.selectedVille.value;
+    if (ville == null) {
+      if (mounted) setState(() { _logements = []; _isLoadingLogements = false; });
+      return;
+    }
     try {
       final data = await _supabase
           .from('logements')
           .select('*, proprietaire:users!proprietaire_id(nom, verified, note_globale, nb_avis)')
           .eq('statut', 'disponible')
           .eq('statut_moderation', 'publie')
+          .eq('ville', ville.nom)
           .order('boosted', ascending: false)
           .order('date_publication', ascending: false)
           .limit(6);
@@ -129,12 +176,18 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
   }
 
   Future<void> _chargerArticles() async {
+    final ville = VilleService.instance.selectedVille.value;
+    if (ville == null) {
+      if (mounted) setState(() { _articles = []; _isLoadingArticles = false; });
+      return;
+    }
     try {
       final data = await _supabase
           .from('articles')
           .select('*, vendeur:users!vendeur_id(nom, verified)')
           .eq('statut', 'disponible')
           .eq('statut_moderation', 'publie')
+          .eq('ville', ville.nom)
           .order('boosted', ascending: false)
           .order('date_publication', ascending: false)
           .limit(6);
@@ -172,15 +225,34 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
   }
 
   // ── Trouve ton Mboa : position réelle ou lieu choisi ─────
-  Future<void> _initTrouveTonMboa() async {
+  // lieux_publics filtré par ville sélectionnée : sans ça, les repères de
+  // Kribi apparaîtraient dans "Choisir un lieu" en parcourant Sangmelima.
+  Future<void> _chargerLieuxPublics() async {
+    final ville = VilleService.instance.selectedVille.value;
+    if (ville == null) {
+      if (mounted) setState(() => _lieuxPublics = []);
+      return;
+    }
     try {
-      final lieux = await _supabase.from('lieux_publics').select('id, nom, categorie, lat, lng').order('nom');
+      final lieux = await _supabase
+          .from('lieux_publics')
+          .select('id, nom, categorie, lat, lng')
+          .eq('ville', ville.nom)
+          .order('nom');
       if (mounted) setState(() => _lieuxPublics = List<Map<String, dynamic>>.from(lieux));
     } catch (_) {}
+  }
 
-    double lat = AppConstants.defaultLat;
-    double lng = AppConstants.defaultLng;
-    String nom = AppConstants.defaultVille;
+  // Point de référence pour la recherche de proximité : le centre de la
+  // ville sélectionnée par défaut, remplacé par la position GPS réelle si
+  // elle tombe dans le rayon de couverture de cette ville (résultats plus
+  // précis qu'un simple centre-ville quand c'est possible).
+  Future<void> _resoudreReferenceProximite() async {
+    final ville = VilleService.instance.selectedVille.value;
+    if (ville == null) return;
+    double lat = ville.lat;
+    double lng = ville.lng;
+    String nom = ville.nom;
 
     try {
       if (await Geolocator.isLocationServiceEnabled()) {
@@ -189,10 +261,12 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
           permission = await Geolocator.requestPermission();
         }
         if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
-          final position = await Geolocator.getCurrentPosition();
+          final position = await Geolocator.getCurrentPosition(
+            timeLimit: const Duration(seconds: 15),
+          );
           final distanceVilleM = Geolocator.distanceBetween(
-              position.latitude, position.longitude, AppConstants.defaultLat, AppConstants.defaultLng);
-          if (distanceVilleM <= 30000) {
+              position.latitude, position.longitude, ville.lat, ville.lng);
+          if (distanceVilleM <= ville.rayonCouvertureKm * 1000) {
             lat = position.latitude;
             lng = position.longitude;
             nom = 'ta position';
@@ -207,7 +281,7 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
         _refLng = lng;
         _refNom = nom;
       });
-      _rechercherProches();
+      await _rechercherProches();
     }
   }
 
@@ -229,6 +303,63 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
     } catch (e) {
       if (mounted) setState(() => _isLoadingProches = false);
     }
+  }
+
+  // introduction: true quand affiché automatiquement parce que la ville
+  // détectée n'a pas (encore) d'annonces — message d'accueil différent
+  // d'un changement de ville volontaire.
+  void _choisirVille({bool introduction = false}) {
+    final villes = VilleService.instance.villesActives;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                introduction
+                    ? 'Mboa n\'est pas encore très actif ici, mais couvre déjà ces villes :'
+                    : 'Choisir une ville',
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w800, color: MboaColors.text),
+              ),
+              const SizedBox(height: 14),
+              if (villes.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Text('Aucune ville disponible pour le moment', style: MboaTextStyles.muted),
+                )
+              else
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: villes.length,
+                    itemBuilder: (context, index) {
+                      final ville = villes[index];
+                      final estSelectionnee = VilleService.instance.selectedVille.value?.id == ville.id;
+                      return ListTile(
+                        leading: const Icon(Icons.location_city_rounded, color: MboaColors.primary),
+                        title: Text(ville.nom, style: MboaTextStyles.body),
+                        trailing: estSelectionnee ? const Icon(Icons.check_circle_rounded, color: MboaColors.verified) : null,
+                        onTap: () {
+                          Navigator.pop(context);
+                          VilleService.instance.selectVille(ville);
+                        },
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _choisirLieu() {
@@ -342,15 +473,23 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
                                       'Bienvenue sur Mboa',
                                       style: TextStyle(fontFamily: 'Poppins', fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white),
                                     ),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.location_on_rounded, color: Colors.white70, size: 14),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          AppConstants.defaultVille,
-                                          style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Colors.white.withValues(alpha: 0.7)),
+                                    GestureDetector(
+                                      onTap: _choisirVille,
+                                      child: ValueListenableBuilder<VilleModel?>(
+                                        valueListenable: VilleService.instance.selectedVille,
+                                        builder: (context, ville, _) => Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.location_on_rounded, color: Colors.white70, size: 14),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              ville?.nom ?? 'Choisir une ville',
+                                              style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Colors.white.withValues(alpha: 0.7)),
+                                            ),
+                                            const Icon(Icons.expand_more_rounded, color: Colors.white70, size: 16),
+                                          ],
                                         ),
-                                      ],
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -982,7 +1121,7 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
                       const Icon(Icons.location_on_rounded, size: 11, color: MboaColors.textMuted),
                       const SizedBox(width: 2),
                       Expanded(
-                        child: Text(l['quartier'] ?? 'Sangmelima',
+                        child: Text(l['quartier'] ?? l['ville'] ?? '',
                             style: const TextStyle(fontFamily: 'Poppins', fontSize: 10, color: MboaColors.textMuted), overflow: TextOverflow.ellipsis),
                       ),
                     ],

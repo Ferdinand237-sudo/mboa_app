@@ -9,7 +9,9 @@ import 'admin_annonces_screen.dart';
 import 'admin_signalements_screen.dart';
 import 'admin_demandes_screen.dart';
 import 'admin_verifications_screen.dart';
+import 'admin_villes_screen.dart';
 import '../../../core/mixins/refreshable_state.dart';
+import '../../../core/services/ville_service.dart';
 // import 'admin_demandes_screen.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -235,6 +237,10 @@ class _DashboardTabState extends State<_DashboardTab> with RefreshableState {
   void initState() {
     super.initState();
     _chargerStats();
+    // Un admin peut arriver ici directement (redirection au login) sans
+    // jamais monter HomeScreen, seul autre point d'entrée qui initialise
+    // VilleService — nécessaire pour "Gérer la carte" et l'écran villes.
+    VilleService.instance.init();
   }
 
   @override
@@ -470,6 +476,19 @@ class _DashboardTabState extends State<_DashboardTab> with RefreshableState {
                         context,
                         MaterialPageRoute(
                           builder: (_) => const MapScreen(),
+                        ),
+                      ),
+                    ),
+                    _buildActionCard(
+                      icon: Icons.location_city_rounded,
+                      titre: 'Villes couvertes',
+                      desc:
+                          'Ajouter, désactiver ou ajuster une ville couverte par Mboa',
+                      color: MboaColors.accent,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminVillesScreen(),
                         ),
                       ),
                     ),

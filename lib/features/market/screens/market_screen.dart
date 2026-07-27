@@ -7,6 +7,7 @@ import '../../../core/widgets/mboa_cached_image.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../app/router.dart';
 import '../../../core/mixins/refreshable_state.dart';
+import '../../../core/services/ville_service.dart';
 import 'article_detail_screen.dart';
 
 class MarketScreen extends StatefulWidget {
@@ -35,6 +36,7 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
   @override
   void initState() {
     super.initState();
+    VilleService.instance.selectedVille.addListener(_chargerArticles);
     _chargerArticles();
   }
 
@@ -42,6 +44,7 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
   void dispose() {
     _searchController.dispose();
     _debounce?.cancel();
+    VilleService.instance.selectedVille.removeListener(_chargerArticles);
     super.dispose();
   }
 
@@ -50,6 +53,11 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
 
   Future<void> _chargerArticles() async {
     final requestId = ++_requestId;
+    final ville = VilleService.instance.selectedVille.value;
+    if (ville == null) {
+      setState(() { _articles = []; _isLoading = false; });
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       var query = _supabase
@@ -57,7 +65,8 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
           .select(
               '*, vendeur:users!vendeur_id(nom, photo_url, verified, note_globale)')
           .eq('statut', 'disponible')
-          .eq('statut_moderation', 'publie');
+          .eq('statut_moderation', 'publie')
+          .eq('ville', ville.nom);
 
       if (_selectedCategorie != 'Tous') {
         query = query.eq('categorie', _selectedCategorie);
