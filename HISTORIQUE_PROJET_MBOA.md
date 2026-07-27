@@ -161,6 +161,35 @@ l'objet de Pull Requests — commits directs sur la branche principale.)*
 - Blocage indéfini à l'upload de photos corrigé, publication accélérée.
 - Crash silencieux à la création d'un ambassadeur corrigé.
 
+### Vérification sur device réel et correctifs complémentaires (22 juillet)
+Session de test manuel sur un appareil Android réel (APK installé via
+`adb`, comptes de `COMPTES_TEST.md`), en parallèle du démarrage de la
+Phase 2 web. A révélé un bug architectural resté invisible jusque-là :
+- `conversations.non_lu` n'était initialisé qu'à la création d'une
+  conversation et jamais mis à jour ensuite — ni par un trigger serveur,
+  ni par le code client à l'envoi d'un message. Vérifié en insérant un
+  message de test directement en base : le compteur restait à 0 quel que
+  soit le nombre réel de messages non lus. Bug silencieux (aucune
+  erreur, juste un badge qui ne s'affichait jamais) présent depuis
+  l'origine de la fonctionnalité chat, sur mobile comme sur web. Corrigé
+  par un trigger d'incrémentation à l'insertion d'un message et une
+  fonction RPC de remise à zéro à la lecture
+  (`supabase/migrations/20260722120000_non_lu_messages.sql`).
+- Boutons retour/favori flottants du détail logement plaqués en position
+  fixe au-dessus de la galerie photo : restaient visibles par-dessus le
+  texte une fois la galerie scrollée hors de vue. Masqués au-delà du
+  seuil de la galerie via un `ScrollController`.
+- Bouton "Appeler" tronqué en "Appe..." sur écran étroit (détail
+  logement, détail article, profil vendeur) : l'ellipsis empêchait le
+  débordement de layout mais pas la troncature du mot lui-même ;
+  padding resserré pour lui redonner la place nécessaire.
+
+Création à cette occasion de `GUIDE_SESSIONS.md`, catalogue des pièges
+techniques récurrents du projet (types Postgrest, RLS silencieuse,
+colonnes jamais alimentées, timeouts réseau manquants, race conditions
+sur des listes rechargées...), à consulter avant de coder et à enrichir
+quand un nouveau piège générique apparaît.
+
 ---
 
 ## 4. Phase 2 — Détail des fonctionnalités Web (mboa-web)
@@ -412,8 +441,9 @@ correctif minimal :
 |---|---|
 | Race condition sur les filtres prix/note | Mobile, corrigée avant le port web |
 | Annonces validées par l'admin bloquées | Filtre `statut_moderation` mal appliqué |
-| Badge non-lu jamais incrémenté | Web, détail logement |
-| Boutons flottants chevauchant le contenu | Web, détail logement |
+| Badge non-lu jamais incrémenté | Bug architectural cross-plateforme : `conversations.non_lu` n'était mis à jour nulle part (ni trigger, ni client) — trouvé sur mobile via test device réel le 22/07, corrigé par trigger + RPC ; désynchronisation d'affichage similaire corrigée séparément côté web (PR #4/#5) |
+| Boutons flottants chevauchant le contenu | Détail logement, mobile (`ScrollController`, 22/07) et web (PR #4), corrigés séparément le même jour |
+| Bouton "Appeler" tronqué en "Appe..." | Mobile, détail logement/article/profil vendeur — l'ellipsis évitait le débordement mais pas la troncature |
 | Redirect email de confirmation cassé | Web, inscription |
 | Connexion Google jamais fonctionnelle (web) | Route `/auth/callback` manquante |
 | 25 logements affichés vs 34 sur la carte | Plafond de budget par défaut invisible |
@@ -461,8 +491,10 @@ correctif minimal :
 | #29 | 27/07 | Doc : ajoute l'historique complet du projet Mboa |
 | #30 | 27/07 | Mobile : parité admin/ambassadeur + visite guidée |
 
-*Toutes fusionnées dans `main`, à l'exception de la #30, ouverte au
-moment de la rédaction de cette section.*
+*Toutes fusionnées dans `main`, y compris la #30 — confirmée fusionnée
+et synchronisée en local le 27/07 (fast-forward propre, `flutter
+analyze` sans erreur après fusion, aucun conflit entre les correctifs
+mobile du 22/07 et le travail web/notifications qui a suivi).*
 
 ---
 
@@ -486,3 +518,12 @@ moment de la rédaction de cette section.*
   clé API Gemini en quota dépassé (modération IA de contenu inopérante
   depuis plusieurs tentatives, seul le hachage perceptuel anti-fraude
   fonctionne).
+- **Campagne de test manuel sur device réel** (Android, via `adb`,
+  comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
+  non inscrit et étudiant connecté couverts, ayant mené aux correctifs
+  de la section 3 ("Vérification sur device réel"). Parcours
+  vendeur/propriétaire et administrateur restent à tester, mis en pause
+  à la demande de Ferdinand pour reprise ultérieure.
+- **Synchronisation dépôt local/distant vérifiée le 27/07** : fast-forward
+  propre vers `main` (jusqu'à la PR #30 incluse), aucun commit local
+  perdu, `flutter analyze` sans erreur après fusion.
