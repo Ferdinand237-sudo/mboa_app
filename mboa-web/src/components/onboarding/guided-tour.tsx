@@ -7,6 +7,27 @@ function attendre(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
+// Attend la fin réelle du scroll déclenché par scrollIntoView avant de
+// mesurer la cible, au lieu d'un délai fixe : sur mobile, les formulaires en
+// une colonne demandent un scroll bien plus long qu'un délai qui suffit sur
+// desktop (ex. position GPS/bouton Publier tout en bas), ce qui capturait la
+// position en pleine animation et décalait durablement le halo par rapport
+// au bouton réel. On considère le scroll terminé quand la position de la
+// cible ne bouge plus entre deux mesures.
+async function attendreScrollStable(el: HTMLElement, maxMs = 1200): Promise<DOMRect> {
+  let precedent = el.getBoundingClientRect();
+  const debut = Date.now();
+  while (Date.now() - debut < maxMs) {
+    await attendre(60);
+    const actuel = el.getBoundingClientRect();
+    if (Math.abs(actuel.top - precedent.top) < 0.5 && Math.abs(actuel.left - precedent.left) < 0.5) {
+      return actuel;
+    }
+    precedent = actuel;
+  }
+  return el.getBoundingClientRect();
+}
+
 function cibleVisible(nom: string): HTMLElement | null {
   const elements = document.querySelectorAll<HTMLElement>(`[data-tour="${nom}"]`);
   for (const el of elements) {
@@ -72,8 +93,8 @@ export function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () 
         return;
       }
       el.scrollIntoView({ behavior: "smooth", block: "center" });
-      await attendre(220);
-      if (!annule) setRect(el.getBoundingClientRect());
+      const rectStable = await attendreScrollStable(el);
+      if (!annule) setRect(rectStable);
     }
     positionner();
     return () => {
@@ -81,14 +102,21 @@ export function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () 
     };
   }, [index, steps, onClose]);
 
-  // Recalcule la position si la fenêtre est redimensionnée pendant la visite.
+  // Recalcule la position si la fenêtre est redimensionnée, ou si la page
+  // défile pendant la visite (le clic hors de la bulle ferme la visite, mais
+  // un scroll tactile/molette passe au travers et doit garder le halo aligné
+  // sur la cible réelle).
   useEffect(() => {
     function recalc() {
       const el = cibleVisible(steps[index].target);
       if (el) setRect(el.getBoundingClientRect());
     }
     window.addEventListener("resize", recalc);
-    return () => window.removeEventListener("resize", recalc);
+    window.addEventListener("scroll", recalc, { passive: true, capture: true });
+    return () => {
+      window.removeEventListener("resize", recalc);
+      window.removeEventListener("scroll", recalc, true);
+    };
   }, [index, steps]);
 
   function fermer() {
