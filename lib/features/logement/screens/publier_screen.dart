@@ -7,6 +7,9 @@ import 'dart:io';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/mixins/refreshable_state.dart';
+import '../../../core/onboarding/tour_step.dart';
+import '../../../core/onboarding/tour_texts.dart';
+import '../../../core/onboarding/tour_button.dart';
 
 // Attend le résultat de l'analyse de modération IA (moderate-annonce) sur la
 // ligne fraîchement insérée, via un canal realtime ciblé sur son id — fermé
@@ -89,6 +92,33 @@ class _PublierScreenState extends State<PublierScreen>
   bool _peutLogement = false;
   bool _peutArticle = false;
   bool _compteActifPublication = true;
+
+  final _tourHeroKey = GlobalKey();
+  final _tourTabsKey = GlobalKey();
+  final _tourPhotosKeyLogement = GlobalKey();
+  final _tourGpsKeyLogement = GlobalKey();
+  final _tourSubmitKeyLogement = GlobalKey();
+  final _tourPhotosKeyArticle = GlobalKey();
+  final _tourSubmitKeyArticle = GlobalKey();
+
+  GlobalKey? get _tourTabsKeyOuNull => (_peutLogement && _peutArticle) ? _tourTabsKey : null;
+
+  // La visite pointe vers le formulaire réellement affiché par défaut
+  // (Logement si l'utilisateur peut en publier, sinon Article) — l'autre
+  // formulaire n'est pas monté tant qu'on ne bascule pas d'onglet, ses
+  // cibles seraient donc absentes.
+  List<TourStep> get _tourSteps {
+    if (_peutLogement) {
+      return buildTourSteps(
+        [_tourHeroKey, _tourTabsKeyOuNull, _tourPhotosKeyLogement, _tourGpsKeyLogement, _tourSubmitKeyLogement],
+        tourPublierTexts,
+      );
+    }
+    return buildTourSteps(
+      [_tourHeroKey, _tourTabsKeyOuNull, _tourPhotosKeyArticle, null, _tourSubmitKeyArticle],
+      tourPublierTexts,
+    );
+  }
 
   @override
   void initState() {
@@ -184,15 +214,34 @@ class _PublierScreenState extends State<PublierScreen>
                 width: double.infinity,
                 color: Colors.white,
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                child: Text(
-                  _peutLogement ? '🏠 Publier un logement' : '🛒 Publier un article',
-                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 22, fontWeight: FontWeight.w800, color: MboaColors.text),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: KeyedSubtree(
+                        key: _tourHeroKey,
+                        child: Text(
+                          _peutLogement ? '🏠 Publier un logement' : '🛒 Publier un article',
+                          style: const TextStyle(fontFamily: 'Poppins', fontSize: 22, fontWeight: FontWeight.w800, color: MboaColors.text),
+                        ),
+                      ),
+                    ),
+                    TourButton(steps: _tourSteps),
+                  ],
                 ),
               ),
               Expanded(
                 child: _peutLogement
-                    ? _FormLogement(compteActifPublication: _compteActifPublication)
-                    : const _FormArticle(),
+                    ? _FormLogement(
+                        compteActifPublication: _compteActifPublication,
+                        tourPhotosKey: _tourPhotosKeyLogement,
+                        tourGpsKey: _tourGpsKeyLogement,
+                        tourSubmitKey: _tourSubmitKeyLogement,
+                      )
+                    : _FormArticle(
+                        tourPhotosKey: _tourPhotosKeyArticle,
+                        tourSubmitKey: _tourSubmitKeyArticle,
+                      ),
               ),
             ],
           ),
@@ -211,14 +260,25 @@ class _PublierScreenState extends State<PublierScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '➕ Publier',
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: MboaColors.text,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: KeyedSubtree(
+                          key: _tourHeroKey,
+                          child: const Text(
+                            '➕ Publier',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: MboaColors.text,
+                            ),
+                          ),
+                        ),
+                      ),
+                      TourButton(steps: _tourSteps),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -226,21 +286,24 @@ class _PublierScreenState extends State<PublierScreen>
                     style: MboaTextStyles.muted,
                   ),
                   const SizedBox(height: 16),
-                  TabBar(
-                    controller: _tabController,
-                    indicatorColor: MboaColors.primary,
-                    indicatorWeight: 3,
-                    labelColor: MboaColors.primary,
-                    unselectedLabelColor: MboaColors.textMuted,
-                    labelStyle: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
+                  KeyedSubtree(
+                    key: _tourTabsKey,
+                    child: TabBar(
+                      controller: _tabController,
+                      indicatorColor: MboaColors.primary,
+                      indicatorWeight: 3,
+                      labelColor: MboaColors.primary,
+                      unselectedLabelColor: MboaColors.textMuted,
+                      labelStyle: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      tabs: const [
+                        Tab(text: '🏠 Logement'),
+                        Tab(text: '🛒 Article'),
+                      ],
                     ),
-                    tabs: const [
-                      Tab(text: '🏠 Logement'),
-                      Tab(text: '🛒 Article'),
-                    ],
                   ),
                 ],
               ),
@@ -249,8 +312,16 @@ class _PublierScreenState extends State<PublierScreen>
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _FormLogement(compteActifPublication: _compteActifPublication),
-                  const _FormArticle(),
+                  _FormLogement(
+                    compteActifPublication: _compteActifPublication,
+                    tourPhotosKey: _tourPhotosKeyLogement,
+                    tourGpsKey: _tourGpsKeyLogement,
+                    tourSubmitKey: _tourSubmitKeyLogement,
+                  ),
+                  _FormArticle(
+                    tourPhotosKey: _tourPhotosKeyArticle,
+                    tourSubmitKey: _tourSubmitKeyArticle,
+                  ),
                 ],
               ),
             ),
@@ -266,7 +337,15 @@ class _PublierScreenState extends State<PublierScreen>
 // ════════════════════════════════════════════════════════════
 class _FormLogement extends StatefulWidget {
   final bool compteActifPublication;
-  const _FormLogement({required this.compteActifPublication});
+  final GlobalKey? tourPhotosKey;
+  final GlobalKey? tourGpsKey;
+  final GlobalKey? tourSubmitKey;
+  const _FormLogement({
+    required this.compteActifPublication,
+    this.tourPhotosKey,
+    this.tourGpsKey,
+    this.tourSubmitKey,
+  });
 
   @override
   State<_FormLogement> createState() => _FormLogementState();
@@ -613,7 +692,9 @@ class _FormLogementState extends State<_FormLogement> {
               ),
             ),
             const SizedBox(height: 12),
-            SizedBox(
+            KeyedSubtree(
+              key: widget.tourPhotosKey,
+              child: SizedBox(
               height: 100,
               child: ListView(
                 scrollDirection: Axis.horizontal,
@@ -706,6 +787,7 @@ class _FormLogementState extends State<_FormLogement> {
                       ),
                     ),
                 ],
+              ),
               ),
             ),
             const SizedBox(height: 24),
@@ -849,7 +931,9 @@ class _FormLogementState extends State<_FormLogement> {
             // ── Position GPS ─────────────────────────
             _buildSectionTitle('📍 Position GPS'),
             const SizedBox(height: 8),
-            Container(
+            KeyedSubtree(
+              key: widget.tourGpsKey,
+              child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -939,6 +1023,7 @@ class _FormLogementState extends State<_FormLogement> {
                   ),
                 ],
               ),
+              ),
             ),
             const SizedBox(height: 20),
 
@@ -1018,7 +1103,9 @@ class _FormLogementState extends State<_FormLogement> {
             const SizedBox(height: 32),
 
             // ── Bouton publier ───────────────────────
-            SizedBox(
+            KeyedSubtree(
+              key: widget.tourSubmitKey,
+              child: SizedBox(
               width: double.infinity,
               height: MboaSizes.buttonHeight,
               child: ElevatedButton.icon(
@@ -1039,6 +1126,7 @@ class _FormLogementState extends State<_FormLogement> {
                         ? 'Analyse en cours...'
                         : 'Publication en cours...')
                     : 'Publier le logement'),
+              ),
               ),
             ),
             const SizedBox(height: 20),
@@ -1065,7 +1153,9 @@ class _FormLogementState extends State<_FormLogement> {
 // FORMULAIRE ARTICLE MARKETPLACE
 // ════════════════════════════════════════════════════════════
 class _FormArticle extends StatefulWidget {
-  const _FormArticle();
+  final GlobalKey? tourPhotosKey;
+  final GlobalKey? tourSubmitKey;
+  const _FormArticle({this.tourPhotosKey, this.tourSubmitKey});
 
   @override
   State<_FormArticle> createState() => _FormArticleState();
@@ -1252,7 +1342,9 @@ class _FormArticleState extends State<_FormArticle> {
               ),
             ),
             const SizedBox(height: 12),
-            SizedBox(
+            KeyedSubtree(
+              key: widget.tourPhotosKey,
+              child: SizedBox(
               height: 100,
               child: ListView(
                 scrollDirection: Axis.horizontal,
@@ -1343,6 +1435,7 @@ class _FormArticleState extends State<_FormArticle> {
                       ),
                     ),
                 ],
+              ),
               ),
             ),
             const SizedBox(height: 24),
@@ -1558,7 +1651,9 @@ class _FormArticleState extends State<_FormArticle> {
             const SizedBox(height: 32),
 
             // ── Bouton publier ───────────────────────
-            SizedBox(
+            KeyedSubtree(
+              key: widget.tourSubmitKey,
+              child: SizedBox(
               width: double.infinity,
               height: MboaSizes.buttonHeight,
               child: ElevatedButton.icon(
@@ -1582,6 +1677,7 @@ class _FormArticleState extends State<_FormArticle> {
                         ? 'Analyse en cours...'
                         : 'Publication en cours...')
                     : 'Publier l\'article'),
+              ),
               ),
             ),
             const SizedBox(height: 20),

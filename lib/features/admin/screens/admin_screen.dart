@@ -109,11 +109,12 @@ class _AdminScreenState extends State<AdminScreen> {
           child: SizedBox(
             height: 65,
             child: Row(
-              children: List.generate(_navItems.length, (index) {
-                final item = _navItems[index];
-                final isActive = _currentIndex == index;
-                final badge = _badgePourOnglet(index);
-                return Expanded(
+              children: [
+                ...List.generate(_navItems.length, (index) {
+                  final item = _navItems[index];
+                  final isActive = _currentIndex == index;
+                  final badge = _badgePourOnglet(index);
+                  return Expanded(
                   child: GestureDetector(
                     onTap: () => _selectionnerOnglet(index),
                     behavior: HitTestBehavior.opaque,
@@ -176,7 +177,37 @@ class _AdminScreenState extends State<AdminScreen> {
                     ),
                   ),
                 );
-              }),
+                }),
+                // Retour au compte de base (visiteur/vendeur) : privilège
+                // superposé, plus une redirection forcée sans issue — voir
+                // roles_multiples_admin_ambassadeur et main_screen.dart.
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => context.go(AppRoutes.main),
+                    behavior: HitTestBehavior.opaque,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.arrow_back_rounded,
+                          color: MboaColors.textMuted,
+                          size: 24,
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Mon compte',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: MboaColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

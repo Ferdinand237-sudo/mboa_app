@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../home/screens/home_screen.dart';
@@ -9,11 +8,10 @@ import '../../chat/screens/chat_screen.dart';
 import '../../profil/screens/profil_screen.dart';
 import '../../logement/screens/publier_screen.dart';
 import '../../logement/screens/gestion_screen.dart';
-import '../../ambassadeur/screens/ambassadeur_dashboard_screen.dart';
-import '../../ambassadeur/screens/ambassadeur_liste_screen.dart';
-import '../../../app/router.dart';
 import '../../../core/mixins/refreshable_state.dart';
 import '../../../core/services/unread_service.dart';
+import '../../../core/onboarding/tour_step.dart';
+import '../../../core/onboarding/tour_texts.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -43,7 +41,23 @@ class _MainScreenState extends State<MainScreen> {
   final _profilKey = GlobalKey<State>();
   final _gestionKey = GlobalKey<State>();
   final _publierKey = GlobalKey<State>();
-  final _ambassadeurDashboardKey = GlobalKey<State>();
+
+  // ── Cibles de la visite guidée (voir core/onboarding) ─────────────
+  // Portées par MainScreen car elles couvrent à la fois des éléments du
+  // header de HomeScreen (passés en paramètre, voir plus bas) et des items
+  // de la bottom nav bar définie ici — les deux sont dans le même arbre de
+  // widgets au moment du build, donc atteignables par les mêmes GlobalKeys.
+  final _tourLogoKey = GlobalKey();
+  final _tourRechercheKey = GlobalKey();
+  final _tourCarteKey = GlobalKey();
+  final _tourNotifKey = GlobalKey();
+  final _tourRegisterKey = GlobalKey();
+  final _tourNavLogementKey = GlobalKey();
+  final _tourNavMarketKey = GlobalKey();
+  final _tourNavChatKey = GlobalKey();
+  final _tourNavProfilKey = GlobalKey();
+  final _tourNavGestionKey = GlobalKey();
+  final _tourNavPublierKey = GlobalKey();
 
   @override
   void initState() {
@@ -92,12 +106,11 @@ class _MainScreenState extends State<MainScreen> {
           .single();
       final role = data['role'] ?? 'visiteur';
 
-      // Rediriger l'admin vers son interface
-      if (role == 'admin' && mounted) {
-        context.go(AppRoutes.admin);
-        return;
-      }
-
+      // Admin/ambassadeur sont désormais des privilèges superposés à un
+      // compte visiteur/vendeur normal (est_admin/est_ambassadeur, voir
+      // roles_multiples_admin_ambassadeur) : on n'y redirige plus de force,
+      // le compte garde sa navigation habituelle et accède à son espace
+      // dédié via le profil (voir profil_screen.dart, "Espaces privilégiés").
       setState(() {
         _userRole = role;
         _isLoading = false;
@@ -107,12 +120,63 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+  bool get _isLoggedIn => Supabase.instance.client.auth.currentUser != null;
+
+  // Visite guidée de l'accueil : le contenu dépend du rôle/statut de
+  // connexion, comme sur le web (TOUR_HOME_VISITEUR/ETUDIANT/VENDEUR).
+  List<TourStep> get _tourStepsHome {
+    if (_isVendeur) {
+      return buildTourSteps(
+        [_tourLogoKey, _tourNavGestionKey, _tourNavPublierKey, _tourNavChatKey, _tourNavProfilKey],
+        tourHomeVendeurTexts,
+      );
+    }
+    if (_isLoggedIn) {
+      return buildTourSteps(
+        [
+          _tourLogoKey,
+          _tourRechercheKey,
+          _tourNavLogementKey,
+          _tourNavMarketKey,
+          _tourCarteKey,
+          _tourNavChatKey,
+          _tourNotifKey,
+          _tourNavProfilKey,
+        ],
+        tourHomeEtudiantTexts,
+      );
+    }
+    return buildTourSteps(
+      [
+        _tourLogoKey,
+        _tourRechercheKey,
+        _tourNavLogementKey,
+        _tourNavMarketKey,
+        _tourCarteKey,
+        _tourNavChatKey,
+        _tourRegisterKey,
+      ],
+      tourHomeVisiteurTexts,
+    );
+  }
+
+  // Lancement automatique (une fois) réservé au visiteur non connecté sur
+  // l'accueil, comme sur le web (voir SEEN_KEY_HOME_VISITEUR côté web).
+  String? get _tourAutoOpenKey => (!_isVendeur && !_isLoggedIn) ? 'tour_seen_home_visiteur' : null;
+
   // ── Navigation Visiteur ───────────────────────────────────
   List<Widget> get _screensVisiteur => [
     HomeScreen(
       key: _homeKey,
       onNavigateLogement: () => _onTabTapped(1),
       onNavigateMarket: () => _onTabTapped(2),
+      tourLogoKey: _tourLogoKey,
+      tourRechercheKey: _tourRechercheKey,
+      tourCarteKey: _tourCarteKey,
+      tourNotifKey: _tourNotifKey,
+      tourRegisterKey: _tourRegisterKey,
+      tourSteps: _tourStepsHome,
+      tourAutoOpenKey: _tourAutoOpenKey,
     ),
     LogementScreen(key: _logementKey),
     MarketScreen(key: _marketKey),
@@ -141,6 +205,13 @@ class _MainScreenState extends State<MainScreen> {
       onNavigateMarket: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const MarketScreen()),
       ),
+      tourLogoKey: _tourLogoKey,
+      tourRechercheKey: _tourRechercheKey,
+      tourCarteKey: _tourCarteKey,
+      tourNotifKey: _tourNotifKey,
+      tourRegisterKey: _tourRegisterKey,
+      tourSteps: _tourStepsHome,
+      tourAutoOpenKey: _tourAutoOpenKey,
     ),
     GestionScreen(key: _gestionKey),
     PublierScreen(key: _publierKey),
@@ -159,41 +230,19 @@ class _MainScreenState extends State<MainScreen> {
     _NavItem(icon: Icons.person_rounded, label: 'Profil'),
   ];
 
-  // ── Navigation Ambassadeur ────────────────────────────────
-  List<Widget> get _screensAmbassadeur => [
-    AmbassadeurDashboardScreen(key: _ambassadeurDashboardKey),
-    // AmbassadeurListeScreen a déjà son propre abonnement realtime
-    // (voir CLAUDE.md) : pas besoin de la rafraîchir manuellement ici.
-    const AmbassadeurListeScreen(),
-    ProfilScreen(key: _profilKey, onOuvrirMessages: () {}),
-  ];
-
-  List<GlobalKey<State>?> get _refreshKeysAmbassadeur =>
-      [_ambassadeurDashboardKey, null, _profilKey];
-
-  List<_NavItem> get _navItemsAmbassadeur => [
-    _NavItem(icon: Icons.dashboard_rounded, label: 'Dashboard'),
-    _NavItem(icon: Icons.people_alt_rounded, label: 'Assignés'),
-    _NavItem(icon: Icons.person_rounded, label: 'Profil'),
-  ];
-
+  // Ambassadeur (comme admin) n'est plus un mode exclusif de la nav
+  // principale mais un privilège superposé, avec son propre espace dédié
+  // accessible depuis le profil (voir AmbassadeurScreen, router.dart) —
+  // la nav de base reste toujours vendeur/visiteur.
   bool get _isVendeur => _userRole == 'vendeur';
-  bool get _isAmbassadeur => _userRole == 'ambassadeur';
 
-  List<Widget> get _screens {
-    if (_isAmbassadeur) return _screensAmbassadeur;
-    return _isVendeur ? _screensVendeur : _screensVisiteur;
-  }
+  List<Widget> get _screens => _isVendeur ? _screensVendeur : _screensVisiteur;
 
-  List<_NavItem> get _navItems {
-    if (_isAmbassadeur) return _navItemsAmbassadeur;
-    return _isVendeur ? _navItemsVendeur : _navItemsVisiteur;
-  }
+  List<_NavItem> get _navItems =>
+      _isVendeur ? _navItemsVendeur : _navItemsVisiteur;
 
-  List<GlobalKey<State>?> get _refreshKeys {
-    if (_isAmbassadeur) return _refreshKeysAmbassadeur;
-    return _isVendeur ? _refreshKeysVendeur : _refreshKeysVisiteur;
-  }
+  List<GlobalKey<State>?> get _refreshKeys =>
+      _isVendeur ? _refreshKeysVendeur : _refreshKeysVisiteur;
 
   void _onTabTapped(int index) {
     setState(() => _currentIndex = index);
@@ -224,6 +273,33 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  GlobalKey? _tourKeyForNavIndex(int index) {
+    if (_isVendeur) {
+      switch (index) {
+        case 1:
+          return _tourNavGestionKey;
+        case 2:
+          return _tourNavPublierKey;
+        case 3:
+          return _tourNavChatKey;
+        case 4:
+          return _tourNavProfilKey;
+      }
+    } else {
+      switch (index) {
+        case 1:
+          return _tourNavLogementKey;
+        case 2:
+          return _tourNavMarketKey;
+        case 3:
+          return _tourNavChatKey;
+        case 4:
+          return _tourNavProfilKey;
+      }
+    }
+    return null;
+  }
+
   Widget _buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
@@ -243,11 +319,14 @@ class _MainScreenState extends State<MainScreen> {
             children: List.generate(_navItems.length, (index) {
               final item = _navItems[index];
               final isActive = _currentIndex == index;
+              final tourKey = _tourKeyForNavIndex(index);
 
               // Bouton Publier spécial pour vendeur
               if (_isVendeur && index == 2) {
                 return Expanded(
-                  child: GestureDetector(
+                  child: KeyedSubtree(
+                    key: tourKey,
+                    child: GestureDetector(
                     onTap: () => _onTabTapped(index),
                     behavior: HitTestBehavior.opaque,
                     child: Column(
@@ -288,12 +367,15 @@ class _MainScreenState extends State<MainScreen> {
                         ),
                       ],
                     ),
+                    ),
                   ),
                 );
               }
 
               return Expanded(
-                child: GestureDetector(
+                child: KeyedSubtree(
+                  key: tourKey,
+                  child: GestureDetector(
                   onTap: () => _onTabTapped(index),
                   behavior: HitTestBehavior.opaque,
                   child: Column(
@@ -321,8 +403,8 @@ class _MainScreenState extends State<MainScreen> {
                                   : MboaColors.textMuted,
                               size: 24,
                             ),
-                            // Onglet Chat/Messages : index 3 chez visiteur
-                            // et vendeur, absent chez ambassadeur (3 items).
+                            // Onglet Chat/Messages : index 3, aussi bien
+                            // chez visiteur que vendeur.
                             if (index == 3 && _nbMessagesNonLus > 0)
                               Positioned(
                                 top: -4,
@@ -367,6 +449,7 @@ class _MainScreenState extends State<MainScreen> {
                         ),
                       ),
                     ],
+                  ),
                   ),
                 ),
               );

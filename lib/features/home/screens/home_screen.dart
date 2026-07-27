@@ -15,12 +15,32 @@ import 'contributeurs_screen.dart';
 import '../../profil/screens/profil_vendeur_screen.dart';
 import '../../../core/mixins/refreshable_state.dart';
 import '../../../app/router.dart';
+import '../../../core/onboarding/tour_step.dart';
+import '../../../core/onboarding/tour_button.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onNavigateLogement;
   final VoidCallback? onNavigateMarket;
+  final GlobalKey? tourLogoKey;
+  final GlobalKey? tourRechercheKey;
+  final GlobalKey? tourCarteKey;
+  final GlobalKey? tourNotifKey;
+  final GlobalKey? tourRegisterKey;
+  final List<TourStep> tourSteps;
+  final String? tourAutoOpenKey;
 
-  const HomeScreen({super.key, this.onNavigateLogement, this.onNavigateMarket});
+  const HomeScreen({
+    super.key,
+    this.onNavigateLogement,
+    this.onNavigateMarket,
+    this.tourLogoKey,
+    this.tourRechercheKey,
+    this.tourCarteKey,
+    this.tourNotifKey,
+    this.tourRegisterKey,
+    this.tourSteps = const [],
+    this.tourAutoOpenKey,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -274,6 +294,8 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
     return parts.isNotEmpty ? parts[0] : 'Visiteur';
   }
 
+  Widget _tourTarget(GlobalKey? key, Widget child) => key == null ? child : KeyedSubtree(key: key, child: child);
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
@@ -307,110 +329,126 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Bonjour $_prenom 👋',
-                                    style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: Colors.white.withValues(alpha: 0.8)),
-                                  ),
-                                  const Text(
-                                    'Bienvenue sur Mboa',
-                                    style: TextStyle(fontFamily: 'Poppins', fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white),
-                                  ),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.location_on_rounded, color: Colors.white70, size: 14),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        AppConstants.defaultVille,
-                                        style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Colors.white.withValues(alpha: 0.7)),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              GestureDetector(
-                                onTap: () async {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                                  );
-                                  _verifierNotifications();
-                                },
-                                child: Stack(
-                                  clipBehavior: Clip.none,
+                              _tourTarget(
+                                widget.tourLogoKey,
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: const Icon(Icons.notifications_rounded, color: Colors.white, size: 22),
+                                    Text(
+                                      'Bonjour $_prenom 👋',
+                                      style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: Colors.white.withValues(alpha: 0.8)),
                                     ),
-                                    if (_nbNotifications > 0)
-                                      Positioned(
-                                        top: -4,
-                                        right: -4,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                          constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                                          decoration: BoxDecoration(
-                                            color: MboaColors.secondary,
-                                            borderRadius: BorderRadius.circular(9),
-                                            border: Border.all(color: MboaColors.primary, width: 1.5),
-                                          ),
-                                          child: Center(
-                                            child: Text(
-                                              _nbNotifications > 9 ? '9+' : '$_nbNotifications',
-                                              style: const TextStyle(
-                                                fontFamily: 'Poppins',
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w700,
-                                                color: Colors.white,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ),
+                                    const Text(
+                                      'Bienvenue sur Mboa',
+                                      style: TextStyle(fontFamily: 'Poppins', fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white),
+                                    ),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.location_on_rounded, color: Colors.white70, size: 14),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          AppConstants.defaultVille,
+                                          style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Colors.white.withValues(alpha: 0.7)),
                                         ),
-                                      ),
+                                      ],
+                                    ),
                                   ],
                                 ),
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  TourButton(steps: widget.tourSteps, dark: true, autoOpenKey: widget.tourAutoOpenKey),
+                                  const SizedBox(width: 10),
+                                  _tourTarget(
+                                    widget.tourNotifKey,
+                                    GestureDetector(
+                                      onTap: () async {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                                        );
+                                        _verifierNotifications();
+                                      },
+                                      child: Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          Container(
+                                            width: 44,
+                                            height: 44,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withValues(alpha: 0.2),
+                                              borderRadius: BorderRadius.circular(14),
+                                            ),
+                                            child: const Icon(Icons.notifications_rounded, color: Colors.white, size: 22),
+                                          ),
+                                          if (_nbNotifications > 0)
+                                            Positioned(
+                                              top: -4,
+                                              right: -4,
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                                                decoration: BoxDecoration(
+                                                  color: MboaColors.secondary,
+                                                  borderRadius: BorderRadius.circular(9),
+                                                  border: Border.all(color: MboaColors.primary, width: 1.5),
+                                                ),
+                                                child: Center(
+                                                  child: Text(
+                                                    _nbNotifications > 9 ? '9+' : '$_nbNotifications',
+                                                    style: const TextStyle(
+                                                      fontFamily: 'Poppins',
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: Colors.white,
+                                                    ),
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                           const SizedBox(height: 16),
 
                           // Barre recherche
-                          GestureDetector(
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const HomeSearchScreen()),
-                            ),
-                            child: Container(
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10)],
+                          _tourTarget(
+                            widget.tourRechercheKey,
+                            GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const HomeSearchScreen()),
                               ),
-                              child: Row(
-                                children: [
-                                  const SizedBox(width: 14),
-                                  const Icon(Icons.search_rounded, color: MboaColors.textMuted, size: 20),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text('Chambre, studio, meublé...', style: MboaTextStyles.muted),
-                                  ),
-                                  Container(
-                                    margin: const EdgeInsets.all(6),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                                    decoration: BoxDecoration(color: MboaColors.primary, borderRadius: BorderRadius.circular(10)),
-                                    child: const Icon(Icons.tune_rounded, color: Colors.white, size: 18),
-                                  ),
-                                ],
+                              child: Container(
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10)],
+                                ),
+                                child: Row(
+                                  children: [
+                                    const SizedBox(width: 14),
+                                    const Icon(Icons.search_rounded, color: MboaColors.textMuted, size: 20),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text('Chambre, studio, meublé...', style: MboaTextStyles.muted),
+                                    ),
+                                    Container(
+                                      margin: const EdgeInsets.all(6),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      decoration: BoxDecoration(color: MboaColors.primary, borderRadius: BorderRadius.circular(10)),
+                                      child: const Icon(Icons.tune_rounded, color: Colors.white, size: 18),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -450,6 +488,7 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
                             }
                             Navigator.push(context, MaterialPageRoute(builder: (_) => const MapScreen()));
                           },
+                          tourKey: widget.tourCarteKey,
                         ),
                       ],
                     ),
@@ -552,28 +591,31 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
     );
   }
 
-  Widget _buildCategoryCard(String emoji, String label, Color color, VoidCallback? onTap) {
+  Widget _buildCategoryCard(String emoji, String label, Color color, VoidCallback? onTap, {GlobalKey? tourKey}) {
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 2))],
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
-                child: Center(child: Text(emoji, style: const TextStyle(fontSize: 24))),
-              ),
-              const SizedBox(height: 8),
-              Text(label, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600, color: MboaColors.text)),
-            ],
+      child: _tourTarget(
+        tourKey,
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(MboaSizes.radiusLg),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 2))],
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
+                  child: Center(child: Text(emoji, style: const TextStyle(fontSize: 24))),
+                ),
+                const SizedBox(height: 8),
+                Text(label, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600, color: MboaColors.text)),
+              ],
+            ),
           ),
         ),
       ),
@@ -731,15 +773,18 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
             style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Colors.white.withValues(alpha: 0.9), height: 1.5),
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => context.push(AppRoutes.register),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: MboaColors.primary,
+          _tourTarget(
+            widget.tourRegisterKey,
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => context.push(AppRoutes.register),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: MboaColors.primary,
+                ),
+                child: const Text('Créer un compte'),
               ),
-              child: const Text('Créer un compte'),
             ),
           ),
         ],

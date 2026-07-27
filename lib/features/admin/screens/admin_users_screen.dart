@@ -299,6 +299,110 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> with RefreshableSta
     }
   }
 
+  Future<void> _togglePrivilege({
+    required String userId,
+    required String champ,
+    required bool currentValue,
+    required String titreOn,
+    required String titreOff,
+    required String bodyOn,
+    required String bodyOff,
+    required String labelOn,
+    required String labelOff,
+  }) async {
+    try {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(MboaSizes.radiusXl),
+          ),
+          title: Text(
+            currentValue ? titreOff : titreOn,
+            style: const TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+            ),
+          ),
+          content: Text(
+            currentValue ? bodyOff : bodyOn,
+            style: const TextStyle(
+              fontFamily: 'Poppins',
+              color: MboaColors.textMuted,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    currentValue ? MboaColors.danger : MboaColors.verified,
+              ),
+              child: Text(currentValue ? labelOff : labelOn),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true) {
+        await _supabase
+            .from('users')
+            .update({champ: !currentValue})
+            .eq('id', userId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(currentValue ? '✅ $titreOff' : '✅ $titreOn'),
+              backgroundColor:
+                  currentValue ? MboaColors.danger : MboaColors.verified,
+            ),
+          );
+          _chargerUsers();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur : ${e.toString()}'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleEstAdmin(String userId, bool currentValue) => _togglePrivilege(
+        userId: userId,
+        champ: 'est_admin',
+        currentValue: currentValue,
+        titreOn: '👑 Nommer administrateur',
+        titreOff: 'Retirer les droits administrateur',
+        bodyOn:
+            'Ce compte garde son expérience actuelle (visiteur ou vendeur) et gagne en plus un accès "Administration" dans son profil.',
+        bodyOff: 'Ce compte perdra l\'accès à l\'espace d\'administration.',
+        labelOn: 'Nommer administrateur',
+        labelOff: 'Retirer',
+      );
+
+  Future<void> _toggleEstAmbassadeur(String userId, bool currentValue) => _togglePrivilege(
+        userId: userId,
+        champ: 'est_ambassadeur',
+        currentValue: currentValue,
+        titreOn: '🧭 Nommer ambassadeur',
+        titreOff: 'Retirer les droits ambassadeur',
+        bodyOn:
+            'Ce compte garde son expérience actuelle et gagne en plus un accès "Espace ambassadeur" dans son profil.',
+        bodyOff: 'Ce compte perdra l\'accès à l\'espace ambassadeur.',
+        labelOn: 'Nommer ambassadeur',
+        labelOff: 'Retirer',
+      );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -378,21 +482,20 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> with RefreshableSta
     final role = user['role'] ?? 'visiteur';
     final isActif = user['actif'] ?? true;
     final isVerified = user['verified'] ?? false;
+    // role reste l'identité de base (visiteur/vendeur) ; est_admin/
+    // est_ambassadeur sont des privilèges superposés, affichés comme des
+    // badges en plus plutôt que remplaçant le badge de rôle — le || sur
+    // role garde une compatibilité défensive avec d'éventuels comptes non
+    // migrés (voir roles_multiples_admin_ambassadeur).
+    final estAdmin = role == 'admin' || user['est_admin'] == true;
+    final estAmbassadeur = role == 'ambassadeur' || user['est_ambassadeur'] == true;
 
     Color roleColor;
     String roleLabel;
     switch (role) {
-      case 'admin':
-        roleColor = MboaColors.accent;
-        roleLabel = '👑 Admin';
-        break;
       case 'vendeur':
         roleColor = MboaColors.secondary;
         roleLabel = '🏪 Vendeur';
-        break;
-      case 'ambassadeur':
-        roleColor = MboaColors.primaryDark;
-        roleLabel = '🧭 Ambassadeur';
         break;
       default:
         roleColor = MboaColors.primary;
@@ -497,6 +600,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> with RefreshableSta
                             ),
                           ),
                         ),
+                        if (estAdmin)
+                          _buildPrivilegeBadge('👑 Admin', MboaColors.accent),
+                        if (estAmbassadeur)
+                          _buildPrivilegeBadge('🧭 Ambassadeur', MboaColors.primaryDark),
                         if (_statutVerificationParUser.containsKey(user['id']))
                           _buildBadgeVerification(_statutVerificationParUser[user['id']]!),
                       ],
@@ -507,7 +614,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> with RefreshableSta
             ],
           ),
 
-          if (role != 'admin') ...[
+          if (!estAdmin) ...[
             const SizedBox(height: 12),
             const Divider(height: 1),
             const SizedBox(height: 10),
@@ -539,7 +646,45 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> with RefreshableSta
               ],
             ),
           ],
+
+          // Attribution des privilèges admin/ambassadeur : choisir parmi
+          // les utilisateurs existants, sans passer par la création d'un
+          // nouveau compte (voir _creerAmbassadeur pour un compte neuf).
+          const SizedBox(height: 10),
+          const Divider(height: 1),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildActionBtn(
+                icon: estAdmin ? Icons.shield_rounded : Icons.shield_outlined,
+                label: estAdmin ? 'Admin' : 'Nommer admin',
+                color: MboaColors.accent,
+                onTap: () => _toggleEstAdmin(user['id'], estAdmin),
+              ),
+              _buildActionBtn(
+                icon: estAmbassadeur ? Icons.explore_rounded : Icons.explore_outlined,
+                label: estAmbassadeur ? 'Ambassadeur' : 'Nommer ambassadeur',
+                color: MboaColors.primaryDark,
+                onTap: () => _toggleEstAmbassadeur(user['id'], estAmbassadeur),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPrivilegeBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontFamily: 'Poppins', fontSize: 10, fontWeight: FontWeight.w700, color: color),
       ),
     );
   }
