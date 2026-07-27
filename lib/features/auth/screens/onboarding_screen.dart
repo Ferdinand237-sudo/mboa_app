@@ -13,7 +13,6 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
-  int _currentPage = 0;
 
   final List<_OnboardingData> _slides = [
     _OnboardingData(
@@ -108,9 +107,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
-                  onPageChanged: (index) {
-                    setState(() => _currentPage = index);
-                  },
                   itemCount: _slides.length,
                   itemBuilder: (context, index) {
                     return _SlideWidget(data: _slides[index]);
