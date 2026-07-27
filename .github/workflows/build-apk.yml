@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -37,3 +39,18 @@ jobs:
           name: mboa-app-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
+
+      # L'artifact ci-dessus est hébergé sur le stockage blob interne
+      # d'Actions, injoignable depuis certains environnements réseau
+      # restreints. Une Release GitHub sert le même fichier depuis
+      # objects.githubusercontent.com, plus largement accessible.
+      - name: Publier l'APK en Release GitHub
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-run-${{ github.run_number }}
+          name: APK build #${{ github.run_number }} (${{ github.ref_name }})
+          files: build/app/outputs/flutter-apk/app-release.apk
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
