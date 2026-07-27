@@ -66,21 +66,28 @@ export function HeaderClient({ user, unreadCount }: { user: UserModel | null; un
     router.refresh();
   }
 
-  // Miroir de _navItemsVendeur (main_screen.dart) : Gestion + Publier
-  // remplacent Logement + Market une fois connecté comme vendeur.
-  const NAV_LINKS =
-    user?.role === "vendeur"
-      ? NAV_LINKS_VENDEUR
-      : user?.role === "admin"
-        ? NAV_LINKS_ADMIN
-        : user?.role === "ambassadeur"
-          ? NAV_LINKS_AMBASSADEUR
-          : NAV_LINKS_VISITEUR;
+  // Admin/ambassadeur sont des privilèges superposables à un compte
+  // visiteur/vendeur normal (voir UserModel.estAdmin/estAmbassadeur) : la
+  // navigation admin/ambassadeur ne s'affiche que quand on est effectivement
+  // dans /admin ou /ambassadeur, pas partout dès qu'on a le privilège — le
+  // reste du temps, le header reflète le compte de base (vendeur/visiteur),
+  // et le profil propose un lien pour entrer dans l'espace dédié.
+  const dansAdmin = estActif(pathname, "/admin") && user?.estAdmin === true;
+  const dansAmbassadeur = estActif(pathname, "/ambassadeur") && user?.estAmbassadeur === true;
+
+  const NAV_LINKS = dansAdmin
+    ? NAV_LINKS_ADMIN
+    : dansAmbassadeur
+      ? NAV_LINKS_AMBASSADEUR
+      : user?.role === "vendeur"
+        ? NAV_LINKS_VENDEUR
+        : NAV_LINKS_VISITEUR;
 
   // Admin (6 onglets) et ambassadeur passent uniquement par le menu à
   // déplier plutôt que des pastilles en ligne dans le header, même sur
   // desktop : plus simple qu'une barre horizontale chargée.
-  const menuSeulement = user?.role === "admin" || user?.role === "ambassadeur";
+  const menuSeulement = dansAdmin || dansAmbassadeur;
+  const dansEspaceDedie = dansAdmin || dansAmbassadeur;
 
   return (
     <header className="sticky top-0 z-50 border-b border-mboa-border bg-mboa-card/95 backdrop-blur">
@@ -109,6 +116,15 @@ export function HeaderClient({ user, unreadCount }: { user: UserModel | null; un
               </Link>
             ))}
           </nav>
+        )}
+
+        {dansEspaceDedie && (
+          <Link
+            href="/"
+            className="hidden items-center gap-1.5 rounded-mboa-md px-4 py-2 text-sm font-semibold text-mboa-text-muted transition-colors hover:bg-mboa-background hover:text-mboa-primary md:flex"
+          >
+            ← Mon compte
+          </Link>
         )}
 
         {user && (
@@ -194,6 +210,15 @@ export function HeaderClient({ user, unreadCount }: { user: UserModel | null; un
                 {link.label}
               </Link>
             ))}
+            {dansEspaceDedie && (
+              <Link
+                href="/"
+                onClick={() => setOpen(false)}
+                className="rounded-mboa-md px-3 py-2.5 text-sm font-semibold text-mboa-text-muted hover:bg-mboa-background"
+              >
+                ← Mon compte
+              </Link>
+            )}
             {/* Le menu du hamburger reste ouvert en permanence pour
                 admin/ambassadeur (menuSeulement) : profil/déconnexion sont
                 déjà visibles inline juste à côté sur desktop, inutile de les
