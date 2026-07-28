@@ -534,6 +534,100 @@ Ferdinand testés et corrigés le même jour.
 
 ---
 
+## 5quater. Phase 4 (suite) — Jeu de données de test Kribi/Ébolowa (28 juillet 2026)
+
+La couverture multi-villes (§5bis) rendait Kribi et Ébolowa sélectionnables
+mais vides : aucune annonce, aucun lieu public, aucun compte vendeur.
+Ferdinand a demandé un jeu de données réaliste pour les deux villes —
+vrais quartiers, vrais lieux publics géocodés (pas de coordonnées
+inventées), comptes vendeurs de test avec mots de passe consignés, photos
+cohérentes par type d'annonce, et tout pré-validé pour contourner le
+circuit de vérification qui bloque normalement la publication d'un
+nouveau compte propriétaire.
+
+- **Migration `20260728000000_seed_kribi_ebolowa.sql`** : crée 4 comptes
+  vendeurs (`auth.users` + `auth.identities` insérés directement en SQL —
+  aucune clé service_role disponible dans cet environnement pour passer
+  par l'API Admin/l'Edge Function `create-vendor`, donc reproduction
+  manuelle du même résultat : mot de passe hashé via `pgcrypto`,
+  `email_confirmed_at` renseigné, `raw_user_meta_data` avec `role:
+  'vendeur'`), 42 logements (21 chacun pour les 2 comptes propriétaires,
+  répartis également 7 Chambre / 7 Studio / 7 Appartement par ville),
+  52 articles (26 chacun pour les 2 comptes commerçants) et 14 lieux
+  publics. Volume monté en trois temps à la demande de Ferdinand avant
+  collage dans le SQL Editor (3→6→21 logements et 3→6→26 articles par
+  ville — le dernier palier réutilise les 5 quartiers déjà géocodés par
+  ville plutôt que d'en inventer de nouveaux, une même ville ayant
+  légitimement plusieurs annonces dans le même quartier). Testée de bout
+  en bout avant livraison sur un Postgres local (schéma reconstitué à
+  partir du code de l'app, faute d'accès à la vraie base) : exécution
+  propre, ré-exécution sans doublon confirmée après chaque ajout.
+- **Comptes créés** (mots de passe à changer si ces comptes servent au-delà
+  des tests) :
+
+  | Ville | Nom | Email | Mot de passe | Rôle |
+  |---|---|---|---|---|
+  | Kribi | Émilienne Mbarga | emilienne.mbarga@mboa-test.cm | `MboaKribi2026!` | propriétaire |
+  | Kribi | Serge Nkoulou | serge.nkoulou@mboa-test.cm | `MboaKribi2026!` | commerçant / vendeur indépendant |
+  | Ébolowa | Odette Ayissi | odette.ayissi@mboa-test.cm | `MboaEbolowa2026!` | propriétaire |
+  | Ébolowa | Bruno Essomba | bruno.essomba@mboa-test.cm | `MboaEbolowa2026!` | commerçant / vendeur indépendant |
+
+- **Contournement du blocage de publication** : un nouveau compte
+  `proprietaire` a normalement `compte_actif_publication = false` tant
+  qu'un ambassadeur n'a pas validé une vérification terrain (§Partie 2,
+  `verifications_terrain`). Les 4 comptes sont créés directement avec
+  `compte_actif_publication = true` et `verified = true`, sans ligne
+  `verifications_terrain` factice associée (aurait pollué le tableau de
+  bord admin avec de fausses visites "validées" sans ambassadeur
+  réel) — décision de ne pas simuler cette partie du flux.
+- **Triggers désactivés le temps de l'insertion** (`alter table ...
+  disable trigger user` / `enable trigger user`, dans une transaction
+  `begin`/`commit` pour tout annuler proprement en cas d'échec) : sans
+  ça, le trigger de modération IA aurait déclenché un appel HTTP inutile
+  vers l'Edge Function `moderate-annonce` pour chaque annonce, et le
+  trigger de protection des colonnes de confiance (`verified`,
+  `compte_actif_publication`, `statut_moderation`...) les aurait
+  silencieusement réinitialisées — ces triggers vérifient `is_admin()`/
+  `auth.role() = 'service_role'`, tous deux vides dans une session brute
+  de l'éditeur SQL Supabase.
+- **Quartiers et lieux publics** : noms et coordonnées obtenus par
+  recherche web puis géocodage OpenStreetMap Nominatim (pas de
+  coordonnées inventées), une ville par ligne :
+  - Kribi : Bella, Afan Mabé, Ngoyé, Dombé, Mpango pour les logements
+    (Bella utilisé deux fois, sur une chambre et un appartement) ;
+    Hôpital de District de Kribi, Marché Central, École Maternelle
+    Publique, Cathédrale Saint-Joseph, Pharmacie de l'Atlantique, Brigade
+    de Gendarmerie de Kribi 1, Aéroport de Kribi comme lieux publics.
+    Exception documentée : le quartier Bella (confirmé réel via
+    recherche web) n'a pas de résultat Nominatim direct — coordonnées
+    approximées près du centre côtier déjà géocodé (cathédrale/hôpital),
+    pas une vraie mesure.
+  - Ébolowa : New-Bell, Elat, Ngalan I, Mekalat, Biyeyem pour les
+    logements (Elat utilisé deux fois, sur un studio et un appartement) ;
+    Hôpital Régional, Marché Central, Lycée d'Ébolowa, Cathédrale
+    Sainte-Anne-et-Joachim, Pharmacie du Bercail, Commissariat Central,
+    Université d'Ébolowa comme lieux publics.
+- **Photos** : URLs Unsplash stables (`images.unsplash.com/photo-<id>`),
+  chacune vérifiée accessible (`curl` HTTP 200) avant intégration,
+  choisies par cohérence avec le type d'annonce (chambre/studio/
+  appartement pour les logements ; literie/mobilier/électronique/
+  cuisine/scolaire/divers pour les articles). Pas d'upload réel dans le
+  Storage Supabase — l'app affiche les photos via `Image.network`/
+  `NetworkImage` simple, donc une URL externe stable fonctionne à
+  l'identique d'une image hébergée sur Supabase.
+- **`COMPTES_TEST.md`** : fichier référencé à plusieurs endroits de cet
+  historique (§3, §9) mais introuvable dans le dépôt (ni suivi ni
+  untracked, aucune trace dans `git log`) — les mots de passe ci-dessus
+  sont donc consignés uniquement ici pour l'instant.
+- **Non vérifié sur device réel** : cette migration n'a pas encore été
+  collée dans le SQL Editor Supabase par Ferdinand au moment de la
+  rédaction (pas d'accès direct à la base de production depuis cet
+  environnement) — à confirmer après exécution, notamment que les
+  nouvelles annonces apparaissent bien dans Logement/Market/Carte une
+  fois Kribi/Ébolowa sélectionnées.
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
@@ -668,6 +762,12 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
 - **Assistant Mboa côté mobile** : pas encore implémenté (recherche
   faite, voir section 5ter) — portage 100% client, backend déjà en
   place côté serveur (partagé avec le web).
+- **Jeu de données de test Kribi/Ébolowa (28/07, section 5quater)** :
+  migration `20260728000000_seed_kribi_ebolowa.sql` écrite et testée
+  contre un schéma reconstitué en local (pas d'accès direct à la base de
+  production) — 4 comptes vendeurs pré-validés, 42 logements, 52
+  articles, 14 lieux publics géocodés. Reste à coller dans le SQL Editor
+  Supabase et à vérifier sur device réel.
 - **Campagne de test manuel sur device réel** (Android, via `adb`,
   comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
   non inscrit et étudiant connecté couverts (section 3), plus des
