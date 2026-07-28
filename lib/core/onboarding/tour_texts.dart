@@ -10,6 +10,10 @@ import 'tour_step.dart';
 // tourAutoOpenKey dans main_screen.dart.
 const tourHomeVisiteurTexts = [
   TourStepText(
+    title: '🧭 Ton guide, toujours là',
+    body: "Retrouve ce bouton à tout moment pour relancer cette visite guidée si tu as besoin d'un rappel.",
+  ),
+  TourStepText(
     title: 'Bienvenue sur Mboa 👋',
     body: "Ton premier ami dans une nouvelle ville. Fais un tour rapide pour découvrir comment ça marche, ça prend 30 secondes.",
   ),
@@ -30,6 +34,10 @@ const tourHomeVisiteurTexts = [
     body: "Repère les logements, le campus, l'hôpital et le marché directement sur la carte.",
   ),
   TourStepText(
+    title: '📍 Trouve ton Mboa',
+    body: "Une des sections les plus puissantes : trouve vite les logements autour de ta position ou d'un lieu que tu choisis (campus, marché...).",
+  ),
+  TourStepText(
     title: '💬 Chat',
     body: "Discute en direct avec les propriétaires et les vendeurs, dès que tu as un compte.",
   ),
@@ -42,6 +50,10 @@ const tourHomeVisiteurTexts = [
 // Visiteur inscrit (étudiant connecté) sur l'accueil : pas de rappel
 // d'inscription, mais notifications + profil en plus.
 const tourHomeEtudiantTexts = [
+  TourStepText(
+    title: '🧭 Ton guide, toujours là',
+    body: "Retrouve ce bouton à tout moment pour relancer cette visite guidée si tu as besoin d'un rappel.",
+  ),
   TourStepText(
     title: 'Content de te revoir 👋',
     body: 'Petit rappel de ce que tu peux faire sur Mboa, ça prend 30 secondes.',
@@ -61,6 +73,10 @@ const tourHomeEtudiantTexts = [
   TourStepText(
     title: '🗺️ Carte',
     body: "Repère les logements, le campus, l'hôpital et le marché directement sur la carte.",
+  ),
+  TourStepText(
+    title: '📍 Trouve ton Mboa',
+    body: "Une des sections les plus puissantes : trouve vite les logements autour de ta position ou d'un lieu que tu choisis (campus, marché...).",
   ),
   TourStepText(
     title: '💬 Chat',

@@ -23,9 +23,11 @@ import '../../../core/models/ville_model.dart';
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onNavigateLogement;
   final VoidCallback? onNavigateMarket;
+  final GlobalKey? tourButtonKey;
   final GlobalKey? tourLogoKey;
   final GlobalKey? tourRechercheKey;
   final GlobalKey? tourCarteKey;
+  final GlobalKey? tourTrouveTonMboaKey;
   final GlobalKey? tourNotifKey;
   final GlobalKey? tourRegisterKey;
   final List<TourStep> tourSteps;
@@ -35,9 +37,11 @@ class HomeScreen extends StatefulWidget {
     super.key,
     this.onNavigateLogement,
     this.onNavigateMarket,
+    this.tourButtonKey,
     this.tourLogoKey,
     this.tourRechercheKey,
     this.tourCarteKey,
+    this.tourTrouveTonMboaKey,
     this.tourNotifKey,
     this.tourRegisterKey,
     this.tourSteps = const [],
@@ -497,7 +501,15 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  TourButton(steps: widget.tourSteps, dark: true, autoOpenKey: widget.tourAutoOpenKey),
+                                  _tourTarget(
+                                    widget.tourButtonKey,
+                                    TourButton(
+                                      steps: widget.tourSteps,
+                                      dark: true,
+                                      autoOpenKey: widget.tourAutoOpenKey,
+                                      iconOnly: true,
+                                    ),
+                                  ),
                                   const SizedBox(width: 10),
                                   _tourTarget(
                                     widget.tourNotifKey,
@@ -655,9 +667,10 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
                     const SizedBox(height: 28),
 
                     // ── Trouve ton Mboa ─────────────────
-                    _isLoggedIn
-                        ? _buildTrouveTonMboa()
-                        : _buildTrouveTonMboaVerrouille(),
+                    _tourTarget(
+                      widget.tourTrouveTonMboaKey,
+                      _isLoggedIn ? _buildTrouveTonMboa() : _buildTrouveTonMboaVerrouille(),
+                    ),
                     const SizedBox(height: 28),
 
                     // ── Market ──────────────────────────

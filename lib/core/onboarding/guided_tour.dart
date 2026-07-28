@@ -94,6 +94,22 @@ class _GuidedTourViewState extends State<_GuidedTourView> {
         final position = finalBox.localToGlobal(Offset.zero);
         setState(() => _rect = position & finalBox.size);
       }
+      // Re-mesure de rattrapage : si la cible est plus bas dans une page
+      // encore en train de charger (ex. sections Logements récents/Trouve
+      // ton Mboa avant les données réseau), sa position réelle peut encore
+      // bouger juste après ce premier calcul — sans ça, le halo restait
+      // figé sur l'ancienne position et finissait par tomber sur un autre
+      // élément de la page (repéré sur l'étape "Crée ton compte", tout en
+      // bas de l'accueil visiteur).
+      final capturedIndex = _index;
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (!mounted || _index != capturedIndex) return;
+        final box = step.key.currentContext?.findRenderObject();
+        if (box is RenderBox && box.attached && box.hasSize) {
+          final rect = box.localToGlobal(Offset.zero) & box.size;
+          if (rect != _rect) setState(() => _rect = rect);
+        }
+      });
       break;
     }
     _positioning = false;
@@ -125,26 +141,35 @@ class _GuidedTourViewState extends State<_GuidedTourView> {
     final rect = _rect;
     if (rect == null) return const SizedBox.shrink();
     final step = widget.steps[_index];
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: widget.onClose,
-            child: CustomPaint(painter: _SpotlightPainter(rect: rect)),
+    // Material(transparency) : ce Stack est monté hors du Scaffold via un
+    // OverlayEntry (voir GuidedTour.show), donc sans ancêtre Material.
+    // Sans ça, tout le texte de la bulle hérite du DefaultTextStyle de
+    // repli de Flutter — un double soulignement coloré très visible,
+    // signal de debug natif indiquant l'absence de Material, pas un style
+    // volontaire de l'app.
+    return Material(
+      type: MaterialType.transparency,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: widget.onClose,
+              child: CustomPaint(painter: _SpotlightPainter(rect: rect)),
+            ),
           ),
-        ),
-        _TourBulle(
-          rect: rect,
-          index: _index,
-          total: widget.steps.length,
-          title: step.title,
-          body: step.body,
-          onSuivant: _suivant,
-          onPrecedent: _index > 0 ? _precedent : null,
-          onPasser: widget.onClose,
-        ),
-      ],
+          _TourBulle(
+            rect: rect,
+            index: _index,
+            total: widget.steps.length,
+            title: step.title,
+            body: step.body,
+            onSuivant: _suivant,
+            onPrecedent: _index > 0 ? _precedent : null,
+            onPasser: widget.onClose,
+          ),
+        ],
+      ),
     );
   }
 }

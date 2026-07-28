@@ -20,12 +20,16 @@ alter table public.villes enable row level security;
 
 -- Lecture publique : même un visiteur non connecté doit voir la liste des
 -- villes couvertes (sélecteur d'accueil, repli GPS hors zone).
+-- drop if exists avant chaque create : rend le script rejouable tel quel
+-- si une exécution précédente s'est arrêtée en cours de route.
+drop policy if exists "Tout le monde peut voir les villes" on public.villes;
 create policy "Tout le monde peut voir les villes" on public.villes
   for select using (true);
 
 -- Écriture réservée à l'admin, via is_admin() (couvre role='admin' ET le
 -- privilège superposable est_admin) et non un check role='admin' brut —
 -- voir plus bas pour lieux_publics qui avait cet oubli.
+drop policy if exists "Admin gere les villes" on public.villes;
 create policy "Admin gere les villes" on public.villes
   for all using (public.is_admin()) with check (public.is_admin());
 
@@ -52,6 +56,9 @@ update public.lieux_publics set ville = 'Sangmelima' where ville is null;
 drop policy if exists "Seul un admin peut ajouter des lieux" on public.lieux_publics;
 drop policy if exists "Seul un admin peut modifier des lieux" on public.lieux_publics;
 drop policy if exists "Seul un admin peut supprimer des lieux" on public.lieux_publics;
+drop policy if exists "Admin ajoute des lieux" on public.lieux_publics;
+drop policy if exists "Admin modifie des lieux" on public.lieux_publics;
+drop policy if exists "Admin supprime des lieux" on public.lieux_publics;
 
 create policy "Admin ajoute des lieux" on public.lieux_publics
   for insert with check (public.is_admin());
@@ -63,8 +70,13 @@ create policy "Admin supprime des lieux" on public.lieux_publics
   for delete using (public.is_admin());
 
 -- ── Backfill défensif logements/articles ─────────────────────
--- logements.ville était toujours écrite en dur à 'Sangmelima' côté client,
--- articles.ville n'était jamais écrite du tout — toutes les annonces
--- existantes sont réellement à Sangmelima (seule ville couverte jusqu'ici).
+-- logements.ville était toujours écrite en dur à 'Sangmelima' côté client.
+-- articles.ville n'existait même pas en base : le code qui la lit
+-- (article_detail_screen.dart) l'a toujours lue absente/null en silence,
+-- aucune colonne ne l'ayant jamais portée — vérifié après l'échec de ce
+-- backfill sur la première exécution de cette migration (colonne
+-- inexistante). Toutes les annonces existantes sont réellement à
+-- Sangmelima (seule ville couverte jusqu'ici).
+alter table public.articles add column if not exists ville text;
 update public.logements set ville = 'Sangmelima' where ville is null or ville = '';
 update public.articles set ville = 'Sangmelima' where ville is null or ville = '';

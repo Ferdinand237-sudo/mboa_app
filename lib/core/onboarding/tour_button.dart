@@ -15,6 +15,12 @@ class TourButton extends StatefulWidget {
   final bool dark;
   final String? autoOpenKey;
   final String label;
+  // Sur l'accueil, le hero est déjà chargé (prénom, titre, sélecteur de
+  // ville) : le libellé texte faisait déborder "Bienvenue sur Mboa" et la
+  // cloche de notifications hors écran sur les téléphones étroits. Icône
+  // seule (🧭) dans ce contexte, cible de la 1ʳᵉ étape de la visite guidée
+  // qui explique ce qu'elle représente — voir tour_texts.dart.
+  final bool iconOnly;
 
   const TourButton({
     super.key,
@@ -22,6 +28,7 @@ class TourButton extends StatefulWidget {
     this.dark = false,
     this.autoOpenKey,
     this.label = 'Comment utiliser ?',
+    this.iconOnly = false,
   });
 
   @override
@@ -66,17 +73,30 @@ class _TourButtonState extends State<TourButton> {
   @override
   Widget build(BuildContext context) {
     if (widget.steps.isEmpty) return const SizedBox.shrink();
+    final decoration = BoxDecoration(
+      color: widget.dark ? Colors.white.withValues(alpha: 0.15) : MboaColors.primary.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(widget.iconOnly ? 14 : 20),
+      border: Border.all(
+        color: widget.dark ? Colors.white.withValues(alpha: 0.4) : MboaColors.primary.withValues(alpha: 0.2),
+      ),
+    );
+    if (widget.iconOnly) {
+      return GestureDetector(
+        onTap: _ouvrir,
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: decoration,
+          child: const Text('🧭', style: TextStyle(fontSize: 18)),
+        ),
+      );
+    }
     return GestureDetector(
       onTap: _ouvrir,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: widget.dark ? Colors.white.withValues(alpha: 0.15) : MboaColors.primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: widget.dark ? Colors.white.withValues(alpha: 0.4) : MboaColors.primary.withValues(alpha: 0.2),
-          ),
-        ),
+        decoration: decoration,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

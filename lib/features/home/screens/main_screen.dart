@@ -47,9 +47,11 @@ class _MainScreenState extends State<MainScreen> {
   // header de HomeScreen (passés en paramètre, voir plus bas) et des items
   // de la bottom nav bar définie ici — les deux sont dans le même arbre de
   // widgets au moment du build, donc atteignables par les mêmes GlobalKeys.
+  final _tourButtonKey = GlobalKey();
   final _tourLogoKey = GlobalKey();
   final _tourRechercheKey = GlobalKey();
   final _tourCarteKey = GlobalKey();
+  final _tourTrouveTonMboaKey = GlobalKey();
   final _tourNotifKey = GlobalKey();
   final _tourRegisterKey = GlobalKey();
   final _tourNavLogementKey = GlobalKey();
@@ -134,11 +136,13 @@ class _MainScreenState extends State<MainScreen> {
     if (_isLoggedIn) {
       return buildTourSteps(
         [
+          _tourButtonKey,
           _tourLogoKey,
           _tourRechercheKey,
           _tourNavLogementKey,
           _tourNavMarketKey,
           _tourCarteKey,
+          _tourTrouveTonMboaKey,
           _tourNavChatKey,
           _tourNotifKey,
           _tourNavProfilKey,
@@ -148,11 +152,13 @@ class _MainScreenState extends State<MainScreen> {
     }
     return buildTourSteps(
       [
+        _tourButtonKey,
         _tourLogoKey,
         _tourRechercheKey,
         _tourNavLogementKey,
         _tourNavMarketKey,
         _tourCarteKey,
+        _tourTrouveTonMboaKey,
         _tourNavChatKey,
         _tourRegisterKey,
       ],
@@ -170,9 +176,11 @@ class _MainScreenState extends State<MainScreen> {
       key: _homeKey,
       onNavigateLogement: () => _onTabTapped(1),
       onNavigateMarket: () => _onTabTapped(2),
+      tourButtonKey: _tourButtonKey,
       tourLogoKey: _tourLogoKey,
       tourRechercheKey: _tourRechercheKey,
       tourCarteKey: _tourCarteKey,
+      tourTrouveTonMboaKey: _tourTrouveTonMboaKey,
       tourNotifKey: _tourNotifKey,
       tourRegisterKey: _tourRegisterKey,
       tourSteps: _tourStepsHome,
