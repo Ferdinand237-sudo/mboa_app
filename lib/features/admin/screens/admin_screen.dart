@@ -12,6 +12,7 @@ import 'admin_verifications_screen.dart';
 import 'admin_villes_screen.dart';
 import '../../../core/mixins/refreshable_state.dart';
 import '../../../core/services/ville_service.dart';
+import '../../chat/screens/chat_screen.dart';
 // import 'admin_demandes_screen.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -271,6 +272,15 @@ class _DashboardTabState extends State<_DashboardTab> with RefreshableState {
           .from('demandes_compte')
           .select('id')
           .eq('statut', 'en-attente');
+        // Conversations Assistant Mboa non encore prises en charge par un
+        // admin (voir migration 20260726000000_assistant_mboa.sql) : même
+        // logique "actions requises" que demandes/signalements.
+        final assistant = await _supabase
+          .from('conversations')
+          .select('id')
+          .eq('is_support', true)
+          .not('dernier_message', 'is', null)
+          .isFilter('assigned_admin_id', null);
 
       if (mounted) {
         setState(() {
@@ -280,6 +290,7 @@ class _DashboardTabState extends State<_DashboardTab> with RefreshableState {
             'articles': (articles as List).length,
             'signalements': (signalements as List).length,
             'demandes': (demandes as List).length,
+            'assistant': (assistant as List).length,
           };
           _isLoadingStats = false;
         });
@@ -291,6 +302,7 @@ class _DashboardTabState extends State<_DashboardTab> with RefreshableState {
 
   Widget _buildMenu(BuildContext context) {
     final nbDemandes = _stats['demandes'] ?? 0;
+    final nbAssistant = _stats['assistant'] ?? 0;
     return Drawer(
       backgroundColor: Colors.white,
       child: SafeArea(
@@ -325,6 +337,24 @@ class _DashboardTabState extends State<_DashboardTab> with RefreshableState {
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDemandesScreen()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.support_agent_rounded, color: MboaColors.primary),
+              title: const Text('Assistant Mboa', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+              trailing: nbAssistant > 0
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: MboaColors.danger, borderRadius: BorderRadius.circular(10)),
+                      child: Text(
+                        '$nbAssistant',
+                        style: const TextStyle(fontFamily: 'Poppins', fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                    )
+                  : null,
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen()));
               },
             ),
             const Divider(height: 1),
@@ -466,7 +496,8 @@ class _DashboardTabState extends State<_DashboardTab> with RefreshableState {
                   children: [
                     // ── Alertes ───────────────────────
                     if ((_stats['signalements'] ?? 0) > 0 ||
-                        (_stats['demandes'] ?? 0) > 0) ...[
+                        (_stats['demandes'] ?? 0) > 0 ||
+                        (_stats['assistant'] ?? 0) > 0) ...[
                       const Text(
                         '🚨 Actions requises',
                         style: TextStyle(
@@ -502,6 +533,20 @@ class _DashboardTabState extends State<_DashboardTab> with RefreshableState {
                             context,
                             MaterialPageRoute(
                               builder: (_) => const AdminSignalementsScreen(),
+                            ),
+                          ),
+                        ),
+                      if ((_stats['assistant'] ?? 0) > 0)
+                        _buildAlertCard(
+                          icon: '🤖',
+                          titre: 'Assistant Mboa',
+                          desc:
+                              '${_stats['assistant']} conversation(s) en attente de réponse',
+                          color: MboaColors.primary,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ChatScreen(),
                             ),
                           ),
                         ),

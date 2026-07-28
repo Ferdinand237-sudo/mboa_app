@@ -16,6 +16,7 @@ class _ChatScreenState extends State<ChatScreen> with RefreshableState {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _conversations = [];
   bool _isLoading = true;
+  bool _estAdmin = false;
   String _filtreType = 'tous';
 
   @override
@@ -40,82 +41,26 @@ class _ChatScreenState extends State<ChatScreen> with RefreshableState {
     }
 
     try {
-      final data = await _supabase
-          .from('conversations')
-          .select('*')
-          .contains('participants', [user.id])
-          // Une conversation n'apparaît qu'une fois un message échangé.
-          .not('dernier_message', 'is', null)
-          .order('dernier_message_date', ascending: false);
-
-      if (data.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _conversations = [];
-            _isLoading = false;
-          });
-        }
-        return;
-      }
-
-      // Extraire tous les IDs des autres participants pour une seule requête groupée
-      final idsParticipants = data.map((conv) {
-        final parts = List<String>.from(conv['participants']);
-        return parts.firstWhere((id) => id != user.id, orElse: () => user.id);
-      }).toSet().toList();
-
-      // Récupérer tous les profils en une seule fois (Optimisation N+1)
-      final usersData = await _supabase
+      // estAdmin (privilège superposable, pas juste role == 'admin') décide
+      // de la source des conversations : liste classique + Assistant Mboa
+      // personnel pour un membre, file d'attente Assistant Mboa (tous
+      // étudiants confondus) pour un admin. Miroir de getConversations
+      // (mboa-web/src/lib/data/chat.ts).
+      final profil = await _supabase
           .from('users')
-          .select('id, nom, photo_url, verified')
-          .filter('id', 'in', idsParticipants);
+          .select('role, est_admin')
+          .eq('id', user.id)
+          .maybeSingle();
+      final estAdmin = profil != null &&
+          (profil['role'] == 'admin' || profil['est_admin'] == true);
 
-      final mapUsers = {for (var u in usersData) u['id']: u};
-
-      // Récupérer les titres des annonces liées (logements et articles
-      // n'ont pas de FK commune, donc deux requêtes séparées).
-      final idsLogements = data
-          .where((c) => c['annonce_type'] == 'logement' && c['annonce_id'] != null)
-          .map((c) => c['annonce_id'].toString())
-          .toSet()
-          .toList();
-      final idsArticles = data
-          .where((c) => c['annonce_type'] == 'article' && c['annonce_id'] != null)
-          .map((c) => c['annonce_id'].toString())
-          .toSet()
-          .toList();
-
-      final mapTitres = <String, String>{};
-      if (idsLogements.isNotEmpty) {
-        final logementsData =
-            await _supabase.from('logements').select('id, titre').filter('id', 'in', idsLogements);
-        for (final l in List<Map<String, dynamic>>.from(logementsData)) {
-          mapTitres[l['id']] = l['titre'] ?? '';
-        }
-      }
-      if (idsArticles.isNotEmpty) {
-        final articlesData =
-            await _supabase.from('articles').select('id, titre').filter('id', 'in', idsArticles);
-        for (final a in List<Map<String, dynamic>>.from(articlesData)) {
-          mapTitres[a['id']] = a['titre'] ?? '';
-        }
-      }
-
-      final enriched = <Map<String, dynamic>>[];
-      for (final conv in data) {
-        final autreId = List<String>.from(conv['participants'])
-            .firstWhere((id) => id != user.id, orElse: () => user.id);
-
-        enriched.add({
-          ...conv,
-          'autre_user': mapUsers[autreId] ?? {'nom': 'Utilisateur'},
-          'autre_id': autreId,
-          'annonce_titre': mapTitres[conv['annonce_id']?.toString()],
-        });
-      }
+      final enriched = estAdmin
+          ? await _chargerConversationsAdmin(user.id)
+          : await _chargerConversationsMembre(user.id);
 
       if (mounted) {
         setState(() {
+          _estAdmin = estAdmin;
           _conversations = enriched;
           _isLoading = false;
         });
@@ -123,6 +68,124 @@ class _ChatScreenState extends State<ChatScreen> with RefreshableState {
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _chargerConversationsMembre(String userId) async {
+    final data = await _supabase
+        .from('conversations')
+        .select('*')
+        .contains('participants', [userId])
+        .order('dernier_message_date', ascending: false);
+
+    // Une conversation classique n'apparaît qu'une fois un message échangé,
+    // mais la conversation Assistant Mboa reste visible même vide : elle
+    // sert de point d'entrée permanent vers le support.
+    final rows = List<Map<String, dynamic>>.from(data)
+        .where((c) => c['dernier_message'] != null || c['is_support'] == true)
+        .toList();
+    if (rows.isEmpty) return [];
+
+    final idsParticipants = rows
+        .where((c) => c['is_support'] != true)
+        .map((conv) {
+          final parts = List<String>.from(conv['participants']);
+          return parts.firstWhere((id) => id != userId, orElse: () => userId);
+        })
+        .toSet()
+        .toList();
+
+    final usersData = idsParticipants.isEmpty
+        ? []
+        : await _supabase
+            .from('users')
+            .select('id, nom, photo_url, verified')
+            .filter('id', 'in', idsParticipants);
+    final mapUsers = {for (var u in usersData) u['id']: u};
+    final mapTitres = await _chargerTitresAnnonces(rows);
+
+    return rows.map((conv) {
+      if (conv['is_support'] == true) {
+        return {
+          ...conv,
+          'autre_user': const {'nom': 'Assistant Mboa', 'photo_url': null, 'verified': true},
+          'autre_id': userId,
+          'annonce_titre': null,
+        };
+      }
+      final autreId = List<String>.from(conv['participants'])
+          .firstWhere((id) => id != userId, orElse: () => userId);
+      return {
+        ...conv,
+        'autre_user': mapUsers[autreId] ?? {'nom': 'Utilisateur'},
+        'autre_id': autreId,
+        'annonce_titre': mapTitres[conv['annonce_id']?.toString()],
+      };
+    }).toList();
+  }
+
+  // File d'attente admin : uniquement les conversations Assistant Mboa non
+  // assignées ou assignées à cet admin — jamais les conversations
+  // classiques entre étudiants/vendeurs, jamais celles déjà prises par un
+  // autre admin. Miroir de getConversationsAdmin (mboa-web).
+  Future<List<Map<String, dynamic>>> _chargerConversationsAdmin(String adminId) async {
+    final data = await _supabase
+        .from('conversations')
+        .select('*')
+        .eq('is_support', true)
+        .or('assigned_admin_id.is.null,assigned_admin_id.eq.$adminId')
+        .not('dernier_message', 'is', null)
+        .order('dernier_message_date', ascending: false);
+
+    final rows = List<Map<String, dynamic>>.from(data);
+    if (rows.isEmpty) return [];
+
+    final idsEtudiants = rows.map((c) => List<String>.from(c['participants'])[0]).toSet().toList();
+    final usersData = await _supabase
+        .from('users')
+        .select('id, nom, photo_url, verified')
+        .filter('id', 'in', idsEtudiants);
+    final mapUsers = {for (var u in usersData) u['id']: u};
+
+    return rows.map((conv) {
+      final etudiantId = List<String>.from(conv['participants'])[0];
+      return {
+        ...conv,
+        'autre_user': mapUsers[etudiantId] ?? {'nom': 'Utilisateur'},
+        'autre_id': etudiantId,
+        'annonce_titre': null,
+        'assigne_a_moi': conv['assigned_admin_id'] == adminId,
+      };
+    }).toList();
+  }
+
+  Future<Map<String, String>> _chargerTitresAnnonces(List<Map<String, dynamic>> rows) async {
+    final idsLogements = rows
+        .where((c) => c['annonce_type'] == 'logement' && c['annonce_id'] != null)
+        .map((c) => c['annonce_id'].toString())
+        .toSet()
+        .toList();
+    final idsArticles = rows
+        .where((c) => c['annonce_type'] == 'article' && c['annonce_id'] != null)
+        .map((c) => c['annonce_id'].toString())
+        .toSet()
+        .toList();
+
+    final mapTitres = <String, String>{};
+    if (idsLogements.isNotEmpty) {
+      final logementsData =
+          await _supabase.from('logements').select('id, titre').filter('id', 'in', idsLogements);
+      for (final l in List<Map<String, dynamic>>.from(logementsData)) {
+        mapTitres[l['id']] = l['titre'] ?? '';
+      }
+    }
+    if (idsArticles.isNotEmpty) {
+      final articlesData =
+          await _supabase.from('articles').select('id, titre').filter('id', 'in', idsArticles);
+      for (final a in List<Map<String, dynamic>>.from(articlesData)) {
+        mapTitres[a['id']] = a['titre'] ?? '';
+      }
+    }
+    return mapTitres;
   }
 
   String _formatHeure(String? dateStr) {
@@ -307,18 +370,28 @@ class _ChatScreenState extends State<ChatScreen> with RefreshableState {
     final nom = autreUser['nom'] ?? 'Utilisateur';
     final isVerified =
         autreUser['verified'] == true;
-    final nonLu = conv['non_lu'];
+    final isSupport = conv['is_support'] == true;
     final userId =
         _supabase.auth.currentUser?.id ?? '';
+    final nonLu = conv['non_lu'];
+    // Clé du compteur non-lu : soi-même pour un membre (y compris sur son
+    // propre Assistant Mboa), l'admin assigné ou la clé collective
+    // 'non_assigne' pour un admin sur une conversation support non encore
+    // prise en charge — miroir de getConversationsAdmin (mboa-web).
+    final cleNonLu = _estAdmin && isSupport
+        ? (conv['assigne_a_moi'] == true ? userId : 'non_assigne')
+        : userId;
     int nbNonLu = 0;
     if (nonLu is Map) {
-      nbNonLu = (nonLu[userId] ?? 0) as int;
+      nbNonLu = (nonLu[cleNonLu] ?? 0) as int;
     }
     final annonceTitre = conv['annonce_titre'] as String?;
     final emoji = conv['annonce_type'] == 'logement' ? '🏠' : '🛒';
-    final sujet = (annonceTitre != null && annonceTitre.isNotEmpty)
-        ? '$emoji $annonceTitre'
-        : (conv['annonce_type'] == 'logement' ? '🏠 Logement' : '🛒 Article');
+    final sujet = isSupport
+        ? (_estAdmin ? '💬 Assistant Mboa' : '💬 Support Mboa')
+        : (annonceTitre != null && annonceTitre.isNotEmpty)
+            ? '$emoji $annonceTitre'
+            : (conv['annonce_type'] == 'logement' ? '🏠 Logement' : '🛒 Article');
 
     return GestureDetector(
       onTap: () async {
@@ -332,6 +405,9 @@ class _ChatScreenState extends State<ChatScreen> with RefreshableState {
               sujet: sujet,
               annonceId: conv['annonce_id']?.toString(),
               annonceType: conv['annonce_type'],
+              isSupport: isSupport,
+              estAdminViewer: _estAdmin,
+              assignedAdminId: conv['assigned_admin_id'] as String?,
             ),
           ),
         );
@@ -379,10 +455,10 @@ class _ChatScreenState extends State<ChatScreen> with RefreshableState {
                       border: Border.all(
                           color: MboaColors.border),
                     ),
-                    child: const Center(
-                      child: Text('💬',
+                    child: Center(
+                      child: Text(isSupport ? '🤖' : '💬',
                           style:
-                              TextStyle(fontSize: 10)),
+                              const TextStyle(fontSize: 10)),
                     ),
                   ),
                 ),
@@ -589,6 +665,14 @@ class ConversationScreen extends StatefulWidget {
   final String sujet;
   final String? annonceId;
   final String? annonceType;
+  // Assistant Mboa (voir migration 20260726000000_assistant_mboa.sql) :
+  // isSupport marque une conversation support (pas d'admin fixe tant que
+  // personne n'a répondu), estAdminViewer distingue le point de vue admin
+  // (file d'attente) du point de vue étudiant (son unique conversation
+  // support), assignedAdminId reflète la prise en charge actuelle.
+  final bool isSupport;
+  final bool estAdminViewer;
+  final String? assignedAdminId;
 
   const ConversationScreen({
     super.key,
@@ -598,6 +682,9 @@ class ConversationScreen extends StatefulWidget {
     required this.sujet,
     this.annonceId,
     this.annonceType,
+    this.isSupport = false,
+    this.estAdminViewer = false,
+    this.assignedAdminId,
   });
 
   @override
@@ -611,6 +698,7 @@ class ConversationScreenState extends State<ConversationScreen> {
   final _scrollController = ScrollController();
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
+  late String? _assignedAdminId = widget.assignedAdminId;
 
   @override
   void initState() {
@@ -686,6 +774,16 @@ class ConversationScreenState extends State<ConversationScreen> {
           .eq('conversation_id',
               widget.conversationId)
           .neq('expediteur_id', userId);
+      // Sur Assistant Mboa vu par un admin non assigné, on ne remet pas le
+      // compteur collectif 'non_assigne' à zéro à la simple lecture — sinon
+      // la conversation semblerait traitée aux yeux des autres admins sans
+      // qu'aucun n'ait encore répondu (miroir de conversation-view.tsx,
+      // mboa-web). Le RPC ne peut de toute façon écrire que non_lu[auth.uid()],
+      // jamais la clé collective : sans prise en charge, l'appel est un
+      // no-op utile pour rien.
+      if (widget.estAdminViewer && widget.isSupport && _assignedAdminId != userId) {
+        return;
+      }
       // RPC plutôt qu'un update direct du JSON non_lu : évite d'écraser
       // l'incrément d'un message qui viendrait d'arriver entre-temps.
       await _supabase.rpc('marquer_conversation_lue',
@@ -747,6 +845,24 @@ class ConversationScreenState extends State<ConversationScreen> {
     _messageController.clear();
 
     try {
+      // Premier admin à répondre sur Assistant Mboa : prise en charge
+      // atomique (update conditionné par assigned_admin_id is null, gagné
+      // par le premier qui l'exécute) — la conversation disparaît alors de
+      // la liste des autres admins et les prochains messages de l'étudiant
+      // ne notifient plus que celui-ci. Miroir de conversation-view.tsx.
+      if (widget.estAdminViewer && widget.isSupport && _assignedAdminId == null) {
+        final pris = await _supabase
+            .from('conversations')
+            .update({'assigned_admin_id': userId})
+            .eq('id', widget.conversationId)
+            .isFilter('assigned_admin_id', null)
+            .select('assigned_admin_id')
+            .maybeSingle();
+        if (pris != null && mounted) {
+          setState(() => _assignedAdminId = pris['assigned_admin_id'] as String?);
+        }
+      }
+
       await _supabase.from('messages').insert({
         'conversation_id': widget.conversationId,
         'expediteur_id': userId,
@@ -986,16 +1102,19 @@ class ConversationScreenState extends State<ConversationScreen> {
               color: MboaColors.text),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Laisser un avis',
-            onPressed: _ouvrirFormulaireAvis,
-            icon: const Icon(
-              Icons.star_rate_rounded,
-              color: MboaColors.boost,
-            ),
-          ),
-        ],
+        // Assistant Mboa n'a pas de propriétaire/vendeur à noter.
+        actions: widget.isSupport
+            ? null
+            : [
+                IconButton(
+                  tooltip: 'Laisser un avis',
+                  onPressed: _ouvrirFormulaireAvis,
+                  icon: const Icon(
+                    Icons.star_rate_rounded,
+                    color: MboaColors.boost,
+                  ),
+                ),
+              ],
         title: Row(
           children: [
             Container(
@@ -1042,15 +1161,32 @@ class ConversationScreenState extends State<ConversationScreen> {
                     ],
                   ],
                 ),
-                const Text(
-                  '● En ligne',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 11,
-                    color: MboaColors.verified,
-                    fontWeight: FontWeight.w500,
+                if (widget.estAdminViewer && widget.isSupport)
+                  Text(
+                    _assignedAdminId == userId
+                        ? '✅ Assigné à vous'
+                        : _assignedAdminId != null
+                            ? 'Pris en charge'
+                            : '🆕 Non assigné',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _assignedAdminId != null
+                          ? MboaColors.verified
+                          : MboaColors.boost,
+                    ),
+                  )
+                else
+                  const Text(
+                    '● En ligne',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 11,
+                      color: MboaColors.verified,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
               ],
             ),
           ],

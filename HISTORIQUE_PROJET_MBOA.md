@@ -628,6 +628,75 @@ nouveau compte propriétaire.
 
 ---
 
+## 5quinquies. Portage mobile de l'Assistant Mboa (29 juillet 2026)
+
+Ferdinand a constaté que l'Assistant Mboa (chat support, déjà en
+production côté web depuis §4.6) ne s'affichait pas dans le chat mobile,
+et voulait que tout le monde — étudiants comme admin — puisse en
+bénéficier sur l'app comme sur le site. Le backend existait déjà en
+entier (migration `20260726000000_assistant_mboa.sql` : conversation
+support `is_support=true` créée automatiquement à l'inscription de tout
+compte non-admin, `assigned_admin_id` figé sur le premier admin qui
+répond, RLS et compteur de non-lus déjà adaptés) — portage 100% client
+côté mobile, miroir de `mboa-web/src/components/chat/{chat-list,
+conversation-view}.tsx` et `src/lib/data/chat.ts`.
+
+- **`chat_screen.dart` (`ChatScreen`)** : détecte `estAdmin` (role='admin'
+  OU privilège superposé `est_admin`, pas juste role) au chargement, puis
+  branche vers deux chargements distincts — `_chargerConversationsMembre`
+  (conversations classiques + toujours sa propre conversation Assistant
+  Mboa, visible même sans message échangé, comme point d'entrée
+  permanent) ou `_chargerConversationsAdmin` (file d'attente : uniquement
+  les conversations support non assignées ou assignées à cet admin,
+  jamais les conversations classiques d'un autre utilisateur). Badge 🤖
+  sur l'avatar à la place de 💬 pour les distinguer dans la liste.
+- **`ConversationScreen`** : nouveaux paramètres `isSupport`,
+  `estAdminViewer`, `assignedAdminId`. Sous-titre d'en-tête contextuel
+  pour un admin sur une conversation support ("🆕 Non assigné" / "Pris en
+  charge" / "✅ Assigné à vous"), bouton "Laisser un avis" masqué
+  (Assistant Mboa n'a pas de vendeur à noter). Prise en charge atomique à
+  la première réponse d'un admin (`update ... where assigned_admin_id is
+  null`, gagnée par le premier qui l'exécute, comme sur le web) —
+  au-delà, la conversation disparaît de la file des autres admins.
+  `_marquerLus` ne remet le compteur non-lu à zéro que si l'appelant est
+  membre ou admin déjà assigné : un admin qui ouvre juste une conversation
+  non assignée sans y répondre ne doit pas la faire paraître traitée aux
+  yeux des autres admins.
+- **Bug préexistant corrigé au passage** (même famille que lieux_publics,
+  §5bis, et pas une coïncidence : cette migration date du 26/07, la veille
+  de la refonte des rôles superposables du 27/07, PR #28 — jamais mise à
+  jour depuis) : les 4 policies RLS de `20260726000000_assistant_mboa.sql`
+  et le repli de notification "aucun admin assigné" utilisaient encore
+  `role = 'admin'` en dur — un admin par privilège superposé (`est_admin
+  = true`, role resté 'visiteur'/'vendeur') ne voyait donc aucune
+  conversation Assistant Mboa du tout, sur aucune plateforme. Très
+  probablement la cause réelle du symptôme signalé par Ferdinand, en plus
+  de l'absence pure et simple de l'écran mobile. Migration
+  `20260729000000_fix_assistant_mboa_est_admin.sql` : les 4 policies et
+  le repli de notification passent à `is_admin()`/`role = 'admin' or
+  est_admin = true` ; `marquer_conversation_lue()` (RPC utilisée par le
+  mobile pour remettre le compteur à zéro, absente du web qui fait sa
+  propre écriture directe) exigeait `auth.uid() = any(participants)`,
+  toujours faux pour un admin sur une conversation support puisque
+  `participants` ne contient que l'étudiant — corrigé pour accepter aussi
+  un admin sur une ligne `is_support`.
+- **Navigation admin** : entrée "🤖 Assistant Mboa" ajoutée au menu
+  hamburger de `admin_screen.dart` (à côté de "Demandes", même style de
+  badge rouge que le nombre de conversations non assignées) et carte
+  "🚨 Actions requises" sur le Dashboard quand ce nombre est supérieur à
+  zéro — miroir du lien "🤖 Assistant Mboa" dans `NAV_LINKS_ADMIN`
+  (`header-client.tsx`, web).
+- Testé : `flutter analyze` propre (seuls les avertissements
+  `withOpacity`/`prefer_const` préexistants, non liés à ce changement) ;
+  migration de correctif rejouée deux fois sur un Postgres local (schéma
+  reconstitué) sans erreur.
+- **Non vérifié sur device réel** au moment de la rédaction — la
+  migration de correctif doit d'abord être collée dans le SQL Editor
+  Supabase (sans elle, un admin par privilège superposé continuera à ne
+  rien voir, même avec l'écran mobile en place).
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
