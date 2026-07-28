@@ -409,6 +409,62 @@ correctif minimal :
 
 ---
 
+## 5bis. Phase 4 — Support multi-villes : Sangmelima, Kribi, Ébolowa (27-28 juillet 2026)
+
+Mboa ne couvrait qu'une seule ville depuis le début du projet, codée en
+dur des deux côtés (centre de carte, détection GPS, libellés). Ferdinand
+a demandé l'extension à Kribi et Ébolowa, avec sélection manuelle
+possible à tout moment depuis l'accueil, détection automatique par GPS
+par défaut, et repli vers la liste des villes couvertes quand la
+position détectée n'en fait pas partie (ou que la ville détectée n'a pas
+encore d'annonces). Décision actée : liste des villes gérable par un
+admin via une table Supabase plutôt qu'une liste figée dans le code, pour
+pouvoir en ajouter une 4ᵉ sans republier l'app. Implémenté mobile
+d'abord (device réel à tester), web à porter ensuite.
+
+- **Migration `20260727000000_multi_ville.sql`** : nouvelle table
+  `villes` (nom, lat/lng, rayon de couverture, actif, ordre d'affichage)
+  seedée avec les 3 villes, lecture publique / écriture `is_admin()`.
+  Colonne `ville` ajoutée à `lieux_publics` (n'en avait aucune) + backfill
+  à Sangmelima. Backfill défensif de `logements.ville`/`articles.ville`
+  (toujours du texte libre écrit à la main côté client jusqu'ici, jamais
+  une vraie donnée choisie par l'utilisateur).
+- **Bug préexistant corrigé au passage** : les 4 policies RLS de
+  `lieux_publics` utilisaient encore `role = 'admin'` en dur, jamais
+  migrées vers `is_admin()` lors de la refonte des rôles superposables
+  (§4.9) — un admin `est_admin`-only ne pouvait donc pas gérer les lieux
+  publics. Corrigé dans la même migration puisqu'elle touchait déjà
+  cette table.
+- **`VilleService`** (mobile, `lib/core/services/ville_service.dart`) :
+  singleton à accès direct plutôt qu'un provider Riverpod — constat fait
+  en analysant le code existant qu'aucun écran mobile n'utilise Riverpod
+  aujourd'hui (seuls le router et des providers d'auth inutilisés),
+  introduire du `ConsumerState` partout aurait été disproportionné pour
+  un état aussi simple. Détecte la ville active la plus proche de la
+  position GPS parmi celles couvertes (au lieu d'un seul centre codé en
+  dur comme avant), persiste le choix en `SharedPreferences`, expose un
+  helper de "ville la plus proche d'une position" réutilisé par la carte
+  et par Publier.
+- **Écrans mobiles adaptés** : Home (sélecteur de ville dans le header,
+  logements récents/bons plans Market et Trouve ton Mboa filtrés/
+  recentrés sur la ville choisie, proposition automatique de la liste des
+  villes si la ville détectée n'a pas d'annonces), Logement/Market
+  (filtre ville sur les listes complètes, même garde-fou anti-race-
+  condition que le filtre prix/note du 22/07), Carte (centre dynamique,
+  filtrage par ville, tag automatique de la ville la plus proche sur
+  "Ajouter un lieu ici"), Publier (ville du logement dérivée de sa
+  position GPS captée, ville de l'article dérivée du contexte ville
+  courant du vendeur puisqu'aucune position n'est captée pour un
+  article), nouvel écran admin "Villes couvertes" (ajout/édition/
+  activation).
+- **Reste à faire** : coller la migration dans le dashboard Supabase,
+  vérifier sur device réel (build déclenché sur GitHub Actions le 28/07),
+  puis portage web (cookie + Server Action pour partager la ville
+  sélectionnée entre les Server Components, la persistance client seule
+  ne suffisant pas côté web contrairement au mobile).
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
@@ -416,7 +472,8 @@ correctif minimal :
   `conversations`, `messages`, `avis`, `signalements`, `demandes_compte`,
   `favoris`, `lieux_publics`, `alertes_recherche`, `moderation_ia`,
   `image_hashes`, `verifications_terrain`, `attestations_acces_log`,
-  `notifications`, `etude_marche_reponses`.
+  `notifications`, `etude_marche_reponses`, `villes` (référence des
+  villes couvertes, admin-gérable depuis le 27/07).
 - **Edge Functions** : `create-vendor`, `create-ambassadeur`,
   `send-notification`, `notifier-nouvelle-annonce`, `moderate-annonce`,
   `get-attestation-url`, `debug-hash`, `swift-endpoint`.
@@ -453,6 +510,7 @@ correctif minimal :
 | Blocage indéfini à l'upload de photos | Mobile |
 | Realtime jamais reçu sur verifications_terrain/signalements | Tables absentes de la publication `supabase_realtime` |
 | Comptes admin/ambassadeur réels verrouillés hors de leur espace | Mobile, après la migration `est_admin`/`est_ambassadeur` côté web (4.9) — `UserModel.isAdmin`/`MainScreen` testaient encore `role == 'admin'` littéralement |
+| `lieux_publics` inaccessible aux admins `est_admin`-only | RLS jamais migrée de `role='admin'` vers `is_admin()` lors de la refonte des rôles (4.9), trouvé en implémentant le multi-villes le 27/07 |
 
 ---
 
@@ -527,3 +585,8 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
 - **Synchronisation dépôt local/distant vérifiée le 27/07** : fast-forward
   propre vers `main` (jusqu'à la PR #30 incluse), aucun commit local
   perdu, `flutter analyze` sans erreur après fusion.
+- **Multi-villes (27-28/07)** : Sangmelima/Kribi/Ébolowa couvertes côté
+  mobile (voir Phase 4, section 5bis) — migration écrite mais pas encore
+  appliquée en base de production, build de vérification lancé sur
+  GitHub Actions, pas encore testé sur device réel. Portage web pas
+  commencé.
