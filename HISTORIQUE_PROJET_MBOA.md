@@ -457,11 +457,80 @@ d'abord (device réel à tester), web à porter ensuite.
   courant du vendeur puisqu'aucune position n'est captée pour un
   article), nouvel écran admin "Villes couvertes" (ajout/édition/
   activation).
-- **Reste à faire** : coller la migration dans le dashboard Supabase,
-  vérifier sur device réel (build déclenché sur GitHub Actions le 28/07),
-  puis portage web (cookie + Server Action pour partager la ville
-  sélectionnée entre les Server Components, la persistance client seule
-  ne suffisant pas côté web contrairement au mobile).
+- **Migration appliquée le 28/07**, avec un aller-retour : premier essai
+  échoué sur `column "ville" does not exist` — `articles` n'avait en
+  réalité jamais eu de colonne `ville` en base (contrairement à
+  `logements`), le code qui la lisait (`article_detail_screen.dart`) l'a
+  donc toujours reçue absente/`null` en silence depuis le début du
+  projet. `alter table articles add column if not exists ville` ajouté,
+  et le reste du script rendu rejouable sans risque (`drop policy if
+  exists` systématique avant chaque `create policy`) pour pouvoir le
+  recoller tel quel après un échec partiel.
+- **Reste à faire** : portage web (cookie + Server Action pour partager
+  la ville sélectionnée entre les Server Components, la persistance
+  client seule ne suffisant pas côté web contrairement au mobile).
+
+---
+
+## 5ter. Phase 4 (suite) — Polish visite guidée et navigation admin (28 juillet 2026)
+
+Après la mise en service du multi-villes, deux séries de retours de
+Ferdinand testés et corrigés le même jour.
+
+### Visite guidée (`lib/core/onboarding/`)
+- **Double soulignement coloré sur tout le texte de la bulle**, repéré
+  sur device réel. Cause : la bulle est montée via un `OverlayEntry` sur
+  l'`Overlay` racine (`GuidedTour.show`), donc en dehors du `Scaffold` —
+  sans ancêtre `Material`, Flutter affiche tout `Text` avec son style de
+  repli de debug (double soulignement coloré très visible), pas un style
+  volontaire de l'app. Corrigé en enveloppant le contenu de
+  `_GuidedTourView` dans `Material(type: MaterialType.transparency)`.
+- **Bouton "🧭 Comment utiliser ?"** avec libellé texte faisait déborder
+  "Bienvenue sur Mboa" et poussait la cloche de notifications hors de
+  l'écran sur téléphone étroit (constaté sur capture device réel).
+  `TourButton` gagne un paramètre `iconOnly`, activé uniquement sur
+  l'accueil (Publier/Gestion gardent le libellé, où la place ne manque
+  pas). Nouvelle 1ʳᵉ étape de la visite ("🧭 Ton guide, toujours là") qui
+  présente ce bouton comme le moyen de relancer la visite plus tard,
+  pour compenser la perte du texte explicite.
+- **Étape "📍 Trouve ton Mboa" ajoutée** (visiteur et étudiant) : section
+  jusque-là absente de la visite alors qu'elle est présentée comme l'une
+  des fonctionnalités les plus puissantes de l'app.
+- **Dernière étape "Crée ton compte" mal ciblée** ("ne prend pas le
+  bouton, juste les éléments du bas" — retour Ferdinand). Cause : le
+  rectangle du halo n'est calculé qu'une fois au moment d'atteindre
+  l'étape ; si le contenu au-dessus (Logements récents, chargé en
+  réseau) finit sa mise en page juste après, la position réelle du
+  bouton a bougé et le halo reste figé sur l'ancienne position. Ajout
+  d'une re-mesure de rattrapage 400 ms après le calcul initial.
+- Vérifié pas à pas sur device réel (captures à chaque étape) après
+  correction, y compris la dernière étape.
+
+### Navigation admin (`admin_screen.dart`)
+- Barre du bas réduite de 7 éléments (6 onglets + "Mon compte") à
+  **5 onglets** : Dashboard, Utilisateurs, Annonces, Signalements,
+  Vérifs. Signalements et Vérifs gardés en priorité car ce sont les deux
+  seuls onglets à badge temps réel (urgence) ; Demandes et Mon compte
+  déplacés dans un **menu hamburger** (icône ☰ à côté du bouton
+  déconnexion sur le Dashboard, `Drawer` standard Flutter) — le
+  Dashboard a déjà son alerte "🚨 Actions requises" pour rattraper les
+  demandes en attente.
+- **Comportement clarifié en testant** (pas un bug) : se connecter avec
+  un compte admin n'a jamais redirigé automatiquement vers le dashboard
+  admin — depuis la refonte des rôles superposables (§4.9), il faut
+  passer par Profil → "Administration". Le dashboard admin n'est donc
+  jamais le point d'entrée direct après connexion, y compris pour un
+  compte purement admin.
+- Vérifié sur device réel : barre à 5 onglets, ouverture du menu,
+  "Demandes" et "Mon compte" fonctionnels.
+
+### Reste en suspens
+- **Assistant Mboa côté mobile** (parité avec le web, §4.6) : recherche
+  faite (backend déjà en place — table `conversations` avec
+  `is_support`/`assigned_admin_id`, trigger de création automatique,
+  RLS, comptage non-lu déjà adapté — portage 100% client mobile,
+  aucune nouvelle migration nécessaire), implémentation pas encore
+  commencée.
 
 ---
 
@@ -511,6 +580,9 @@ d'abord (device réel à tester), web à porter ensuite.
 | Realtime jamais reçu sur verifications_terrain/signalements | Tables absentes de la publication `supabase_realtime` |
 | Comptes admin/ambassadeur réels verrouillés hors de leur espace | Mobile, après la migration `est_admin`/`est_ambassadeur` côté web (4.9) — `UserModel.isAdmin`/`MainScreen` testaient encore `role == 'admin'` littéralement |
 | `lieux_publics` inaccessible aux admins `est_admin`-only | RLS jamais migrée de `role='admin'` vers `is_admin()` lors de la refonte des rôles (4.9), trouvé en implémentant le multi-villes le 27/07 |
+| `articles.ville` n'a jamais existé en base | Colonne absente depuis l'origine (contrairement à `logements.ville`), lue en silence comme `null` ; trouvé en appliquant la migration multi-villes le 28/07 |
+| Bulle de la visite guidée soulignée en couleur (double soulignement) | Mobile, `OverlayEntry` monté hors du `Scaffold` sans ancêtre `Material` — style de repli de debug Flutter, pas un style voulu |
+| Dernière étape "Crée ton compte" de la visite guidée mal ciblée | Mobile, distinct du délai de scroll déjà corrigé (ligne ci-dessus) — halo figé sur une position obsolète si le contenu au-dessus finit de charger juste après le calcul initial |
 
 ---
 
@@ -586,7 +658,20 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
   propre vers `main` (jusqu'à la PR #30 incluse), aucun commit local
   perdu, `flutter analyze` sans erreur après fusion.
 - **Multi-villes (27-28/07)** : Sangmelima/Kribi/Ébolowa couvertes côté
-  mobile (voir Phase 4, section 5bis) — migration écrite mais pas encore
-  appliquée en base de production, build de vérification lancé sur
-  GitHub Actions, pas encore testé sur device réel. Portage web pas
-  commencé.
+  mobile (voir Phase 4, section 5bis), migration appliquée en base de
+  production. Portage web pas commencé.
+- **Visite guidée et navigation admin (28/07, section 5ter)** : tous les
+  correctifs vérifiés sur device réel — bulle sans soulignement de
+  debug, bouton icône seule sur l'accueil, étape Trouve ton Mboa,
+  dernière étape correctement ciblée, barre admin à 5 onglets, menu
+  hamburger (Demandes/Mon compte) fonctionnel.
+- **Assistant Mboa côté mobile** : pas encore implémenté (recherche
+  faite, voir section 5ter) — portage 100% client, backend déjà en
+  place côté serveur (partagé avec le web).
+- **Campagne de test manuel sur device réel** (Android, via `adb`,
+  comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
+  non inscrit et étudiant connecté couverts (section 3), plus des
+  vérifications ciblées le 28/07 (multi-villes, visite guidée, nav
+  admin). Parcours vendeur/propriétaire et administrateur restent à
+  tester de façon exhaustive, mis en pause à la demande de Ferdinand
+  pour reprise ultérieure.
