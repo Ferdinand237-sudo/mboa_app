@@ -24,30 +24,35 @@ class AdminScreen extends StatefulWidget {
 class _AdminScreenState extends State<AdminScreen> {
   int _currentIndex = 0;
 
-  // Onglets 3 (Signalements) et 5 (Vérifs) : badge temps réel affiché
+  // Onglets 3 (Signalements) et 4 (Vérifs) : badge temps réel affiché
   // quand un élément arrive pendant que l'admin est sur un autre onglet
   // (voir CLAUDE.md, section temps réel).
   static const int _indexSignalements = 3;
-  static const int _indexVerifications = 5;
+  static const int _indexVerifications = 4;
   int _badgeSignalements = 0;
   int _badgeVerifications = 0;
 
+  // Barre réduite à 5 onglets (constat : 6 onglets + "Mon compte" saturait
+  // la barre). Demandes et "Mon compte" passent dans le menu hamburger du
+  // Dashboard (_DashboardTab) — Signalements et Vérifs restent dans la
+  // barre car ce sont les deux seuls onglets à badge temps réel (urgence),
+  // le Dashboard a déjà son alerte "Actions requises" pour rattraper
+  // Demandes.
+  //
   // Signalements et Vérifs ont déjà leur propre abonnement realtime
   // (voir CLAUDE.md) : pas de clé de rafraîchissement nécessaire pour eux.
   final _dashboardKey = GlobalKey<State>();
   final _usersKey = GlobalKey<State>();
   final _annoncesKey = GlobalKey<State>();
-  final _demandesKey = GlobalKey<State>();
 
   List<GlobalKey<State>?> get _refreshKeys =>
-      [_dashboardKey, _usersKey, _annoncesKey, null, _demandesKey, null];
+      [_dashboardKey, _usersKey, _annoncesKey, null, null];
 
   final List<_AdminNavItem> _navItems = [
     _AdminNavItem(icon: Icons.dashboard_rounded, label: 'Dashboard'),
     _AdminNavItem(icon: Icons.people_rounded, label: 'Utilisateurs'),
     _AdminNavItem(icon: Icons.list_alt_rounded, label: 'Annonces'),
     _AdminNavItem(icon: Icons.flag_rounded, label: 'Signalements'),
-    _AdminNavItem(icon: Icons.mail_rounded, label: 'Demandes'),
     _AdminNavItem(icon: Icons.verified_user_rounded, label: 'Vérifs'),
   ];
 
@@ -62,7 +67,6 @@ class _AdminScreenState extends State<AdminScreen> {
         }
       },
     ),
-    AdminDemandesScreen(key: _demandesKey),
     AdminVerificationsScreen(
       onNouvelElement: () {
         if (_currentIndex != _indexVerifications && mounted) {
@@ -180,35 +184,6 @@ class _AdminScreenState extends State<AdminScreen> {
                   ),
                 );
                 }),
-                // Retour au compte de base (visiteur/vendeur) : privilège
-                // superposé, plus une redirection forcée sans issue — voir
-                // roles_multiples_admin_ambassadeur et main_screen.dart.
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => context.go(AppRoutes.main),
-                    behavior: HitTestBehavior.opaque,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.arrow_back_rounded,
-                          color: MboaColors.textMuted,
-                          size: 24,
-                        ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'Mon compte',
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: MboaColors.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -230,6 +205,7 @@ class _DashboardTab extends StatefulWidget {
 
 class _DashboardTabState extends State<_DashboardTab> with RefreshableState {
   final _supabase = Supabase.instance.client;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   Map<String, int> _stats = {};
   bool _isLoadingStats = true;
 
@@ -313,10 +289,65 @@ class _DashboardTabState extends State<_DashboardTab> with RefreshableState {
     }
   }
 
+  Widget _buildMenu(BuildContext context) {
+    final nbDemandes = _stats['demandes'] ?? 0;
+    return Drawer(
+      backgroundColor: Colors.white,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Text(
+                'Menu',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: MboaColors.text,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.mail_rounded, color: MboaColors.primary),
+              title: const Text('Demandes', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+              trailing: nbDemandes > 0
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: MboaColors.danger, borderRadius: BorderRadius.circular(10)),
+                      child: Text(
+                        '$nbDemandes',
+                        style: const TextStyle(fontFamily: 'Poppins', fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                    )
+                  : null,
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDemandesScreen()));
+              },
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.arrow_back_rounded, color: MboaColors.textMuted),
+              title: const Text('Mon compte', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(context);
+                context.go(AppRoutes.main);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: MboaColors.background,
+      drawer: _buildMenu(context),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -358,22 +389,45 @@ class _DashboardTabState extends State<_DashboardTab> with RefreshableState {
                             ),
                           ],
                         ),
-                        // Bouton déconnexion
-                        GestureDetector(
-                          onTap: () => _confirmerDeconnexion(context),
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(12),
+                        Row(
+                          children: [
+                            // Onglets Demandes + Mon compte, retirés de la
+                            // barre du bas pour la ramener à 5 éléments.
+                            GestureDetector(
+                              onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.menu_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.logout_rounded,
-                              color: Colors.white,
-                              size: 20,
+                            const SizedBox(width: 10),
+                            // Bouton déconnexion
+                            GestureDetector(
+                              onTap: () => _confirmerDeconnexion(context),
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.logout_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
