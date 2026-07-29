@@ -35,7 +35,13 @@ export function VerificationsClient({ verifications: initial }: { verifications:
     setAssignTarget(v);
     setLoadingAmbassadeurs(true);
     const supabase = createClient();
-    const { data } = await supabase.from("users").select("id, nom").eq("role", "ambassadeur");
+    // est_ambassadeur est un privilège superposé (voir HISTORIQUE_PROJET_MBOA.md
+    // §4.9) : un ambassadeur nommé garde son rôle de base (souvent
+    // "visiteur"), role="ambassadeur" seul ne suffit donc pas à le trouver.
+    const { data } = await supabase
+      .from("users")
+      .select("id, nom")
+      .or("role.eq.ambassadeur,est_ambassadeur.eq.true");
     setAmbassadeurs((data ?? []).map((a) => ({ id: a.id, nom: a.nom ?? "" })));
     setLoadingAmbassadeurs(false);
   }

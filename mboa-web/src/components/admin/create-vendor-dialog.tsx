@@ -67,7 +67,7 @@ export function CreateVendorDialog({
           .update({ role: "vendeur", sous_roles: merged })
           .eq("id", demande.userId as string);
         if (updateError) throw updateError;
-        await supabase.from("demandes_compte").update({ statut: "traite" }).eq("id", demande.id);
+        await supabase.from("demandes_compte").update({ statut: "approuve" }).eq("id", demande.id);
       } else {
         const response = await invokeCreateVendor({
           nom: demande.nom,

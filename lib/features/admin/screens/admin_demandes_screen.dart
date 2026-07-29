@@ -380,7 +380,7 @@ class _AdminDemandesScreenState
 
       await _supabase
           .from('demandes_compte')
-          .update({'statut': 'traite'})
+          .update({'statut': 'approuve'})
           .eq('id', demande['id']);
 
       if (mounted) {

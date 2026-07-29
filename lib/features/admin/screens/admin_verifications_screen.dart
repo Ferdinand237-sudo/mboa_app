@@ -75,7 +75,13 @@ class _AdminVerificationsScreenState extends State<AdminVerificationsScreen>
   Future<void> _assigner(Map<String, dynamic> verification) async {
     List<Map<String, dynamic>> ambassadeurs = [];
     try {
-      final data = await _supabase.from('users').select('id, nom').eq('role', AppConstants.roleAmbassadeur);
+      // est_ambassadeur est un privilège superposé (voir HISTORIQUE_PROJET_MBOA.md
+      // §4.9) : un ambassadeur nommé garde son rôle de base, role='ambassadeur'
+      // seul ne suffit donc pas à le trouver.
+      final data = await _supabase
+          .from('users')
+          .select('id, nom')
+          .or('role.eq.${AppConstants.roleAmbassadeur},est_ambassadeur.eq.true');
       ambassadeurs = List<Map<String, dynamic>>.from(data);
     } catch (_) {}
 

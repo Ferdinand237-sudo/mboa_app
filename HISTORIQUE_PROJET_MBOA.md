@@ -987,9 +987,13 @@ l'annonce n'appartient pas à l'appelant) :
 
 **Edge Function `supabase/functions/create-vendor/index.ts`** : relit
 `code_parrain` depuis la demande approuvée et le transmet en métadonnée à
-la création du compte Auth. **Reste à redéployer par Ferdinand**
-(`supabase functions deploy create-vendor --project-ref
-vodmsndqahmxdsqpayrd`), comme `send-notification` précédemment.
+la création du compte Auth. Migration confirmée appliquée en production
+par Ferdinand (vérifié en lisant `paliers_parrainage`/`users.code_parrainage`
+en direct via le MCP Supabase) ; `create-vendor` (v6→v7) et
+`send-notification` (v7→v8, correctif `est_admin` de la section 5sexies)
+redéployées avec succès le 29/07 une fois le bon compte Supabase authentifié
+(le projet `vodmsndqahmxdsqpayrd` n'était pas visible depuis le compte CLI
+utilisé jusque-là).
 
 **Côté web** :
 
@@ -1007,15 +1011,63 @@ vodmsndqahmxdsqpayrd`), comme `send-notification` précédemment.
 - `UserModel` étendu (`codeParrainage`, `creditsParrainage`).
 - Testé : `npx eslint` ciblé propre, `npm run build` complet sans erreur
   TypeScript (40 routes, `/parrainage` incluse).
-- **Non testé en conditions réelles** (inscription avec un vrai lien de
-  parrainage, validation par message/publication, boost effectif) au
-  moment de la rédaction — nécessite que la migration soit collée en
-  production et l'Edge Function redéployée.
+- Test en conditions réelles démarré par Ferdinand le 29/07, une fois la
+  migration en production et les Edge Functions redéployées — voir section
+  5undecies pour les deux bugs (préexistants, sans lien avec le parrainage
+  lui-même) découverts au passage.
 
 **Reste à faire (Phase 3, non commencée)** : versement financier réel au
 palier Ambassadeur Mboa — volontairement repoussé jusqu'à disposer de
 données réelles sur l'engagement du système et d'un revenu récurrent pour
 le financer.
+
+---
+
+## 5undecies. Deux bugs préexistants découverts en testant le parrainage (29 juillet 2026)
+
+En testant la Phase 2 en conditions réelles, Ferdinand a signalé deux
+erreurs sans rapport avec le parrainage lui-même — diagnostiquées en
+lisant directement les logs Postgres et les données du vrai projet via le
+MCP Supabase (accès obtenu ce jour-là après authentification du bon compte
+Supabase, voir section 6).
+
+**1. Impossible de faire évoluer un compte étudiant en compte vendeur
+(erreur 23514, violation de contrainte CHECK).** Root-cause trouvé dans
+les logs : `create-vendor-dialog.tsx` (web) et `admin_demandes_screen.dart`
+(mobile), dans la branche "compte existant" de la validation d'une demande
+Pro, mettent à jour `demandes_compte.statut` avec la valeur `'traite'` —
+qui n'existe pas dans la contrainte `demandes_compte_statut_check`
+(`en-attente`/`approuve`/`rejete`). Confusion avec le vocabulaire de la
+table `signalements`, où `'traite'` est une valeur valide — mêmes écrans
+admin, mécanique "approuver/rejeter" similaire, probablement copié d'un
+écran à l'autre. Corrigé sur les deux plateformes (`'traite'` →
+`'approuve'`, la même valeur que la branche "nouveau compte" du même
+formulaire) ; entrée `traite` retirée de `STATUT_STYLE`
+(`demandes-client.tsx`) devenue inutile. Une demande de Ferdinand
+(`Design Nickel`) était restée bloquée à `en-attente` suite à une tentative
+précédente alors que son compte avait déjà bien été promu vendeur côté
+`users` (les deux écritures ne sont pas transactionnelles) — corrigée
+manuellement en production (`statut` → `approuve`) une fois le bug
+identifié.
+
+**2. "Assigner un ambassadeur" ne trouve aucun ambassadeur alors qu'il en
+existe déjà deux.** Vérifié en base : les deux comptes (`Ambassadeur QA`,
+`Ambassadeur Mboa`) ont `role='visiteur'` avec `est_ambassadeur=true` — un
+ambassadeur nommé via "Nommer ambassadeur" (admin_users_screen.dart)
+conserve son rôle de base, `est_ambassadeur` étant un privilège superposé
+depuis la refonte de la section 4.9, jamais `role='ambassadeur'` en
+pratique. Trois emplacements filtraient encore uniquement sur
+`role='ambassadeur'`, oubliés lors de cette refonte (même famille de bug
+que celle déjà rencontrée sur les notifications, section 5sexies) :
+`admin_verifications_screen.dart` (mobile), `verifications-client.tsx` et
+`lib/data/admin.ts` (`getAmbassadeurs`, web — inutilisé actuellement mais
+corrigé par cohérence). Les trois passent désormais par
+`role.eq.ambassadeur,est_ambassadeur.eq.true` (`.or(...)`), même logique
+que `_estAmbassadeur` déjà utilisé dans `admin_users_screen.dart`.
+
+Testé : `flutter analyze` et `npx eslint` propres sur les fichiers touchés
+des deux bugs. **Non revérifié sur device/navigateur réel** au moment de
+la rédaction — à confirmer par Ferdinand.
 
 ---
 
@@ -1182,12 +1234,21 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
   stable). Phase 1 confirmée fonctionnelle par Ferdinand après test réel.
 - **Stratégie de croissance — Phase 2 : parrainage à crédits/paliers
   (31/07, section 5decies)** : migration `20260731000000_parrainage.sql`
-  écrite et testée en local (non collée en production au moment de la
-  rédaction), Edge Function `create-vendor` mise à jour (redéploiement
-  requis), page `/parrainage`, bouton boost via crédits sur Mes annonces,
-  capture `?ref=` sur mboa-web. Un seul niveau de parrainage et crédits
-  jamais convertibles en argent pour cette itération — Phase 3 (versement
-  réel Ambassadeur) toujours non commencée, séquencée à dessein.
+  écrite, testée en local puis collée et confirmée en production par
+  Ferdinand ; `create-vendor` et `send-notification` redéployées le 29/07
+  (voir section 6). Page `/parrainage`, bouton boost via crédits sur Mes
+  annonces, capture `?ref=` sur mboa-web. Un seul niveau de parrainage et
+  crédits jamais convertibles en argent pour cette itération — Phase 3
+  (versement réel Ambassadeur) toujours non commencée, séquencée à
+  dessein. Test réel en cours par Ferdinand, ayant révélé deux bugs
+  préexistants sans rapport avec le parrainage (section 5undecies).
+- **Bugs préexistants corrigés en testant le parrainage (29/07, section
+  5undecies)** : mise à niveau étudiant→vendeur bloquée par une valeur de
+  statut invalide (`'traite'` au lieu de `'approuve'`), et assignation
+  d'ambassadeur ne trouvant aucun candidat (filtre oublié sur
+  `est_ambassadeur`, même famille que le bug notifications de la section
+  5sexies). Corrigés sur mobile et web, non revérifiés sur device/
+  navigateur réel au moment de la rédaction.
 - **Campagne de test manuel sur device réel** (Android, via `adb`,
   comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
   non inscrit et étudiant connecté couverts (section 3), plus des

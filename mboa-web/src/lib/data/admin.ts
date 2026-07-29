@@ -252,6 +252,12 @@ export type Ambassadeur = { id: string; nom: string };
 
 export async function getAmbassadeurs(): Promise<Ambassadeur[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("users").select("id, nom").eq("role", "ambassadeur");
+  // est_ambassadeur est un privilège superposé (voir HISTORIQUE_PROJET_MBOA.md
+  // §4.9) : un ambassadeur nommé garde son rôle de base, role="ambassadeur"
+  // seul ne suffit donc pas à le trouver.
+  const { data } = await supabase
+    .from("users")
+    .select("id, nom")
+    .or("role.eq.ambassadeur,est_ambassadeur.eq.true");
   return (data ?? []).map((a) => ({ id: a.id, nom: a.nom ?? "" }));
 }

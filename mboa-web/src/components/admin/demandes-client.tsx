@@ -16,7 +16,6 @@ const FILTRES = [
 
 const STATUT_STYLE: Record<string, { label: string; color: string }> = {
   approuve: { label: "✅ Approuvé", color: "text-mboa-verified bg-mboa-verified/12" },
-  traite: { label: "✅ Traité", color: "text-mboa-verified bg-mboa-verified/12" },
   rejete: { label: "❌ Rejeté", color: "text-mboa-danger bg-mboa-danger/12" },
   "en-attente": { label: "⏳ En attente", color: "text-mboa-boost bg-mboa-boost/12" },
 };
@@ -37,7 +36,7 @@ export function DemandesClient({ demandes: initial }: { demandes: AdminDemande[]
   }
 
   function onCreated(id: string) {
-    setDemandes((prev) => prev.map((d) => (d.id === id ? { ...d, statut: "traite" } : d)));
+    setDemandes((prev) => prev.map((d) => (d.id === id ? { ...d, statut: "approuve" } : d)));
     setDialogDemande(null);
   }
 
