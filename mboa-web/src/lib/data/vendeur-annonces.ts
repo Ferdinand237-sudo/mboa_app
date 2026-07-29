@@ -35,6 +35,7 @@ export type MonLogement = {
   photos: string[];
   statut: string;
   statutModeration: string;
+  boosted: boolean;
 };
 
 export type MonArticle = {
@@ -44,6 +45,7 @@ export type MonArticle = {
   photos: string[];
   statut: string;
   statutModeration: string;
+  boosted: boolean;
 };
 
 export async function getMesAnnonces(
@@ -56,14 +58,14 @@ export async function getMesAnnonces(
     permissions.peutLogement
       ? supabase
           .from("logements")
-          .select("id, titre, prix, photos, statut, statut_moderation")
+          .select("id, titre, prix, photos, statut, statut_moderation, boosted")
           .eq("proprietaire_id", userId)
           .order("date_publication", { ascending: false })
       : Promise.resolve({ data: [] }),
     permissions.peutArticle
       ? supabase
           .from("articles")
-          .select("id, titre, prix, photos, statut, statut_moderation")
+          .select("id, titre, prix, photos, statut, statut_moderation, boosted")
           .eq("vendeur_id", userId)
           .order("date_publication", { ascending: false })
       : Promise.resolve({ data: [] }),
@@ -76,6 +78,7 @@ export async function getMesAnnonces(
     photos: string[] | null;
     statut: string | null;
     statut_moderation: string | null;
+    boosted: boolean | null;
   };
 
   const map = (rows: Row[] | null | undefined) =>
@@ -86,6 +89,7 @@ export async function getMesAnnonces(
       photos: r.photos ?? [],
       statut: r.statut ?? "disponible",
       statutModeration: r.statut_moderation ?? "publie",
+      boosted: r.boosted === true,
     }));
 
   return {

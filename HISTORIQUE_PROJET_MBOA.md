@@ -931,6 +931,94 @@ relance périodiques, utilisation des crédits pour boost/certification.
 
 ---
 
+## 5decies. Stratégie de croissance — Phase 2 : parrainage à crédits/paliers (mboa-web, 31 juillet 2026)
+
+Suite de la section 5novies. Décisions actées avec Ferdinand avant
+implémentation (voir aussi [[mboa_feedback_analyse_risques]] en mémoire) :
+un seul niveau de parrainage (jamais de commission sur les filleuls des
+filleuls, pour écarter tout risque de dérive vers un schéma pyramidal),
+crédit du parrain déclenché uniquement après une action réelle du filleul
+(jamais à la simple inscription), et crédits utilisables uniquement pour du
+boost — la certification (badge Vérifié) reste toujours décidée par un
+admin, jamais achetée avec des crédits.
+
+**Migration `supabase/migrations/20260731000000_parrainage.sql`** (testée
+sur un schéma Postgres local reconstitué — auth.users/public.users/
+messages/logements/articles/notifications mockés — avant remise à
+Ferdinand, 4 scénarios vérifiés : parrainage étudiant validé au premier
+message avec 10 crédits, parrainage vendeur validé à la première annonce
+publiée avec 30 crédits, franchissement de palier notifié une seule fois,
+anti-fraude du RPC de boost — refus si crédits insuffisants et si
+l'annonce n'appartient pas à l'appelant) :
+
+- `paliers_parrainage` : table de config (comme `villes`), pas de seuils
+  codés en dur — lisible par tous, modifiable par un admin uniquement.
+  5 paliers seedés : 🌱 Débrouillard(e) (0), 🔌 Connecteur du Quartier (50),
+  ⭐ Grand du Mboa (150), 👑 Chef de Quartier (350), 🏆 Ambassadeur Mboa (500).
+- `users.code_parrainage` (généré automatiquement, déterministe à partir de
+  l'id), `parrain_id`, `credits_parrainage`.
+- `parrainages` : une ligne par filleul, statut `en_attente` jusqu'à
+  validation. RLS : aucune policy insert/update pour les utilisateurs,
+  uniquement écrit par des fonctions `security definer` — empêche un
+  utilisateur de s'auto-créditer directement via l'API.
+- Le code de parrainage voyage en métadonnée auth
+  (`raw_user_meta_data.code_parrain`) : capté directement au `signUp` pour
+  un étudiant, ou transporté via `demandes_compte.code_parrain` jusqu'à
+  l'Edge Function `create-vendor` (mise à jour pour le relire et le
+  transmettre à `auth.admin.createUser`) pour un vendeur — un seul trigger
+  générique (`enregistrer_parrainage`) gère les deux cas sans
+  spécialisation.
+- Validation + crédit : `valider_parrainage_filleul`, appelée sans
+  condition depuis les triggers sur `messages`/`logements`/`articles`
+  (no-op silencieux si le parrainage est déjà validé — pas besoin de
+  détecter explicitement "la première" action).
+- `echanger_credits_boost(annonce_type, annonce_id)` : RPC `security
+  definer`, 50 crédits = 1 boost immédiat et permanent. **Pas
+  d'expiration automatique (pas de "boost 7 jours" pour cette itération)**
+  : ce projet n'a aucune infrastructure de tâche planifiée (ni `pg_cron`,
+  ni Edge Function schedulée — vérifié par grep sur toutes les migrations),
+  et bâtir une expiration fiable aurait demandé soit d'introduire cette
+  infra, soit de modifier le filtrage/l'affichage `boosted` dans une
+  dizaine de fichiers (home/logements/articles/carte/cartes). Écarté comme
+  disproportionné pour une expérimentation ; `credits_utilisations` trace
+  chaque dépense pour une évolution future.
+- `demandes_compte.code_parrain` (nouvelle colonne), `notifications` :
+  nouveau type `parrainage`.
+
+**Edge Function `supabase/functions/create-vendor/index.ts`** : relit
+`code_parrain` depuis la demande approuvée et le transmet en métadonnée à
+la création du compte Auth. **Reste à redéployer par Ferdinand**
+(`supabase functions deploy create-vendor --project-ref
+vodmsndqahmxdsqpayrd`), comme `send-notification` précédemment.
+
+**Côté web** :
+
+- `ReferralCapture` (montée dans `layout.tsx`, comme `InstallPrompt`) capte
+  `?ref=CODE` sur n'importe quelle page et le conserve en `localStorage`
+  jusqu'à l'inscription, potentiellement bien plus tard.
+- `/parrainage` : code + lien à partager (réutilise `ShareButtons` de la
+  Phase 1), jauge de progression vers le prochain palier, échelle des 5
+  paliers, liste des filleuls avec statut.
+- `/vendeur/annonces` : bouton "🚀 Booster (50 crédits)" par annonce non
+  boostée, désactivé si solde insuffisant, `router.refresh()` après succès
+  pour resynchroniser le solde affiché ailleurs (profil, header).
+- Entrée "🎁 Mon parrainage" ajoutée au menu Profil (section "Mes
+  activités"), affichant le solde de crédits.
+- `UserModel` étendu (`codeParrainage`, `creditsParrainage`).
+- Testé : `npx eslint` ciblé propre, `npm run build` complet sans erreur
+  TypeScript (40 routes, `/parrainage` incluse).
+- **Non testé en conditions réelles** (inscription avec un vrai lien de
+  parrainage, validation par message/publication, boost effectif) au
+  moment de la rédaction — nécessite que la migration soit collée en
+  production et l'Edge Function redéployée.
+
+**Reste à faire (Phase 3, non commencée)** : versement financier réel au
+palier Ambassadeur Mboa — volontairement repoussé jusqu'à disposer de
+données réelles sur l'engagement du système et d'un revenu récurrent pour
+le financer.
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
@@ -1091,9 +1179,15 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
   WhatsApp/Facebook/X/Instagram sur les pages détail logement et article
   côté mboa-web. `npm run build`/`lint` propres, aperçu de carte pas
   encore vérifié en conditions réelles (nécessite une URL publique
-  stable). Phases 2 (parrainage à crédits) et 3 (versement réel
-  Ambassadeur) non commencées, séquencées à dessein pour isoler le risque
-  légal/financier du parrainage en cascade.
+  stable). Phase 1 confirmée fonctionnelle par Ferdinand après test réel.
+- **Stratégie de croissance — Phase 2 : parrainage à crédits/paliers
+  (31/07, section 5decies)** : migration `20260731000000_parrainage.sql`
+  écrite et testée en local (non collée en production au moment de la
+  rédaction), Edge Function `create-vendor` mise à jour (redéploiement
+  requis), page `/parrainage`, bouton boost via crédits sur Mes annonces,
+  capture `?ref=` sur mboa-web. Un seul niveau de parrainage et crédits
+  jamais convertibles en argent pour cette itération — Phase 3 (versement
+  réel Ambassadeur) toujours non commencée, séquencée à dessein.
 - **Campagne de test manuel sur device réel** (Android, via `adb`,
   comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
   non inscrit et étudiant connecté couverts (section 3), plus des

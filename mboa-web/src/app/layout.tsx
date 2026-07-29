@@ -4,6 +4,7 @@ import "./globals.css";
 import { Header } from "@/components/layout/header";
 import { ConditionalFooter } from "@/components/layout/conditional-footer";
 import { InstallPrompt } from "@/components/layout/install-prompt";
+import { ReferralCapture } from "@/components/layout/referral-capture";
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -52,6 +53,7 @@ export default function RootLayout({
         <main className="flex-1 lg:px-10 xl:px-24 2xl:px-44">{children}</main>
         <ConditionalFooter />
         <InstallPrompt />
+        <ReferralCapture />
       </body>
     </html>
   );

@@ -50,13 +50,28 @@ serve(async (req) => {
 
     const { nom, email, password, whatsapp, sousRoles, demandeId } = await req.json()
 
+    // Code de parrainage capté à l'inscription (voir demandes_compte.code_parrain,
+    // migration 20260731000000_parrainage.sql) : transporté jusqu'ici pour que
+    // le trigger public.enregistrer_parrainage (qui lit uniquement
+    // auth.users.raw_user_meta_data) crédite le bon parrain, comme pour un
+    // étudiant qui s'inscrit directement.
+    let codeParrain: string | null = null
+    if (demandeId) {
+      const { data: demande } = await supabaseAdmin
+        .from('demandes_compte')
+        .select('code_parrain')
+        .eq('id', demandeId)
+        .single()
+      codeParrain = demande?.code_parrain ?? null
+    }
+
     // Créer le compte Auth
     const { data: authData, error: authError } =
       await supabaseAdmin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
-        user_metadata: { nom, role: 'vendeur' },
+        user_metadata: { nom, role: 'vendeur', code_parrain: codeParrain },
       })
 
     if (authError) {

@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { validateEmail, validateTelephone } from "@/lib/utils/validators";
+import { lireCodeParrainStocke } from "@/lib/utils/referral";
 import { AuthHeader } from "@/components/auth/auth-header";
 import { TextField, TextAreaField, FieldLabel } from "@/components/ui/text-field";
 import { PersonIcon, EmailIcon, PhoneIcon, SendIcon, CheckIcon } from "@/components/ui/icons";
@@ -65,6 +66,9 @@ export default function RegisterVendeurPage() {
       whatsapp: whatsapp.trim(),
       type_activite: ROLES[selectedRole].titre,
       description: description.trim(),
+      // Repris par create-vendor à l'approbation par un admin, pour créditer
+      // le parrain (migration 20260731000000_parrainage.sql).
+      code_parrain: lireCodeParrainStocke(),
     });
     setLoading(false);
 

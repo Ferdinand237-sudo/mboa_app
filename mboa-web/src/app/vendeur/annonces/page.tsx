@@ -40,6 +40,7 @@ export default async function AnnoncesPage() {
         peutArticle={permissions.peutArticle}
         logements={logements}
         articles={articles}
+        creditsDisponibles={user.creditsParrainage}
       />
     </div>
   );

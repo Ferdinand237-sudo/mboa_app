@@ -137,6 +137,14 @@ export function ProfilConnected({ user, stats }: { user: UserModel; stats: Profi
             badge={stats.nbMessagesNonLus}
             href="/chat"
           />
+          <MenuItem
+            icon={<span className="text-base leading-none">🎁</span>}
+            iconColorClass="text-mboa-secondary"
+            iconBgClass="bg-mboa-secondary/12"
+            label="Mon parrainage"
+            subtitle={`${user.creditsParrainage} crédits`}
+            href="/parrainage"
+          />
           {user.role === "vendeur" && (
             <MenuItem
               icon={<StarIcon />}

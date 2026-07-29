@@ -22,11 +22,13 @@ export function GestionTabs({
   peutArticle,
   logements: initialLogements,
   articles: initialArticles,
+  creditsDisponibles,
 }: {
   peutLogement: boolean;
   peutArticle: boolean;
   logements: MonLogement[];
   articles: MonArticle[];
+  creditsDisponibles: number;
 }) {
   const [logements, setLogements] = useState(initialLogements);
   const [articles, setArticles] = useState(initialArticles);
@@ -46,6 +48,7 @@ export function GestionTabs({
             editHref={`/vendeur/logements/${l.id}/edit`}
             onRemoved={() => setLogements((prev) => prev.filter((x) => x.id !== l.id))}
             premiere={i === 0}
+            creditsDisponibles={creditsDisponibles}
           />
         ))}
       </div>
@@ -65,6 +68,7 @@ export function GestionTabs({
             editHref={`/vendeur/articles/${a.id}/edit`}
             onRemoved={() => setArticles((prev) => prev.filter((x) => x.id !== a.id))}
             premiere={i === 0}
+            creditsDisponibles={creditsDisponibles}
           />
         ))}
       </div>

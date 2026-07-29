@@ -54,6 +54,10 @@ export type UserModel = {
   // / estAmbassadeur() ci-dessous plutôt que de tester role directement).
   estAdmin: boolean;
   estAmbassadeur: boolean;
+  // Parrainage (Phase 2 stratégie de croissance) : code unique généré à la
+  // création du compte, crédits gagnés en parrainant d'autres utilisateurs.
+  codeParrainage: string;
+  creditsParrainage: number;
 };
 
 export function userFromRow(row: SupabaseRow): UserModel {
@@ -79,6 +83,8 @@ export function userFromRow(row: SupabaseRow): UserModel {
     lng: numOrNull(row.lng),
     estAdmin: str(row.role) === "admin" || bool(row.est_admin),
     estAmbassadeur: str(row.role) === "ambassadeur" || bool(row.est_ambassadeur),
+    codeParrainage: str(row.code_parrainage),
+    creditsParrainage: num(row.credits_parrainage),
   };
 }
 

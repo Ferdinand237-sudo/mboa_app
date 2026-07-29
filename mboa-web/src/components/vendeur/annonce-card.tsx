@@ -7,6 +7,7 @@ import { Photo } from "@/components/ui/photo";
 import { Dialog } from "@/components/ui/dialog";
 import { EditIcon, TrashIcon } from "@/components/ui/icons";
 import { formatPrix } from "@/lib/utils/format";
+import { BoostCreditsButton } from "@/components/vendeur/boost-credits-button";
 import type { MonLogement, MonArticle } from "@/lib/data/vendeur-annonces";
 
 const MODERATION_LABEL: Record<string, string> = {
@@ -29,6 +30,7 @@ export function AnnonceCard({
   editHref,
   onRemoved,
   premiere = false,
+  creditsDisponibles,
 }: {
   item: MonLogement | MonArticle;
   table: "logements" | "articles";
@@ -36,6 +38,7 @@ export function AnnonceCard({
   editHref: string;
   onRemoved: () => void;
   premiere?: boolean;
+  creditsDisponibles: number;
 }) {
   const [statut, setStatut] = useState(item.statut);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -84,6 +87,11 @@ export function AnnonceCard({
                 {MODERATION_LABEL[item.statutModeration] ?? ""}
               </span>
             )}
+            {item.boosted && (
+              <span className="rounded-full bg-mboa-boost/10 px-2 py-0.5 text-[10px] font-bold text-mboa-boost">
+                🚀 Boosté
+              </span>
+            )}
           </div>
         </div>
       </Link>
@@ -112,6 +120,13 @@ export function AnnonceCard({
         >
           <TrashIcon className="h-3.5 w-3.5" /> Supprimer
         </button>
+        {!item.boosted && (
+          <BoostCreditsButton
+            annonceType={table === "logements" ? "logement" : "article"}
+            annonceId={item.id}
+            creditsDisponibles={creditsDisponibles}
+          />
+        )}
       </div>
 
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>

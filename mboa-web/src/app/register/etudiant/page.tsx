@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { parseAuthError } from "@/lib/utils/auth-errors";
 import { validateEmail, validateTelephone, validateMotDePasse } from "@/lib/utils/validators";
+import { lireCodeParrainStocke } from "@/lib/utils/referral";
 import { AuthHeader } from "@/components/auth/auth-header";
 import { TextField, FieldLabel } from "@/components/ui/text-field";
 import { EmailIcon, PhoneIcon, LockIcon, EyeIcon, EyeOffIcon, CheckIcon } from "@/components/ui/icons";
@@ -70,6 +71,9 @@ export default function RegisterEtudiantPage() {
           nom: `${prenom.trim()} ${nom.trim()}`,
           telephone: telephone.trim() || null,
           role: "visiteur",
+          // Repris par le trigger public.enregistrer_parrainage (migration
+          // 20260731000000_parrainage.sql) pour créditer le parrain.
+          code_parrain: lireCodeParrainStocke(),
         },
       },
     });
