@@ -17,6 +17,35 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> with RefreshableSta
   List<Map<String, dynamic>> _users = [];
   Map<String, String> _statutVerificationParUser = {};
   bool _isLoadingUsers = true;
+  // Miroir de FILTRES_ROLE (users-client.tsx) : absent côté mobile jusqu'ici,
+  // seuls les badges par carte permettaient de distinguer les types de
+  // comptes, sans façon de segmenter la liste complète.
+  String _filtreRole = 'tous';
+
+  static const _filtresRole = [
+    {'valeur': 'tous', 'label': 'Tous'},
+    {'valeur': 'visiteur', 'label': '🎓 Visiteurs'},
+    {'valeur': 'vendeur', 'label': '🏪 Vendeurs'},
+    {'valeur': 'ambassadeur', 'label': '🧭 Ambassadeurs'},
+    {'valeur': 'admin', 'label': '👑 Admins'},
+  ];
+
+  bool _estAdmin(Map<String, dynamic> u) => u['role'] == 'admin' || u['est_admin'] == true;
+  bool _estAmbassadeur(Map<String, dynamic> u) =>
+      u['role'] == 'ambassadeur' || u['est_ambassadeur'] == true;
+
+  List<Map<String, dynamic>> get _usersAffiches {
+    switch (_filtreRole) {
+      case 'admin':
+        return _users.where(_estAdmin).toList();
+      case 'ambassadeur':
+        return _users.where(_estAmbassadeur).toList();
+      case 'tous':
+        return _users;
+      default:
+        return _users.where((u) => u['role'] == _filtreRole).toList();
+    }
+  }
 
   @override
   void initState() {
@@ -449,6 +478,48 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> with RefreshableSta
               ),
             ),
 
+            // ── Filtres par type de compte ────────────
+            Container(
+              width: double.infinity,
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: SizedBox(
+                height: 34,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: _filtresRole.map((f) {
+                    final isSelected = _filtreRole == f['valeur'];
+                    return GestureDetector(
+                      onTap: () => setState(() => _filtreRole = f['valeur']!),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected ? MboaColors.primary : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSelected ? MboaColors.primary : MboaColors.border,
+                            width: 1.5,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          f['label']!,
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isSelected ? Colors.white : MboaColors.text,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+
             // ── Contenu ──────────────────────────────
             Expanded(
               child: _isLoadingUsers
@@ -457,17 +528,24 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> with RefreshableSta
                         color: MboaColors.primary,
                       ),
                     )
-                  : RefreshIndicator(
+                  : _usersAffiches.isEmpty
+                      ? Center(
+                          child: Text(
+                            'Aucun utilisateur dans ce filtre',
+                            style: MboaTextStyles.muted,
+                          ),
+                        )
+                      : RefreshIndicator(
                       color: MboaColors.primary,
                       onRefresh: _chargerUsers,
                       child: ListView.separated(
                         padding: const EdgeInsets.all(16),
-                        itemCount: _users.length,
+                        itemCount: _usersAffiches.length,
                         separatorBuilder: (_, __) =>
                             const SizedBox(height: 10),
                         itemBuilder: (context, index) {
                           return _buildUserCard(
-                              _users[index]);
+                              _usersAffiches[index]);
                         },
                       ),
                     ),
@@ -484,11 +562,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> with RefreshableSta
     final isVerified = user['verified'] ?? false;
     // role reste l'identité de base (visiteur/vendeur) ; est_admin/
     // est_ambassadeur sont des privilèges superposés, affichés comme des
-    // badges en plus plutôt que remplaçant le badge de rôle — le || sur
-    // role garde une compatibilité défensive avec d'éventuels comptes non
-    // migrés (voir roles_multiples_admin_ambassadeur).
-    final estAdmin = role == 'admin' || user['est_admin'] == true;
-    final estAmbassadeur = role == 'ambassadeur' || user['est_ambassadeur'] == true;
+    // badges en plus plutôt que remplaçant le badge de rôle.
+    final estAdmin = _estAdmin(user);
+    final estAmbassadeur = _estAmbassadeur(user);
 
     Color roleColor;
     String roleLabel;
