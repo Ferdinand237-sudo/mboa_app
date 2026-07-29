@@ -697,6 +697,154 @@ conversation-view}.tsx` et `src/lib/data/chat.ts`.
 
 ---
 
+## 5sexies. Notifications admin complètes : push app fermée + centre in-app unifié (29-30 juillet 2026)
+
+Ferdinand a demandé qu'un admin soit notifié — in-app et push, y compris
+app fermée — pour tout message, demande de compte ou signalement, avec
+ouverture directe du bon écran au tap et compteur qui se vide pour cette
+notification précise. En creusant, deux manques distincts empêchaient déjà
+ça de fonctionner pour lui :
+
+1. **Même bug `role='admin'` que §5bis/§5quinquies**, cette fois dans
+   `notifications_admin.sql` (25/07) : les triggers in-app demande/
+   signalement, et le filtre `notifierTousAdmins()` de l'Edge Function
+   `send-notification`, ne ciblaient que `role = 'admin'` — un admin par
+   privilège superposé ne recevait donc ni in-app ni push pour ces deux
+   évènements. Corrigé dans `20260730000000_notifications_admin_push_complet.sql`
+   (`role = 'admin' or est_admin = true`) et dans `send-notification/index.ts`.
+2. **Aucun trigger n'appelait `send-notification` sur `messages`** —
+   contrairement à `demandes_compte`/`signalements` qui ont chacun leur
+   trigger `_push` explicite, alors que l'Edge Function sait déjà router
+   ce cas (admin assigné, ou tous les admins tant qu'Assistant Mboa n'est
+   pas pris en charge). Code mort faute de déclencheur ; ajouté
+   (`trg_notifier_nouveau_message_push`). ⚠️ Si un Database Webhook
+   existait déjà côté dashboard sur `messages` → `send-notification`, à
+   supprimer pour éviter un double push (pas vérifiable depuis cet
+   environnement, aucun accès direct à la configuration du projet).
+3. **Le centre de notifications mobile (`notifications_screen.dart`)
+   n'avait jamais lu la table `public.notifications`** : elle reconstruisait
+   une liste ad-hoc à partir de `conversations.non_lu` et `avis` avec un
+   repère de dernière visite en `SharedPreferences`, alors que cette table
+   existe justement pour ça depuis le 24/07 ("mobile plus tard si besoin" —
+   jamais fait). Conséquence directe : demandes/signalements n'y
+   apparaissaient jamais côté mobile, quel que soit le type de compte
+   admin. Réécrite pour lire `public.notifications` (miroir exact de
+   `mboa-web/src/components/profil/notifications-list.tsx`), avec marquage
+   lu **par notification tapée**, pas en bloc à l'ouverture — le compteur
+   de la cloche (`NotificationsScreen.compterNonLues()`, home_screen.dart)
+   requête maintenant `count(*) where lu = false` sur la même table.
+4. **Ouverture directe du bon écran au tap, y compris app fermée** :
+   aucun code n'existait pour ça (`onMessageOpenedApp`/`getInitialMessage`
+   absents, seul le handler d'arrière-plan minimal de `main.dart` était en
+   place). Ajouté :
+   - `rootNavigatorKey` global (`app/router.dart`, passé à `GoRouter`) pour
+     pousser un écran depuis un contexte sans `BuildContext` (callback FCM,
+     tap sur notification locale).
+   - `ouvrirDepuisNotificationPush(data)` (charge utile FCM : `{type,
+     conversation_id|demande_id|signalement_id}`) et `ouvrirDepuisLien(lien)`
+     (notifications in-app, mêmes chemins que le web : `/chat/<id>`,
+     `/admin/demandes`, `/admin/signalements`, `/logements/<id>`,
+     `/marketplace/<id>`, `/vendeur/<id>`) — reconstruisent les paramètres
+     de `ConversationScreen`/écran cible à partir du seul id, puisqu'une
+     notification n'arrive qu'avec ça.
+   - `NotificationService` : callback `onNotificationTap` branché sur les
+     trois cas où une notification peut être tapée — premier plan
+     (`flutter_local_notifications`, payload JSON encodé dans
+     `message.data`), arrière-plan (`onMessageOpenedApp`), et app
+     complètement fermée (`getInitialMessage()`, appelée depuis `main.dart`
+     3s après le lancement pour laisser le temps au Navigator de GoRouter
+     d'exister au-delà du splash fixe de 2s).
+- Testé : `flutter analyze` propre (mêmes infos préexistantes
+  `withOpacity`/`prefer_const`, rien de nouveau) ; migration rejouée sur
+  Postgres local avec déclencheurs attachés manuellement (schéma non
+  versionné faute d'accès direct) — confirmé qu'un compte `est_admin`-only
+  reçoit désormais bien les notifications demande/signalement, qu'un
+  compte visiteur classique n'en reçoit aucune, et que le trigger message
+  s'exécute sans erreur.
+- **Non vérifié sur device réel** au moment de la rédaction, et l'Edge
+  Function `send-notification` corrigée doit être redéployée par
+  Ferdinand (`supabase functions deploy send-notification --project-ref
+  vodmsndqahmxdsqpayrd`) — pas de clé service_role ni de lien CLI vérifié
+  vers le bon projet depuis cet environnement pour le faire moi-même (le
+  compte CLI authentifié ici ne liste pas ce projet parmi les siens).
+
+---
+
+## 5septies. Portage web du support multi-villes (30 juillet 2026)
+
+Dernier morceau du "Reste à faire" de la §5bis : le web ne connaissait
+encore que Sangmelima (constantes `DEFAULT_VILLE`/`DEFAULT_LAT`/
+`DEFAULT_LNG` codées en dur partout). Porté avec la même approche que
+prévue dans le plan d'origine — cookie plutôt que `localStorage`, chaque
+route étant un Server Component indépendant qui doit lire la même valeur
+au rendu.
+
+- **`src/lib/data/villes.ts`** : `getVilles()` (actives, pour le
+  sélecteur), `getToutesLesVilles()` (toutes, pour l'admin),
+  `getVilleActuelle()` (lit le cookie `mboa_ville` via `cookies()`, repli
+  sur la première ville active si absent ou obsolète — le serveur ne peut
+  pas géolocaliser, contrairement au mobile).
+- **`src/app/ville-actions.ts`** (`setVille`, Server Action) : écrit le
+  cookie (1 an, `sameSite: lax`) puis `revalidatePath("/", "layout")`
+  pour que toutes les pages (accueil, logements, marketplace, carte,
+  publier) repartent d'un rendu serveur frais avec la nouvelle ville.
+- **`VilleSwitcher`** (`components/home/ville-switcher.tsx`, sur l'accueil
+  uniquement pour cette itération, comme prévu) : pill "📍 Ville ▾" en
+  lieu et place du texte "📍 Sangmelima" codé en dur dans `HeroHeader`.
+  Détection GPS automatique une seule fois si aucun cookie n'existe
+  encore (ville active la plus proche dans son rayon de couverture),
+  sélection manuelle possible à tout moment via la liste déroulante —
+  miroir de `VilleService` (mobile), cookie à la place de
+  `SharedPreferences`.
+- **Filtrage par ville** : `getHomeLogements`/`getHomeArticles`/
+  `getLieuxPublics`/`getLogements`/`getArticles`/`getMapData` prennent
+  toutes un paramètre `ville` (sauf l'appel de `getLieuxPublics` depuis la
+  page détail d'un logement, où la distance réelle au point suffit déjà à
+  filtrer — rendu optionnel plutôt que de forcer une ville qu'on ne
+  connaît pas encore à cet endroit du chargement). Les Server Actions de
+  recherche (`searchLogements`, `searchArticles`) lisent la ville
+  elles-mêmes via `getVilleActuelle()`, pas de prop-drilling depuis le
+  client.
+- **`TrouveTonMboa`** : centre par défaut = celui de `villeActuelle` (plus
+  Sangmelima en dur), position GPS retenue seulement si dans le rayon de
+  couverture de cette ville — miroir exact de
+  `_resoudreReferenceProximite` (home_screen.dart). Remonté avec
+  `key={villeActuelle.nom}` par la page plutôt qu'un `setState`
+  synchrone dans un effet au changement de ville (`react-hooks/
+  set-state-in-effect`, seule vraie erreur de lint rencontrée pendant ce
+  portage).
+- **Carte** (`map-view.tsx`) : centre par défaut et libellé "Sangmelima"
+  → `villeActuelle`. L'ajout de lieu public par l'admin reste hors
+  périmètre web (n'existait déjà pas avant cette session, propre au
+  mobile).
+- **Publication** (`form-logement.tsx`/`form-article.tsx`) : logement →
+  ville dérivée de la position GPS captée (la plus proche parmi les
+  villes actives dans son rayon), repli sur la ville courante si aucune
+  position ou hors couverture ; article → ville actuellement parcourue
+  (aucune position captée pour un article, comme sur mobile).
+- **Bug préexistant corrigé au passage** : `form-article.tsx` n'écrivait
+  la colonne `ville` nulle part (contrairement à `form-logement.tsx`) —
+  exactement le même bug déjà rencontré et corrigé côté mobile
+  (§5bis, "articles.ville n'existait même pas en base").
+- **`/admin/villes`** (page + `villes-client.tsx`) : liste avec bascule
+  actif/inactif, dialogue d'ajout/édition (nom, lat, lng, rayon, ordre),
+  écritures directes via le client Supabase (RLS déjà `is_admin()`,
+  migration §5bis) — miroir de `admin_villes_screen.dart`. Lien "📍
+  Villes" ajouté à la nav admin (`NAV_LINKS_ADMIN`, `header-client.tsx`).
+- Corrigé en chemin : trois autres endroits affichaient encore
+  `logement.quartier ?? "Sangmelima"` en dur (`home-logement-card.tsx`,
+  `logement-tile.tsx`, `favoris-list.ts`) — remplacés par
+  `logement.ville`, la vraie donnée plutôt qu'une supposition.
+- Testé : `npm run build` (TypeScript + Next.js 16/Turbopack) et
+  `npm run lint` propres — `node_modules` a dû être réinstallé
+  (`npm ci`, absent dans cet environnement au départ) pour pouvoir lancer
+  l'un ou l'autre.
+- **Non vérifié sur device réel/navigateur** au moment de la rédaction —
+  build et lint uniquement, pas de test manuel du sélecteur ni de la
+  détection GPS en conditions réelles.
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
@@ -828,15 +976,24 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
   debug, bouton icône seule sur l'accueil, étape Trouve ton Mboa,
   dernière étape correctement ciblée, barre admin à 5 onglets, menu
   hamburger (Demandes/Mon compte) fonctionnel.
-- **Assistant Mboa côté mobile** : pas encore implémenté (recherche
-  faite, voir section 5ter) — portage 100% client, backend déjà en
-  place côté serveur (partagé avec le web).
+- **Assistant Mboa côté mobile (29/07, section 5quinquies)** : implémenté
+  et vérifié en production (migration collée avec succès) — chat/liste
+  admin-aware, prise en charge atomique, menu admin dédié.
 - **Jeu de données de test Kribi/Ébolowa (28/07, section 5quater)** :
-  migration `20260728000000_seed_kribi_ebolowa.sql` écrite et testée
-  contre un schéma reconstitué en local (pas d'accès direct à la base de
-  production) — 4 comptes vendeurs pré-validés, 42 logements, 52
-  articles, 14 lieux publics géocodés. Reste à coller dans le SQL Editor
-  Supabase et à vérifier sur device réel.
+  migration `20260728000000_seed_kribi_ebolowa.sql` écrite, testée contre
+  un schéma reconstitué en local, exécutée avec succès en production —
+  4 comptes vendeurs pré-validés, 42 logements, 52 articles, 14 lieux
+  publics géocodés.
+- **Notifications admin complètes (29-30/07, section 5sexies)** : bug
+  `role='admin'` corrigé (in-app + push + Edge Function), trigger push
+  messages ajouté, centre de notifications mobile réécrit sur la vraie
+  table, ouverture directe au tap y compris app fermée. Migration testée
+  en local, mais pas encore collée en production ni l'Edge Function
+  `send-notification` redéployée au moment de la rédaction.
+- **Multi-villes côté web (30/07, section 5septies)** : sélecteur de
+  ville, filtrage complet (accueil/logements/marketplace/carte/
+  publication), `/admin/villes`. `npm run build`/`lint` propres, pas
+  encore testé en navigateur réel.
 - **Campagne de test manuel sur device réel** (Android, via `adb`,
   comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
   non inscrit et étudiant connecté couverts (section 3), plus des

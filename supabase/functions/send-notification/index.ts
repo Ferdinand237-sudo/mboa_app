@@ -70,10 +70,13 @@ async function notifierTousAdmins(
   corps: string,
   data: Record<string, string> = {},
 ) {
+  // role='admin' OU privilège superposé est_admin (voir refonte des rôles,
+  // HISTORIQUE_PROJET_MBOA.md §4.9) — un filtre role seul manquait tout
+  // admin par privilège, jamais notifié par push.
   const { data: admins } = await supabaseAdmin
     .from("users")
     .select("fcm_token")
-    .eq("role", "admin")
+    .or("role.eq.admin,est_admin.eq.true")
     .not("fcm_token", "is", null);
 
   const resultats = [];

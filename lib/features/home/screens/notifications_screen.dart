@@ -1,47 +1,40 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../core/services/unread_service.dart';
+import '../../../app/router.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../chat/screens/chat_screen.dart';
 
+// Miroir de mboa-web/src/components/profil/notifications-list.tsx et
+// notification-bell.tsx : lit directement la table public.notifications
+// (alimentée par les triggers SQL sur messages/avis/annonces/demandes/
+// signalements — voir 20260724000000_notifications_inapp.sql et
+// 20260725000000_notifications_admin.sql), plutôt que l'ancienne
+// reconstruction ad-hoc à partir de conversations.non_lu/avis qui ignorait
+// entièrement cette table (et donc les demandes/signalements côté admin).
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
 
-  // Horodatage de la dernière visite de cet écran : les avis reçus après
-  // cette date sont considérés "nouveaux". Les messages n'ont pas besoin
-  // de ce repère, leur propre compteur non_lu suffit à les qualifier.
-  static const _prefsKeyDerniereVisite = 'notifications_derniere_visite';
+  static const _icones = {
+    'message': '💬',
+    'avis': '⭐',
+    'annonce': '🏘',
+    'demande': '📨',
+    'signalement': '🚨',
+  };
 
-  static Future<String> _obtenirOuInitialiserWatermark(SharedPreferences prefs) async {
-    final existante = prefs.getString(_prefsKeyDerniereVisite);
-    if (existante != null) return existante;
-    final maintenant = DateTime.now().toIso8601String();
-    await prefs.setString(_prefsKeyDerniereVisite, maintenant);
-    return maintenant;
-  }
-
-  /// Messages non lus + avis reçus depuis la dernière visite de cet écran.
-  /// Utilisé pour la pastille sur la cloche (Home). N'avance pas le
-  /// repère : seule l'ouverture effective de l'écran marque les avis
-  /// comme vus.
+  /// Nombre de notifications non lues, pour la pastille sur la cloche (Home).
   static Future<int> compterNonLues() async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
     if (user == null) return 0;
-
-    final nbMessages = await UnreadService.nbMessagesNonLus();
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final watermark = await _obtenirOuInitialiserWatermark(prefs);
-      final avis = await supabase
-          .from('avis')
+      final data = await supabase
+          .from('notifications')
           .select('id')
-          .eq('cible_id', user.id)
-          .gt('date_publication', watermark);
-      return nbMessages + List.from(avis).length;
+          .eq('user_id', user.id)
+          .eq('lu', false);
+      return (data as List).length;
     } catch (_) {
-      return nbMessages;
+      return 0;
     }
   }
 
@@ -67,70 +60,36 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final watermarkAvant = await NotificationsScreen._obtenirOuInitialiserWatermark(prefs);
-      final dateWatermark = DateTime.tryParse(watermarkAvant);
-
-      final resultats = <Map<String, dynamic>>[];
-
-      // Messages non lus
-      final conversations = await _supabase
-          .from('conversations')
-          .select('id, participants, dernier_message, dernier_message_date, non_lu')
-          .contains('participants', [user.id]);
-      for (final conv in List<Map<String, dynamic>>.from(conversations)) {
-        final nonLu = conv['non_lu'];
-        final nb = (nonLu is Map && nonLu[user.id] != null) ? (nonLu[user.id] as num).toInt() : 0;
-        if (nb > 0) {
-          resultats.add({
-            'type': 'message',
-            'texte': '$nb nouveau${nb > 1 ? 'x' : ''} message${nb > 1 ? 's' : ''} : ${conv['dernier_message'] ?? ''}',
-            'date': conv['dernier_message_date'],
-            'conversationId': conv['id'],
-            'nouveau': true,
-          });
-        }
-      }
-
-      // Avis reçus récemment
-      final avis = await _supabase
-          .from('avis')
-          .select('note, commentaire, date_publication, auteur:users!auteur_id(nom)')
-          .eq('cible_id', user.id)
-          .order('date_publication', ascending: false)
-          .limit(10);
-      for (final a in List<Map<String, dynamic>>.from(avis)) {
-        final auteur = a['auteur'] as Map<String, dynamic>?;
-        final dateAvis = DateTime.tryParse(a['date_publication']?.toString() ?? '');
-        resultats.add({
-          'type': 'avis',
-          'texte': '${auteur?['nom'] ?? 'Un utilisateur'} vous a donné ${a['note']} ⭐',
-          'date': a['date_publication'],
-          'nouveau': dateWatermark != null && dateAvis != null && dateAvis.isAfter(dateWatermark),
-        });
-      }
-
-      resultats.sort((x, y) {
-        final dx = DateTime.tryParse(x['date']?.toString() ?? '') ?? DateTime(2000);
-        final dy = DateTime.tryParse(y['date']?.toString() ?? '') ?? DateTime(2000);
-        return dy.compareTo(dx);
-      });
-
-      // La liste vient d'être consultée : tout ce qui suit est considéré vu.
-      await prefs.setString(
-        NotificationsScreen._prefsKeyDerniereVisite,
-        DateTime.now().toIso8601String(),
-      );
+      final data = await _supabase
+          .from('notifications')
+          .select('id, type, titre, corps, lien, lu, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false)
+          .limit(30);
 
       if (mounted) {
         setState(() {
-          _notifications = resultats;
+          _notifications = List<Map<String, dynamic>>.from(data);
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // Ne marque lue que la notification tapée (pas toute la liste) : miroir
+  // exact de notifications-list.tsx, pour que le compteur de la cloche ne
+  // baisse que d'une unité à chaque fois, pas d'un coup.
+  Future<void> _ouvrir(Map<String, dynamic> n) async {
+    if (n['lu'] != true) {
+      setState(() => n['lu'] = true);
+      try {
+        await _supabase.from('notifications').update({'lu': true}).eq('id', n['id']);
+      } catch (_) {}
+    }
+    final lien = n['lien'] as String?;
+    if (lien != null) ouvrirDepuisLien(lien);
   }
 
   String _formatDate(String? dateStr) {
@@ -171,7 +130,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         const Text('Aucune notification',
                             style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w700, color: MboaColors.text)),
                         const SizedBox(height: 8),
-                        Text('Tu seras notifié ici des nouveaux messages et avis.',
+                        Text('Tu seras notifié ici des nouveaux messages, avis et annonces correspondant à tes alertes.',
                             style: MboaTextStyles.muted, textAlign: TextAlign.center),
                       ],
                     ),
@@ -186,21 +145,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final n = _notifications[index];
-                      final isMessage = n['type'] == 'message';
-                      final estNouveau = n['nouveau'] == true;
+                      final type = n['type'] as String? ?? 'message';
+                      final estLu = n['lu'] == true;
+                      final icone = NotificationsScreen._icones[type] ?? '🔔';
                       return GestureDetector(
-                        onTap: isMessage
-                            ? () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const ChatScreen()),
-                                )
-                            : null,
+                        onTap: () => _ouvrir(n),
                         child: Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: estNouveau ? MboaColors.primary.withValues(alpha: 0.04) : Colors.white,
+                            color: estLu ? Colors.white : MboaColors.primary.withValues(alpha: 0.04),
                             borderRadius: BorderRadius.circular(MboaSizes.radiusMd),
-                            border: estNouveau ? Border.all(color: MboaColors.primary.withValues(alpha: 0.15)) : null,
+                            border: estLu ? null : Border.all(color: MboaColors.primary.withValues(alpha: 0.15)),
                             boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
                           ),
                           child: Row(
@@ -209,11 +164,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: (isMessage ? MboaColors.primary : MboaColors.boost).withValues(alpha: 0.12),
+                                  color: (type == 'signalement' ? MboaColors.danger : MboaColors.primary)
+                                      .withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Center(
-                                  child: Text(isMessage ? '💬' : '⭐', style: const TextStyle(fontSize: 18)),
+                                  child: Text(icone, style: const TextStyle(fontSize: 18)),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -221,19 +177,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(n['texte'] ?? '',
+                                    Text(n['titre'] ?? '',
                                         style: TextStyle(
                                           fontFamily: 'Poppins',
                                           fontSize: 13,
-                                          fontWeight: estNouveau ? FontWeight.w700 : FontWeight.w600,
+                                          fontWeight: estLu ? FontWeight.w600 : FontWeight.w700,
                                           color: MboaColors.text,
                                         )),
+                                    if ((n['corps'] as String?)?.isNotEmpty == true) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        n['corps'],
+                                        style: MboaTextStyles.bodySm,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                     const SizedBox(height: 2),
-                                    Text(_formatDate(n['date']?.toString()), style: MboaTextStyles.caption),
+                                    Text(_formatDate(n['created_at']?.toString()), style: MboaTextStyles.caption),
                                   ],
                                 ),
                               ),
-                              if (estNouveau)
+                              if (!estLu)
                                 Container(
                                   width: 9,
                                   height: 9,

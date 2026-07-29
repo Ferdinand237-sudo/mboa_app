@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -18,6 +19,12 @@ class NotificationService {
 
   bool _initialise = false;
 
+  // Callback branché par main.dart (ouvrirDepuisNotificationPush,
+  // app/router.dart) : ouvre directement le bon écran au tap sur la
+  // notification, quel que soit l'état de l'app à ce moment (premier plan,
+  // arrière-plan, ou complètement fermée — voir gererLancementDepuisNotification).
+  void Function(Map<String, dynamic> data)? onNotificationTap;
+
   Future<void> initialiser() async {
     if (_initialise) return;
     _initialise = true;
@@ -32,6 +39,17 @@ class NotificationService {
     const iosInit = DarwinInitializationSettings();
     await _local.initialize(
       const InitializationSettings(android: androidInit, iOS: iosInit),
+      // Notification affichée localement (app au premier plan) et tapée :
+      // même charge utile (message.data) que les deux autres cas, encodée
+      // en JSON dans le payload car flutter_local_notifications ne porte
+      // qu'une chaîne.
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload == null) return;
+        try {
+          onNotificationTap?.call(Map<String, dynamic>.from(jsonDecode(payload)));
+        } catch (_) {}
+      },
     );
 
     const canalAndroid = AndroidNotificationChannel(
@@ -46,6 +64,13 @@ class NotificationService {
         ?.createNotificationChannel(canalAndroid);
 
     FirebaseMessaging.onMessage.listen(_afficherNotificationLocale);
+    // App en arrière-plan (pas fermée) et notification tapée dans le
+    // tiroir système : le cas "app fermée" est couvert séparément par
+    // gererLancementDepuisNotification (getInitialMessage), appelée une
+    // fois depuis main.dart après le démarrage.
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      onNotificationTap?.call(message.data);
+    });
     _messaging.onTokenRefresh.listen((_) => enregistrerToken());
 
     Supabase.instance.client.auth.onAuthStateChange.listen((data) {
@@ -57,6 +82,15 @@ class NotificationService {
     if (Supabase.instance.client.auth.currentUser != null) {
       await enregistrerToken();
     }
+  }
+
+  /// App lancée depuis zéro par un tap sur la notification (processus tué,
+  /// pas juste mis en arrière-plan) : à appeler une fois que l'app a fini
+  /// de démarrer (après le splash), sans quoi le push effectué par
+  /// GoRouter/Navigator n'aurait rien sur quoi s'empiler.
+  Future<void> gererLancementDepuisNotification() async {
+    final message = await _messaging.getInitialMessage();
+    if (message != null) onNotificationTap?.call(message.data);
   }
 
   /// Récupère le jeton FCM de l'appareil et l'enregistre sur le profil
@@ -90,6 +124,7 @@ class NotificationService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
+      payload: jsonEncode(message.data),
     );
   }
 }

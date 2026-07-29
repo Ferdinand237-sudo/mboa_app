@@ -8,6 +8,7 @@ import 'core/constants/app_constants.dart';
 import 'core/services/notification_service.dart';
 import 'firebase_options.dart';
 import 'app/app.dart';
+import 'app/router.dart';
 
 // Doit rester une fonction top-level : appelée par le système dans un
 // isolate séparé quand l'app est fermée et qu'une notification arrive.
@@ -47,10 +48,19 @@ void main() async {
 
   // ── Notifications : permissions, canal Android, jeton ─────
   await NotificationService.instance.initialiser();
+  NotificationService.instance.onNotificationTap = ouvrirDepuisNotificationPush;
 
   runApp(
     const ProviderScope(
       child: MboaApp(),
     ),
   );
+
+  // App lancée depuis zéro par un tap sur la notification (pas juste
+  // ramenée au premier plan) : le Navigator de GoRouter doit exister avant
+  // de pouvoir y empiler un écran, d'où l'attente au-delà du délai fixe du
+  // splash (2s, splash_screen.dart) avant de traiter getInitialMessage.
+  Future.delayed(const Duration(seconds: 3), () {
+    NotificationService.instance.gererLancementDepuisNotification();
+  });
 }
