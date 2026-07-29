@@ -1023,7 +1023,7 @@ le financer.
 
 ---
 
-## 5undecies. Deux bugs préexistants découverts en testant le parrainage (29 juillet 2026)
+## 5undecies. Trois bugs préexistants découverts en testant le parrainage (29 juillet 2026)
 
 En testant la Phase 2 en conditions réelles, Ferdinand a signalé deux
 erreurs sans rapport avec le parrainage lui-même — diagnostiquées en
@@ -1065,9 +1065,26 @@ corrigé par cohérence). Les trois passent désormais par
 `role.eq.ambassadeur,est_ambassadeur.eq.true` (`.or(...)`), même logique
 que `_estAmbassadeur` déjà utilisé dans `admin_users_screen.dart`.
 
+**3. Envoi impossible du formulaire de vérification terrain assigné à un
+ambassadeur.** Diagnostiqué directement dans les logs Postgres du vrai
+projet (`get_logs`, service `postgres`) : `new row violates row-level
+security policy for table "objects"` — le formulaire échoue au moment de
+téléverser la pièce justificative (photo) dans le bucket Storage privé
+`attestations-proprietaires`. La policy `storage.objects` correspondante
+(définie dans `20260717010000_verification_terrain.sql`) ne vérifiait,
+elle aussi, que `role = 'ambassadeur'` — exactement le même bug que le
+point 2 ci-dessus, sur une troisième surface distincte (policy Storage,
+pas une requête applicative). Corrigé par la migration
+`20260801000000_fix_ambassadeur_storage_policy.sql` (`drop`/`create
+policy`, condition étendue à `role = 'ambassadeur' or est_ambassadeur =
+true`), appliquée directement en production via le MCP Supabase
+(`apply_migration`, correctement tracée dans l'historique de migrations
+Supabase) et vérifiée en relisant la policy après coup.
+
 Testé : `flutter analyze` et `npx eslint` propres sur les fichiers touchés
-des deux bugs. **Non revérifié sur device/navigateur réel** au moment de
-la rédaction — à confirmer par Ferdinand.
+des bugs 1 et 2 ; policy Storage vérifiée directement en base pour le bug
+3. **Non revérifié sur device/navigateur réel** au moment de la
+rédaction — à confirmer par Ferdinand.
 
 ---
 
@@ -1240,15 +1257,18 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
   annonces, capture `?ref=` sur mboa-web. Un seul niveau de parrainage et
   crédits jamais convertibles en argent pour cette itération — Phase 3
   (versement réel Ambassadeur) toujours non commencée, séquencée à
-  dessein. Test réel en cours par Ferdinand, ayant révélé deux bugs
+  dessein. Test réel en cours par Ferdinand, ayant révélé trois bugs
   préexistants sans rapport avec le parrainage (section 5undecies).
 - **Bugs préexistants corrigés en testant le parrainage (29/07, section
   5undecies)** : mise à niveau étudiant→vendeur bloquée par une valeur de
-  statut invalide (`'traite'` au lieu de `'approuve'`), et assignation
-  d'ambassadeur ne trouvant aucun candidat (filtre oublié sur
-  `est_ambassadeur`, même famille que le bug notifications de la section
-  5sexies). Corrigés sur mobile et web, non revérifiés sur device/
-  navigateur réel au moment de la rédaction.
+  statut invalide (`'traite'` au lieu de `'approuve'`), assignation
+  d'ambassadeur ne trouvant aucun candidat, et envoi du formulaire de
+  vérification terrain bloqué par une policy Storage — les trois filtraient
+  encore sur `role = 'ambassadeur'` sans tenir compte du privilège
+  superposé `est_ambassadeur` (même famille que le bug notifications de la
+  section 5sexies). Corrigés sur mobile et web ; la policy Storage
+  (bug 3) appliquée directement en production via le MCP Supabase. Non
+  revérifiés sur device/navigateur réel au moment de la rédaction.
 - **Campagne de test manuel sur device réel** (Android, via `adb`,
   comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
   non inscrit et étudiant connecté couverts (section 3), plus des
