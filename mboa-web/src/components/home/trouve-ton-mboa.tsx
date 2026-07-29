@@ -7,7 +7,7 @@ import { formatPrix } from "@/lib/utils/format";
 import { distanceMetres } from "@/lib/utils/geo";
 import { Photo } from "@/components/ui/photo";
 import type { LieuPublic } from "@/lib/data/home";
-import { DEFAULT_LAT, DEFAULT_LNG, DEFAULT_VILLE } from "@/lib/constants";
+import type { VilleModel } from "@/lib/data/villes";
 
 const RAYONS_KM = [0.5, 1, 1.5, 2, 3, 5];
 
@@ -19,12 +19,25 @@ function formatRayon(km: number) {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km % 1 === 0 ? km.toFixed(0) : km} km`;
 }
 
-// Miroir de _buildTrouveTonMboa dans home_screen.dart : géolocalisation
-// navigateur (ou lieu choisi manuellement) + RPC logements_proches.
-export function TrouveTonMboa({ lieuxPublics }: { lieuxPublics: LieuPublic[] }) {
-  const [refLat, setRefLat] = useState(DEFAULT_LAT);
-  const [refLng, setRefLng] = useState(DEFAULT_LNG);
-  const [refNom, setRefNom] = useState(DEFAULT_VILLE);
+// Miroir de _buildTrouveTonMboa/_resoudreReferenceProximite (home_screen.dart) :
+// géolocalisation navigateur (ou lieu choisi manuellement) + RPC
+// logements_proches. Le point de référence par défaut est le centre de la
+// ville sélectionnée (villeActuelle), pas Sangmelima en dur — remplacé par
+// la position GPS réelle seulement si elle tombe dans le rayon de
+// couverture de cette ville. Le parent (page.tsx) doit rendre ce composant
+// avec `key={villeActuelle.nom}` : un changement de ville doit repartir
+// d'un état initial propre (centre de la nouvelle ville), pas d'un setState
+// synchrone dans un effet (anti-pattern react-hooks/set-state-in-effect).
+export function TrouveTonMboa({
+  lieuxPublics,
+  villeActuelle,
+}: {
+  lieuxPublics: LieuPublic[];
+  villeActuelle: VilleModel;
+}) {
+  const [refLat, setRefLat] = useState(villeActuelle.lat);
+  const [refLng, setRefLng] = useState(villeActuelle.lng);
+  const [refNom, setRefNom] = useState(villeActuelle.nom);
   const [rayonKm, setRayonKm] = useState(2);
   const [result, setResult] = useState<{ key: string; data: LogementProche[] } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -38,8 +51,8 @@ export function TrouveTonMboa({ lieuxPublics }: { lieuxPublics: LieuPublic[] }) 
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        const distanceM = distanceMetres(latitude, longitude, DEFAULT_LAT, DEFAULT_LNG);
-        if (distanceM <= 30000) {
+        const distanceM = distanceMetres(latitude, longitude, villeActuelle.lat, villeActuelle.lng);
+        if (distanceM <= villeActuelle.rayonCouvertureKm * 1000) {
           setRefLat(latitude);
           setRefLng(longitude);
           setRefNom("ta position");
@@ -48,7 +61,7 @@ export function TrouveTonMboa({ lieuxPublics }: { lieuxPublics: LieuPublic[] }) 
       () => {},
       { timeout: 8000 },
     );
-  }, []);
+  }, [villeActuelle]);
 
   useEffect(() => {
     let cancelled = false;

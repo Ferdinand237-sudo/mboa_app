@@ -1,5 +1,6 @@
 import { getHomeLogements, getHomeArticles, getContributeurs, getLieuxPublics } from "@/lib/data/home";
 import { getCurrentUser } from "@/lib/data/auth";
+import { getVilles, getVilleActuelle } from "@/lib/data/villes";
 import { HeroHeader } from "@/components/home/hero-header";
 import { CategoryCards } from "@/components/home/category-cards";
 import { SectionTitle } from "@/components/home/section-title";
@@ -13,13 +14,17 @@ import { TOUR_HOME_VISITEUR, TOUR_HOME_ETUDIANT, TOUR_HOME_VENDEUR } from "@/com
 const SEEN_KEY_HOME_VISITEUR = "mboa_tour_seen";
 
 export default async function HomePage() {
-  const user = await getCurrentUser();
+  const [user, villes, { ville: villeActuelle, cookiePresent }] = await Promise.all([
+    getCurrentUser(),
+    getVilles(),
+    getVilleActuelle(),
+  ]);
 
   const [logements, articles, contributeurs, lieuxPublics] = await Promise.all([
-    getHomeLogements(),
-    getHomeArticles(),
+    getHomeLogements(villeActuelle.nom),
+    getHomeArticles(villeActuelle.nom),
     getContributeurs(),
-    getLieuxPublics(),
+    getLieuxPublics(villeActuelle.nom),
   ]);
 
   const prenom = user ? user.nom.split(" ")[0] : "Visiteur";
@@ -37,7 +42,14 @@ export default async function HomePage() {
 
   return (
     <div>
-      <HeroHeader prenom={prenom} tourSteps={tourSteps} tourAutoOpenKey={tourAutoOpenKey} />
+      <HeroHeader
+        prenom={prenom}
+        tourSteps={tourSteps}
+        tourAutoOpenKey={tourAutoOpenKey}
+        villes={villes}
+        villeActuelle={villeActuelle}
+        cookiePresent={cookiePresent}
+      />
 
       <div className="mx-auto max-w-7xl px-5 py-6 sm:px-6">
         {/* Explorer */}
@@ -71,7 +83,7 @@ export default async function HomePage() {
         {/* Trouve ton Mboa */}
         <div className="mt-7">
           {user ? (
-            <TrouveTonMboa lieuxPublics={lieuxPublics} />
+            <TrouveTonMboa key={villeActuelle.nom} lieuxPublics={lieuxPublics} villeActuelle={villeActuelle} />
           ) : (
             <TrouveTonMboaLocked />
           )}

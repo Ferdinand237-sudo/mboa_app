@@ -11,15 +11,37 @@ import {
   TYPES_LOGEMENT,
   EQUIPEMENTS,
   BUCKET_LOGEMENTS,
-  DEFAULT_VILLE,
   MAX_PHOTOS_LOGEMENT,
   MIN_PHOTOS_LOGEMENT,
 } from "@/lib/constants";
+import type { VilleModel } from "@/lib/data/villes";
 
 type LieuProche = { nom: string; distance: number };
 
+// Ville la plus proche d'une position parmi les villes couvertes actives,
+// à condition qu'elle tombe dans son rayon de couverture — miroir de
+// VilleService.villeProchePosition (mobile). null si aucune ne correspond.
+function villeProchePosition(lat: number, lng: number, villes: VilleModel[]): VilleModel | null {
+  let plusProche: VilleModel | null = null;
+  let distanceMin = Infinity;
+  for (const v of villes) {
+    const d = distanceMetres(lat, lng, v.lat, v.lng);
+    if (d <= v.rayonCouvertureKm * 1000 && d < distanceMin) {
+      distanceMin = d;
+      plusProche = v;
+    }
+  }
+  return plusProche;
+}
+
 // Miroir de _FormLogement (publier_screen.dart).
-export function FormLogement({ compteActifPublication }: { compteActifPublication: boolean }) {
+export function FormLogement({
+  compteActifPublication,
+  villeActuelle,
+}: {
+  compteActifPublication: boolean;
+  villeActuelle: VilleModel;
+}) {
   const [titre, setTitre] = useState("");
   const [description, setDescription] = useState("");
   const [prix, setPrix] = useState("");
@@ -32,6 +54,7 @@ export function FormLogement({ compteActifPublication }: { compteActifPublicatio
   const [lng, setLng] = useState<number | null>(null);
   const [gettingLocation, setGettingLocation] = useState(false);
   const [lieuxPublics, setLieuxPublics] = useState<{ nom: string; lat: number; lng: number }[]>([]);
+  const [villes, setVilles] = useState<VilleModel[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ message: string; tone: ToneResultat } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -43,6 +66,23 @@ export function FormLogement({ compteActifPublication }: { compteActifPublicatio
       .from("lieux_publics")
       .select("nom, lat, lng")
       .then(({ data }) => setLieuxPublics(data ?? []));
+    supabase
+      .from("villes")
+      .select("id, nom, lat, lng, rayon_couverture_km, actif, ordre_affichage")
+      .eq("actif", true)
+      .then(({ data }) =>
+        setVilles(
+          (data ?? []).map((v) => ({
+            id: String(v.id),
+            nom: String(v.nom),
+            lat: Number(v.lat),
+            lng: Number(v.lng),
+            rayonCouvertureKm: Number(v.rayon_couverture_km),
+            actif: true,
+            ordreAffichage: Number(v.ordre_affichage),
+          })),
+        ),
+      );
   }, []);
 
   const photos: PhotoItem[] = newPhotos.map((p) => ({ kind: "new", preview: p.preview }));
@@ -148,6 +188,12 @@ export function FormLogement({ compteActifPublication }: { compteActifPublicatio
       return;
     }
 
+    // Ville dérivée de la position GPS captée du bien (la plus proche parmi
+    // les villes couvertes), repli sur la ville actuellement parcourue si
+    // aucune position n'a été captée ou qu'elle tombe hors de toute ville
+    // couverte — même logique que _publier (publier_screen.dart).
+    const villeLogement = (lat !== null && lng !== null ? villeProchePosition(lat, lng, villes) : null) ?? villeActuelle;
+
     try {
       const photoUrls = await uploadPhotos(user.id);
       const { data: inserted, error: insertError } = await supabase
@@ -161,7 +207,7 @@ export function FormLogement({ compteActifPublication }: { compteActifPublicatio
           photos: photoUrls,
           equipements: selectedEquipements,
           quartier: quartier.trim(),
-          ville: DEFAULT_VILLE,
+          ville: villeLogement.nom,
           lat,
           lng,
           proprietaire_id: user.id,

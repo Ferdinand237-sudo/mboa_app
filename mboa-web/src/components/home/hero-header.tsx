@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { TuneIcon } from "@/components/ui/icons";
 import { TourButton } from "@/components/onboarding/tour-button";
+import { VilleSwitcher } from "@/components/home/ville-switcher";
 import type { TourStep } from "@/components/onboarding/tours";
+import type { VilleModel } from "@/lib/data/villes";
 
 // Le badge de notifications non lues vit désormais dans le header persistant
 // (NotificationBell, présent sur toutes les pages, live via Supabase
@@ -11,10 +13,16 @@ export function HeroHeader({
   prenom,
   tourSteps,
   tourAutoOpenKey,
+  villes,
+  villeActuelle,
+  cookiePresent,
 }: {
   prenom: string;
   tourSteps: TourStep[];
   tourAutoOpenKey?: string;
+  villes: VilleModel[];
+  villeActuelle: VilleModel;
+  cookiePresent: boolean;
 }) {
   return (
     <section className="rounded-b-[32px] bg-gradient-to-br from-mboa-primary-dark via-mboa-primary to-mboa-primary-light">
@@ -25,9 +33,7 @@ export function HeroHeader({
             <h1 className="text-xl font-extrabold text-white">
               Bienvenue sur Mboa
             </h1>
-            <p className="mt-1 flex items-center gap-1 text-xs text-white/70">
-              📍 Sangmelima
-            </p>
+            <VilleSwitcher villes={villes} villeActuelle={villeActuelle} cookiePresent={cookiePresent} />
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <TourButton steps={tourSteps} variant="dark" autoOpenKey={tourAutoOpenKey} />

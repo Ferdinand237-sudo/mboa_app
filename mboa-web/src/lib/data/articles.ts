@@ -6,20 +6,22 @@ const SELECT_WITH_VENDEUR =
   "*, vendeur:users!vendeur_id(nom, photo_url, verified, note_globale)";
 
 export async function getArticles(params: {
+  ville: string;
   categorie?: string;
   etat?: string;
   search?: string;
   limit?: number;
   offset?: number;
 }): Promise<ArticleModel[]> {
-  const { categorie, etat, search, limit = PAGE_SIZE, offset = 0 } = params;
+  const { ville, categorie, etat, search, limit = PAGE_SIZE, offset = 0 } = params;
   const supabase = await createClient();
 
   let query = supabase
     .from("articles")
     .select(SELECT_WITH_VENDEUR)
     .eq("statut", "disponible")
-    .eq("statut_moderation", "publie");
+    .eq("statut_moderation", "publie")
+    .eq("ville", ville);
 
   if (categorie && categorie !== "Tous") {
     query = query.eq("categorie", categorie);

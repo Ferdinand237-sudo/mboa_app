@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FormLogement } from "@/components/vendeur/form-logement";
 import { FormArticle } from "@/components/vendeur/form-article";
+import type { VilleModel } from "@/lib/data/villes";
 
 // Miroir du TabBar Logement/Article (publier_screen.dart) quand le compte
 // cumule les deux sous-rôles.
@@ -10,15 +11,18 @@ export function PublierTabs({
   peutLogement,
   peutArticle,
   compteActifPublication,
+  villeActuelle,
 }: {
   peutLogement: boolean;
   peutArticle: boolean;
   compteActifPublication: boolean;
+  villeActuelle: VilleModel;
 }) {
   const [tab, setTab] = useState<"logement" | "article">(peutLogement ? "logement" : "article");
 
-  if (peutLogement && !peutArticle) return <FormLogement compteActifPublication={compteActifPublication} />;
-  if (peutArticle && !peutLogement) return <FormArticle />;
+  if (peutLogement && !peutArticle)
+    return <FormLogement compteActifPublication={compteActifPublication} villeActuelle={villeActuelle} />;
+  if (peutArticle && !peutLogement) return <FormArticle villeActuelle={villeActuelle} />;
 
   return (
     <div>
@@ -43,9 +47,9 @@ export function PublierTabs({
         </button>
       </div>
       {tab === "logement" ? (
-        <FormLogement compteActifPublication={compteActifPublication} />
+        <FormLogement compteActifPublication={compteActifPublication} villeActuelle={villeActuelle} />
       ) : (
-        <FormArticle />
+        <FormArticle villeActuelle={villeActuelle} />
       )}
     </div>
   );

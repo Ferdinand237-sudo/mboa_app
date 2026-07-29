@@ -1,6 +1,7 @@
 "use server";
 
 import { getArticles } from "@/lib/data/articles";
+import { getVilleActuelle } from "@/lib/data/villes";
 import { createClient } from "@/lib/supabase/server";
 import type { ArticleModel } from "@/lib/types/models";
 
@@ -9,7 +10,8 @@ export async function searchArticles(filters: {
   etat?: string;
   search?: string;
 }): Promise<ArticleModel[]> {
-  return getArticles({ ...filters, limit: 200 });
+  const { ville } = await getVilleActuelle();
+  return getArticles({ ...filters, ville: ville.nom, limit: 200 });
 }
 
 export async function enregistrerAlerteArticle(libelle: string, criteres: Record<string, unknown>) {

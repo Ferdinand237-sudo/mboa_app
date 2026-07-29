@@ -13,7 +13,15 @@ export type FavoriItem = {
 
 type FavoriRow = {
   logement:
-    | { id: string; titre: string; prix: number; photos: string[] | null; quartier: string | null; proprietaire: { verified: boolean } | null }
+    | {
+        id: string;
+        titre: string;
+        prix: number;
+        photos: string[] | null;
+        quartier: string | null;
+        ville: string | null;
+        proprietaire: { verified: boolean } | null;
+      }
     | null;
   article:
     | { id: string; titre: string; prix: number; photos: string[] | null; etat: string | null; vendeur: { verified: boolean } | null }
@@ -25,7 +33,7 @@ export async function getFavoris(userId: string): Promise<FavoriItem[]> {
   const { data, error } = await supabase
     .from("favoris")
     .select(
-      "logement:logements(id, titre, prix, photos, quartier, proprietaire:users!proprietaire_id(verified)), article:articles(id, titre, prix, photos, etat, vendeur:users!vendeur_id(verified))",
+      "logement:logements(id, titre, prix, photos, quartier, ville, proprietaire:users!proprietaire_id(verified)), article:articles(id, titre, prix, photos, etat, vendeur:users!vendeur_id(verified))",
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
@@ -44,7 +52,7 @@ export async function getFavoris(userId: string): Promise<FavoriItem[]> {
         titre: row.logement.titre,
         prix: row.logement.prix,
         photos: row.logement.photos ?? [],
-        sousTitre: row.logement.quartier ?? "Sangmelima",
+        sousTitre: row.logement.quartier ?? row.logement.ville ?? "",
         verified: row.logement.proprietaire?.verified === true,
       });
     } else if (row.article) {

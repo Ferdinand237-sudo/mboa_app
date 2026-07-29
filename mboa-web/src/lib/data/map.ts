@@ -8,6 +8,7 @@ export type MapLogement = {
   type: string;
   prix: number;
   quartier: string | null;
+  ville: string;
   photos: string[];
   lat: number;
   lng: number;
@@ -23,18 +24,19 @@ export type MapLieu = {
   lng: number;
 };
 
-export async function getMapData(): Promise<{ logements: MapLogement[]; lieuxPublics: MapLieu[] }> {
+export async function getMapData(ville: string): Promise<{ logements: MapLogement[]; lieuxPublics: MapLieu[] }> {
   const supabase = await createClient();
 
   const [logementsRes, lieuxRes] = await Promise.all([
     supabase
       .from("logements")
-      .select("id, titre, type, prix, quartier, photos, lat, lng, boosted, proprietaire:users!proprietaire_id(verified)")
+      .select("id, titre, type, prix, quartier, ville, photos, lat, lng, boosted, proprietaire:users!proprietaire_id(verified)")
       .eq("statut", "disponible")
       .eq("statut_moderation", "publie")
+      .eq("ville", ville)
       .not("lat", "is", null)
       .not("lng", "is", null),
-    supabase.from("lieux_publics").select("id, nom, categorie, lat, lng"),
+    supabase.from("lieux_publics").select("id, nom, categorie, lat, lng").eq("ville", ville),
   ]);
 
   type LogementRow = {
@@ -43,6 +45,7 @@ export async function getMapData(): Promise<{ logements: MapLogement[]; lieuxPub
     type: string | null;
     prix: number | null;
     quartier: string | null;
+    ville: string | null;
     photos: string[] | null;
     lat: number | null;
     lng: number | null;
@@ -58,6 +61,7 @@ export async function getMapData(): Promise<{ logements: MapLogement[]; lieuxPub
       type: l.type ?? "Chambre",
       prix: l.prix ?? 0,
       quartier: l.quartier,
+      ville: l.ville ?? ville,
       photos: l.photos ?? [],
       lat: l.lat as number,
       lng: l.lng as number,

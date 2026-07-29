@@ -29,7 +29,7 @@ export function HomeLogementCard({ logement }: { logement: LogementModel }) {
           {formatPrix(logement.prix)}
         </p>
         <p className="truncate text-[10px] text-mboa-text-muted">
-          📍 {logement.quartier ?? "Sangmelima"}
+          📍 {logement.quartier ?? logement.ville}
         </p>
         <p className="text-[10px] text-mboa-text">
           ⭐ {logement.proprietaireNoteGlobale.toFixed(1)}

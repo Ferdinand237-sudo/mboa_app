@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/data/auth";
 import { getVendeurPermissions } from "@/lib/data/vendeur-annonces";
+import { getVilleActuelle } from "@/lib/data/villes";
 import { PublierTabs } from "@/components/vendeur/publier-tabs";
 import { TourButton } from "@/components/onboarding/tour-button";
 import { TOUR_PUBLIER } from "@/components/onboarding/tours";
@@ -15,7 +16,10 @@ export default async function PublierPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const permissions = await getVendeurPermissions(user.id);
+  const [permissions, { ville: villeActuelle }] = await Promise.all([
+    getVendeurPermissions(user.id),
+    getVilleActuelle(),
+  ]);
 
   if (!permissions.peutLogement && !permissions.peutArticle) {
     return (
@@ -56,6 +60,7 @@ export default async function PublierPage() {
         peutLogement={permissions.peutLogement}
         peutArticle={permissions.peutArticle}
         compteActifPublication={permissions.compteActifPublication}
+        villeActuelle={villeActuelle}
       />
     </div>
   );

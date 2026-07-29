@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import type { MapLogement, MapLieu } from "@/lib/data/map";
+import type { VilleModel } from "@/lib/data/villes";
 
 // Leaflet touche `window` au chargement du module : le composant carte doit
 // donc être client-only. `ssr:false` n'est autorisé que depuis un Client
@@ -19,6 +20,7 @@ export function MapLoader(props: {
   logements: MapLogement[];
   lieuxPublics: MapLieu[];
   focusLogementId?: string;
+  villeActuelle: VilleModel;
 }) {
   return <MapView {...props} />;
 }

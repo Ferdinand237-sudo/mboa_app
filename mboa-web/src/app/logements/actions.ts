@@ -1,6 +1,7 @@
 "use server";
 
 import { getLogements } from "@/lib/data/logements";
+import { getVilleActuelle } from "@/lib/data/villes";
 import { createClient } from "@/lib/supabase/server";
 import type { LogementModel } from "@/lib/types/models";
 
@@ -9,7 +10,8 @@ export async function searchLogements(filters: {
   prixMax?: number;
   search?: string;
 }): Promise<LogementModel[]> {
-  return getLogements({ ...filters, limit: 200 });
+  const { ville } = await getVilleActuelle();
+  return getLogements({ ...filters, ville: ville.nom, limit: 200 });
 }
 
 export async function enregistrerAlerteLogement(libelle: string, criteres: Record<string, unknown>) {

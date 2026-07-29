@@ -14,9 +14,12 @@ import {
   MAX_PHOTOS_ARTICLE,
   MIN_PHOTOS_ARTICLE,
 } from "@/lib/constants";
+import type { VilleModel } from "@/lib/data/villes";
 
-// Miroir de _FormArticle (publier_screen.dart).
-export function FormArticle() {
+// Miroir de _FormArticle (publier_screen.dart). Aucune position GPS n'est
+// captée pour un article (contrairement à un logement) : la ville est
+// celle actuellement parcourue par le vendeur au moment de la publication.
+export function FormArticle({ villeActuelle }: { villeActuelle: VilleModel }) {
   const [titre, setTitre] = useState("");
   const [description, setDescription] = useState("");
   const [prix, setPrix] = useState("");
@@ -104,6 +107,7 @@ export function FormArticle() {
           negociable,
           accepte_avis: accepteAvis,
           photos: photoUrls,
+          ville: villeActuelle.nom,
           vendeur_id: user.id,
           statut: "disponible",
           boosted: false,

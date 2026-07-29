@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getMapData } from "@/lib/data/map";
+import { getVilleActuelle } from "@/lib/data/villes";
 import { MapLoader } from "@/components/carte/map-loader";
 
 export const metadata: Metadata = {
@@ -12,8 +13,16 @@ export default async function CartePage({
 }: {
   searchParams: Promise<{ logement?: string }>;
 }) {
-  const { logements, lieuxPublics } = await getMapData();
+  const { ville } = await getVilleActuelle();
+  const { logements, lieuxPublics } = await getMapData(ville.nom);
   const { logement } = await searchParams;
 
-  return <MapLoader logements={logements} lieuxPublics={lieuxPublics} focusLogementId={logement} />;
+  return (
+    <MapLoader
+      logements={logements}
+      lieuxPublics={lieuxPublics}
+      focusLogementId={logement}
+      villeActuelle={ville}
+    />
+  );
 }

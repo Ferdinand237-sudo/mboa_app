@@ -6,20 +6,22 @@ const SELECT_WITH_PROPRIETAIRE =
   "*, proprietaire:users!proprietaire_id(nom, photo_url, verified, note_globale, nb_avis)";
 
 export async function getLogements(params: {
+  ville: string;
   type?: string;
   prixMax?: number;
   search?: string;
   limit?: number;
   offset?: number;
 }): Promise<LogementModel[]> {
-  const { type, prixMax, search, limit = PAGE_SIZE, offset = 0 } = params;
+  const { ville, type, prixMax, search, limit = PAGE_SIZE, offset = 0 } = params;
   const supabase = await createClient();
 
   let query = supabase
     .from("logements")
     .select(SELECT_WITH_PROPRIETAIRE)
     .eq("statut", "disponible")
-    .eq("statut_moderation", "publie");
+    .eq("statut_moderation", "publie")
+    .eq("ville", ville);
 
   if (type && type !== "Tous") {
     query = query.eq("type", type);

@@ -33,7 +33,7 @@ export function LogementTile({ logement }: { logement: LogementModel }) {
           {logement.titre}
         </p>
         <p className="mt-1 text-xs text-mboa-text-muted">
-          📍 {logement.quartier ?? "Sangmelima"}
+          📍 {logement.quartier ?? logement.ville}
         </p>
         <p className="mt-1.5 text-[15px] font-extrabold text-mboa-primary">
           {formatPrix(logement.prix)}

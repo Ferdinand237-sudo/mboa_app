@@ -10,8 +10,9 @@ import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-lea
 import { Photo } from "@/components/ui/photo";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { distanceMetres, formatDistance } from "@/lib/utils/geo";
-import { CATEGORIES_LIEUX_PUBLICS, DEFAULT_LAT, DEFAULT_LNG } from "@/lib/constants";
+import { CATEGORIES_LIEUX_PUBLICS } from "@/lib/constants";
 import type { MapLogement, MapLieu } from "@/lib/data/map";
+import type { VilleModel } from "@/lib/data/villes";
 
 const FILTRES = ["Tous", "Chambre", "Studio", "Appartement", "📍 Lieux"] as const;
 
@@ -158,10 +159,12 @@ export default function MapView({
   logements,
   lieuxPublics,
   focusLogementId,
+  villeActuelle,
 }: {
   logements: MapLogement[];
   lieuxPublics: MapLieu[];
   focusLogementId?: string;
+  villeActuelle: VilleModel;
 }) {
   const [filtre, setFiltre] = useState<(typeof FILTRES)[number]>("Tous");
   const [selection, setSelection] = useState<Selection>(() => {
@@ -181,8 +184,8 @@ export default function MapView({
 
   const center = useMemo((): [number, number] => {
     const focus = focusLogementId ? logements.find((l) => l.id === focusLogementId) : null;
-    return focus ? [focus.lat, focus.lng] : [DEFAULT_LAT, DEFAULT_LNG];
-  }, [focusLogementId, logements]);
+    return focus ? [focus.lat, focus.lng] : [villeActuelle.lat, villeActuelle.lng];
+  }, [focusLogementId, logements, villeActuelle]);
 
   const logementsFiltres = useMemo(() => {
     if (filtre === "Tous") return logements;
@@ -210,7 +213,7 @@ export default function MapView({
         <div className="mx-auto max-w-7xl">
           <h1 className="text-[22px] font-extrabold text-mboa-text">🗺️ Carte</h1>
           <p className="mt-1 text-xs text-mboa-text-muted">
-            Sangmelima · {logements.length} logement{logements.length > 1 ? "s" : ""} ·{" "}
+            {villeActuelle.nom} · {logements.length} logement{logements.length > 1 ? "s" : ""} ·{" "}
             {lieuxPublics.length} lieu{lieuxPublics.length > 1 ? "x" : ""}
           </p>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
@@ -299,7 +302,7 @@ function FicheLogement({ logement, onItineraire }: { logement: MapLogement; onIt
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 text-sm font-bold text-mboa-text">{logement.titre}</p>
           <p className="mt-1 flex items-center gap-1 text-xs text-mboa-text-muted">
-            📍 {logement.quartier ?? "Sangmelima"}
+            📍 {logement.quartier ?? logement.ville}
           </p>
           <p className="mt-1.5 text-base font-extrabold text-mboa-primary">
             {formatPrixCourt(logement.prix)}/mois

@@ -9,13 +9,14 @@ const SELECT_LOGEMENT_HOME =
   "*, proprietaire:users!proprietaire_id(nom, verified, note_globale, nb_avis)";
 const SELECT_ARTICLE_HOME = "*, vendeur:users!vendeur_id(nom, verified)";
 
-export async function getHomeLogements(): Promise<LogementModel[]> {
+export async function getHomeLogements(ville: string): Promise<LogementModel[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("logements")
     .select(SELECT_LOGEMENT_HOME)
     .eq("statut", "disponible")
     .eq("statut_moderation", "publie")
+    .eq("ville", ville)
     .order("boosted", { ascending: false })
     .order("date_publication", { ascending: false })
     .limit(6);
@@ -27,13 +28,14 @@ export async function getHomeLogements(): Promise<LogementModel[]> {
   return (data ?? []).map(logementFromRow);
 }
 
-export async function getHomeArticles(): Promise<ArticleModel[]> {
+export async function getHomeArticles(ville: string): Promise<ArticleModel[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("articles")
     .select(SELECT_ARTICLE_HOME)
     .eq("statut", "disponible")
     .eq("statut_moderation", "publie")
+    .eq("ville", ville)
     .order("boosted", { ascending: false })
     .order("date_publication", { ascending: false })
     .limit(6);
@@ -86,12 +88,15 @@ export type LieuPublic = {
   lng: number;
 };
 
-export async function getLieuxPublics(): Promise<LieuPublic[]> {
+// ville omise : utilisé par la page détail d'un logement (proximité
+// calculée par distance réelle à son lat/lng, la ville importe peu tant
+// que la distance filtre déjà les résultats pertinents) — voir
+// logements/[id]/page.tsx, seul appelant sans ville explicite.
+export async function getLieuxPublics(ville?: string): Promise<LieuPublic[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("lieux_publics")
-    .select("id, nom, categorie, lat, lng")
-    .order("nom");
+  let query = supabase.from("lieux_publics").select("id, nom, categorie, lat, lng");
+  if (ville) query = query.eq("ville", ville);
+  const { data, error } = await query.order("nom");
 
   if (error) {
     console.error("getLieuxPublics", error.message);
