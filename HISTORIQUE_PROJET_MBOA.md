@@ -845,6 +845,32 @@ au rendu.
 
 ---
 
+## 5octies. Filtres par type de compte sur l'écran admin Utilisateurs (30 juillet 2026)
+
+Ferdinand a signalé qu'il ne pouvait pas distinguer les différents types
+d'utilisateurs sur mobile comme sur le web. En comparant les deux écrans,
+les badges par carte (rôle, 👑 Admin, 🧭 Ambassadeur, statut de
+vérification terrain) existaient déjà côté mobile, aussi complets que sur
+`users-client.tsx` — la vraie différence était l'absence des pills de
+filtre en haut de liste (`FILTRES_ROLE` côté web : Tous/Visiteurs/
+Vendeurs/Ambassadeurs/Admins), qui permettent de segmenter la liste plutôt
+que de la parcourir en entier.
+
+- Ajouté à `admin_users_screen.dart` : rangée de pills horizontale
+  (même style que le filtre de `admin_signalements_screen.dart`, pattern
+  déjà établi dans le projet), état `_filtreRole`, getter `_usersAffiches`
+  qui filtre sur `role` pour visiteur/vendeur et sur les privilèges
+  superposés (`_estAdmin`/`_estAmbassadeur`, désormais des helpers
+  partagés avec `_buildUserCard` plutôt que dupliqués) pour
+  ambassadeur/admin — même logique de filtrage que web.
+- Message "Aucun utilisateur dans ce filtre" ajouté pour le cas d'une
+  liste filtrée vide, miroir du web.
+- Testé : `flutter analyze` propre sur le fichier (aucune erreur, deux
+  infos `prefer_const_constructors` préexistantes au style du fichier).
+- **Non vérifié sur device réel** au moment de la rédaction.
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
@@ -987,13 +1013,19 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
 - **Notifications admin complètes (29-30/07, section 5sexies)** : bug
   `role='admin'` corrigé (in-app + push + Edge Function), trigger push
   messages ajouté, centre de notifications mobile réécrit sur la vraie
-  table, ouverture directe au tap y compris app fermée. Migration testée
-  en local, mais pas encore collée en production ni l'Edge Function
-  `send-notification` redéployée au moment de la rédaction.
+  table, ouverture directe au tap y compris app fermée. Migration collée
+  et confirmée fonctionnelle en production par Ferdinand le 30/07 ; l'Edge
+  Function `send-notification` corrigée reste à redéployer par lui
+  (`supabase functions deploy send-notification --project-ref
+  vodmsndqahmxdsqpayrd`) pour que le correctif `notifierTousAdmins` soit
+  effectif côté push — pas confirmé au moment de la rédaction.
 - **Multi-villes côté web (30/07, section 5septies)** : sélecteur de
   ville, filtrage complet (accueil/logements/marketplace/carte/
   publication), `/admin/villes`. `npm run build`/`lint` propres, pas
   encore testé en navigateur réel.
+- **Filtres par type de compte, écran admin Utilisateurs (30/07, section
+  5octies)** : pills Tous/Visiteurs/Vendeurs/Ambassadeurs/Admins ajoutées,
+  miroir du web. Non vérifié sur device réel.
 - **Campagne de test manuel sur device réel** (Android, via `adb`,
   comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
   non inscrit et étudiant connecté couverts (section 3), plus des
