@@ -871,6 +871,66 @@ que de la parcourir en entier.
 
 ---
 
+## 5novies. Stratégie de croissance — Phase 1 : partage social des annonces (mboa-web, 29 juillet 2026)
+
+Ferdinand a ouvert un chantier de stratégie de croissance : permettre aux
+utilisateurs d'inviter d'autres personnes et de partager les annonces.
+Trois leviers ont été discutés (partage social des annonces, parrainage à
+crédits/paliers avec récompense financière au niveau Ambassadeur,
+publication déjà partagée par les vendeurs) et un point de vigilance
+explicite a été soulevé sur le parrainage : toute récompense en cascade
+(commission sur les filleuls des filleuls) se rapproche structurellement
+d'un schéma pyramidal, un risque légal/réputationnel réel au Cameroun —
+consigné en mémoire long terme pour les prochaines sessions. Décision
+actée : parrainage à un seul niveau, crédits utilisables uniquement en
+interne (boost, certification) tant qu'aucun revenu récurrent ne finance
+un versement réel, expérimentation démarrée côté **mboa-web uniquement**
+avant tout portage mobile.
+
+Cette section documente la Phase 1 (partage social), livrée. Les Phases 2
+(parrainage à crédits/paliers) et 3 (versement réel Ambassadeur) sont
+volontairement repoussées à plus tard, non commencées.
+
+**Livré :**
+
+- `src/lib/utils/url.ts` — `getSiteUrl()` : URL absolue déduite des
+  en-têtes de la requête entrante (`host`/`x-forwarded-proto` via
+  `headers()` de `next/headers`), pas de domaine codé en dur puisqu'aucune
+  URL de production stable n'est encore documentée dans le projet. Fonctionne
+  identiquement en local, en preview Vercel et en production.
+- `generateMetadata` de `src/app/logements/[id]/page.tsx` et
+  `src/app/marketplace/[id]/page.tsx` : ajout des champs `openGraph` et
+  `twitter` (titre, description tronquée à 160 caractères, URL absolue de
+  la page, première photo de l'annonce en image de carte 1200×630). C'est
+  ce qui permet l'aperçu partiel (titre/prix/photo) affiché par
+  WhatsApp/Facebook/X quand le lien est collé ou partagé — le clic renvoie
+  directement vers la page de détail complète de l'annonce, déjà la cible
+  naturelle de ces URLs.
+- Nouveau composant `src/components/ui/share-buttons.tsx` (client
+  component, icônes SVG inline pour éviter une dépendance) : boutons
+  WhatsApp (`wa.me`), Facebook (`sharer.php`) et X (`intent/tweet`) via
+  leurs intents web officiels. Instagram n'a aucun intent web officiel
+  pour un partage de lien pré-rempli (l'app mobile ne le consomme pas) —
+  repli sur `navigator.share` (ouvre le sélecteur natif du système,
+  Instagram y apparaît sur mobile) ou, à défaut, copie du lien dans le
+  presse-papier avec confirmation visuelle.
+- Bloc `ShareButtons` inséré en bas de chaque page de détail (logement et
+  article), juste avant le bouton "Signaler cette annonce" — repère "à la
+  fin de l'annonce" demandé par Ferdinand.
+- Testé : `npx eslint` ciblé propre, `npm run build` complet sans erreur
+  TypeScript ni régression sur les 38 routes existantes.
+- **Non testé en navigateur réel** (aperçu effectif WhatsApp/Facebook/X,
+  comportement `navigator.share` sur mobile) au moment de la rédaction —
+  l'aperçu de carte ne peut être vérifié qu'une fois le site accessible
+  via une URL publique stable (WhatsApp/Facebook doivent pouvoir requêter
+  l'URL pour en lire les meta tags).
+
+**Reste à faire (Phase 2, non commencée)** : table de parrainage
+(code unique par utilisateur, crédits, paliers/badges), notifications de
+relance périodiques, utilisation des crédits pour boost/certification.
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
@@ -1026,6 +1086,14 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
 - **Filtres par type de compte, écran admin Utilisateurs (30/07, section
   5octies)** : pills Tous/Visiteurs/Vendeurs/Ambassadeurs/Admins ajoutées,
   miroir du web. Non vérifié sur device réel.
+- **Stratégie de croissance — Phase 1 : partage social (29/07, section
+  5novies)** : meta Open Graph/Twitter dynamiques + boutons de partage
+  WhatsApp/Facebook/X/Instagram sur les pages détail logement et article
+  côté mboa-web. `npm run build`/`lint` propres, aperçu de carte pas
+  encore vérifié en conditions réelles (nécessite une URL publique
+  stable). Phases 2 (parrainage à crédits) et 3 (versement réel
+  Ambassadeur) non commencées, séquencées à dessein pour isoler le risque
+  légal/financier du parrainage en cascade.
 - **Campagne de test manuel sur device réel** (Android, via `adb`,
   comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
   non inscrit et étudiant connecté couverts (section 3), plus des

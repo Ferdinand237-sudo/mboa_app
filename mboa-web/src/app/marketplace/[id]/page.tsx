@@ -11,7 +11,9 @@ import { BackButton } from "@/components/ui/back-button";
 import { FavoriButton } from "@/components/ui/favori-button";
 import { LaisserAvisButton } from "@/components/ui/laisser-avis-button";
 import { SignalerButton } from "@/components/ui/signaler-button";
+import { ShareButtons } from "@/components/ui/share-buttons";
 import { ContactSticky } from "@/components/logement/contact-sticky";
+import { getSiteUrl } from "@/lib/utils/url";
 
 export async function generateMetadata({
   params,
@@ -21,9 +23,29 @@ export async function generateMetadata({
   const { id } = await params;
   const article = await getArticle(id);
   if (!article) return { title: "Article introuvable" };
+
+  const titre = `${article.titre} — ${formatPrix(article.prix)}`;
+  const description = article.description.slice(0, 160);
+  const siteUrl = await getSiteUrl();
+  const url = `${siteUrl}/marketplace/${id}`;
+  const image = article.photos[0];
+
   return {
-    title: `${article.titre} — ${formatPrix(article.prix)}`,
-    description: article.description.slice(0, 160),
+    title: titre,
+    description,
+    openGraph: {
+      title: titre,
+      description,
+      url,
+      type: "website",
+      images: image ? [{ url: image, width: 1200, height: 630, alt: article.titre }] : undefined,
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title: titre,
+      description,
+      images: image ? [image] : undefined,
+    },
   };
 }
 
@@ -46,10 +68,11 @@ export default async function ArticleDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [article, user, avis] = await Promise.all([
+  const [article, user, avis, siteUrl] = await Promise.all([
     getArticle(id),
     getCurrentUser(),
     getAvisAnnonce(id),
+    getSiteUrl(),
   ]);
 
   if (!article) notFound();
@@ -201,6 +224,13 @@ export default async function ArticleDetailPage({
             )}
           </div>
         )}
+
+        <div className="mt-7">
+          <ShareButtons
+            url={`${siteUrl}/marketplace/${article.id}`}
+            title={`${article.titre} — ${formatPrix(article.prix)}`}
+          />
+        </div>
 
         <div className="mt-6">
           <SignalerButton annonceId={article.id} />

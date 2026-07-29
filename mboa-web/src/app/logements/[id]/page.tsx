@@ -15,7 +15,9 @@ import { BackButton } from "@/components/ui/back-button";
 import { FavoriButton } from "@/components/ui/favori-button";
 import { LaisserAvisButton } from "@/components/ui/laisser-avis-button";
 import { SignalerButton } from "@/components/ui/signaler-button";
+import { ShareButtons } from "@/components/ui/share-buttons";
 import { ContactSticky } from "@/components/logement/contact-sticky";
+import { getSiteUrl } from "@/lib/utils/url";
 
 export async function generateMetadata({
   params,
@@ -25,9 +27,31 @@ export async function generateMetadata({
   const { id } = await params;
   const logement = await getLogement(id);
   if (!logement) return { title: "Logement introuvable" };
+
+  const titre = `${logement.titre} — ${formatPrix(logement.prix)}`;
+  const description = logement.description.slice(0, 160);
+  const siteUrl = await getSiteUrl();
+  const url = `${siteUrl}/logements/${id}`;
+  const image = logement.photos[0];
+
   return {
-    title: `${logement.titre} — ${formatPrix(logement.prix)}`,
-    description: logement.description.slice(0, 160),
+    title: titre,
+    description,
+    // Carte de partage affichée par WhatsApp/Facebook/X quand le lien est
+    // collé ou partagé — voir ShareButtons plus bas dans la page.
+    openGraph: {
+      title: titre,
+      description,
+      url,
+      type: "website",
+      images: image ? [{ url: image, width: 1200, height: 630, alt: logement.titre }] : undefined,
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title: titre,
+      description,
+      images: image ? [image] : undefined,
+    },
   };
 }
 
@@ -37,11 +61,12 @@ export default async function LogementDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [logement, user, avis, lieuxPublics] = await Promise.all([
+  const [logement, user, avis, lieuxPublics, siteUrl] = await Promise.all([
     getLogement(id),
     getCurrentUser(),
     getAvisAnnonce(id),
     getLieuxPublics(),
+    getSiteUrl(),
   ]);
 
   if (!logement) notFound();
@@ -239,6 +264,13 @@ export default async function LogementDetailPage({
               ))}
             </div>
           )}
+        </div>
+
+        <div className="mt-7">
+          <ShareButtons
+            url={`${siteUrl}/logements/${logement.id}`}
+            title={`${logement.titre} — ${formatPrix(logement.prix)}`}
+          />
         </div>
 
         <div className="mt-6">
