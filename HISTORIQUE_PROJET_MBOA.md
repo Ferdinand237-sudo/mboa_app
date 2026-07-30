@@ -1147,6 +1147,48 @@ Function dans ce projet.
 
 ---
 
+## 5terdecies. Annonces vendeurs invisibles côté public + photos non compressées sur le web (PR #31, 30 juillet 2026)
+
+Deux correctifs traités par Ferdinand dans une autre session/environnement
+(auteur des commits : `Claude <noreply@anthropic.com>`), fusionnés via la
+PR #31 et récupérés ici par fast-forward. Documentés a posteriori à sa
+demande, à partir de la lecture des commits sur GitHub.
+
+**1. Annonces bloquées indéfiniment en `statut_moderation='en_attente'`,
+donc jamais visibles publiquement.** Root cause : `moderate-annonce`
+décode chaque photo entièrement en mémoire (`imagescript`) pour calculer
+un hash anti-fraude, sans jamais limiter la taille avant décodage. Une
+photo de 3,9 Mo (photo de téléphone non compressée, uploadée depuis
+mboa-web qui n'avait alors aucune étape de redimensionnement côté client,
+contrairement à `publier_screen.dart` sur mobile) suffisait à dépasser la
+mémoire allouée au worker (`WORKER_RESOURCE_LIMIT`), qui crashait avant
+même d'écrire une ligne dans `moderation_ia` ou de renvoyer une décision —
+l'annonce restait donc coincée dans son statut par défaut pour toujours.
+Corrigé par des seuils de taille (2,5 Mo pour le hash perceptuel, 4 Mo
+pour l'inclusion dans l'appel Gemini) : une image trop lourde est
+désormais simplement ignorée pour ce traitement précis plutôt que de
+faire planter toute la modération, qui aboutit maintenant systématiquement
+à une décision définitive. Déployé (`moderate-annonce` v6) et vérifié en
+production : l'annonce `2dc4dc52-6289-42b3-aa64-d19f5ba39133`, bloquée
+depuis sa publication, est repassée à un statut définitif après
+re-déclenchement manuel.
+
+**2. Photos non compressées à l'upload sur mboa-web.** Root cause
+directement liée au bug 1 : le web n'avait aucune étape de
+redimensionnement/compression avant l'upload vers Supabase Storage,
+contrairement à mobile (`image_picker` configuré en `maxWidth`/`maxHeight`
+1200, `imageQuality` 80 dans `publier_screen.dart`). Nouveau
+`mboa-web/src/lib/utils/image-compress.ts` (`compresserImage()`) :
+redimensionne via `canvas`/`createImageBitmap` à 1200px max (ratio
+conservé) et ré-encode en JPEG qualité 0.8 — mêmes valeurs que mobile.
+Repli sur le fichier original en cas d'échec de décodage ou si la
+recompression ressort plus lourde (ex. PNG avec transparence), pour ne
+jamais bloquer la publication. Branché une seule fois dans
+`PhotoPicker.onChange` (composant partagé par les 4 formulaires
+logement/article, création et édition) plutôt que dupliqué dans chacun.
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
@@ -1333,6 +1375,22 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
   complet du projet (app + RLS + fonctions SQL) confirmé propre après
   coup. Non revérifiés sur device/navigateur réel au moment de la
   rédaction.
+- **send-notification cassée par son propre redéploiement (29-30/07,
+  section 5duodecies)** : régression auto-infligée (pas un bug
+  préexistant) — un redéploiement sans `--no-verify-jwt` ni section
+  `config.toml` dédiée avait réactivé la vérification JWT, rejetant tous
+  les appels des triggers SQL (401, aucun header Authorization envoyé).
+  Corrigé, `config.toml` mis à jour pour fixer le réglage durablement,
+  vérifié par un appel curl sans authentification (200). ~13h de push
+  perdus, aucune notification in-app perdue.
+- **Annonces vendeurs invisibles + photos non compressées sur le web
+  (PR #31, 30/07, section 5terdecies)** : traité par Ferdinand dans une
+  autre session, documenté ici a posteriori. `moderate-annonce` plantait
+  sur les grosses photos (>~4 Mo) et laissait l'annonce bloquée en
+  `en_attente` pour toujours ; le web n'avait aucune compression d'image
+  côté client contrairement à mobile. Les deux corrigés et déployés en
+  production (`moderate-annonce` v6), vérifiés sur une annonce réellement
+  bloquée.
 - **Campagne de test manuel sur device réel** (Android, via `adb`,
   comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
   non inscrit et étudiant connecté couverts (section 3), plus des
