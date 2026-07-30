@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import { Photo } from "@/components/ui/photo";
+import { compresserImage } from "@/lib/utils/image-compress";
 
 export type PhotoItem = { kind: "existing"; url: string } | { kind: "new"; preview: string };
 
@@ -36,6 +37,7 @@ export function PhotoPicker({
   onRemove: (index: number) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [compressing, setCompressing] = useState(false);
   const c = VARIANTS[variant];
 
   return (
@@ -60,13 +62,20 @@ export function PhotoPicker({
       {photos.length < max && (
         <button
           type="button"
+          disabled={compressing}
           onClick={() => inputRef.current?.click()}
-          className={`flex h-[100px] w-[100px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] ${c.border} ${c.bg} ${c.text}`}
+          className={`flex h-[100px] w-[100px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] disabled:opacity-60 ${c.border} ${c.bg} ${c.text}`}
         >
-          <span className="text-2xl" aria-hidden>
-            📷
+          {compressing ? (
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          ) : (
+            <span className="text-2xl" aria-hidden>
+              📷
+            </span>
+          )}
+          <span className="text-[11px] font-semibold">
+            {compressing ? "Traitement..." : photos.length === 0 ? "Ajouter" : "+ Photo"}
           </span>
-          <span className="text-[11px] font-semibold">{photos.length === 0 ? "Ajouter" : "+ Photo"}</span>
         </button>
       )}
       <input
@@ -74,10 +83,19 @@ export function PhotoPicker({
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(e) => {
+        onChange={async (e) => {
           const file = e.target.files?.[0];
-          if (file) onAdd(file);
           e.target.value = "";
+          if (!file) return;
+          setCompressing(true);
+          try {
+            // Redimensionne/compresse côté client avant d'ajouter, comme
+            // image_picker le fait déjà sur mobile (voir image-compress.ts)
+            // — évite d'uploader des photos de plusieurs Mo non compressées.
+            onAdd(await compresserImage(file));
+          } finally {
+            setCompressing(false);
+          }
         }}
       />
     </div>
