@@ -37,11 +37,14 @@ serve(async (req) => {
 
     const { data: callerProfile, error: profileError } = await supabaseAdmin
       .from('users')
-      .select('role')
+      .select('role, est_admin')
       .eq('id', callerData.user.id)
       .single()
 
-    if (profileError || callerProfile?.role !== 'admin') {
+    // role='admin' OU privilège superposé est_admin (voir refonte des rôles,
+    // HISTORIQUE_PROJET_MBOA.md §4.9) : un admin nommé garde souvent
+    // role='visiteur', role seul ne suffit donc pas.
+    if (profileError || (callerProfile?.role !== 'admin' && !callerProfile?.est_admin)) {
       return new Response(
         JSON.stringify({ error: 'Action réservée aux administrateurs' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },

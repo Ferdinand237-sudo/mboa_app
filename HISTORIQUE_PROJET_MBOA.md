@@ -1023,7 +1023,7 @@ le financer.
 
 ---
 
-## 5undecies. Trois bugs préexistants découverts en testant le parrainage (29 juillet 2026)
+## 5undecies. Quatre bugs préexistants découverts en testant le parrainage (29 juillet 2026)
 
 En testant la Phase 2 en conditions réelles, Ferdinand a signalé deux
 erreurs sans rapport avec le parrainage lui-même — diagnostiquées en
@@ -1081,9 +1081,29 @@ true`), appliquée directement en production via le MCP Supabase
 (`apply_migration`, correctement tracée dans l'historique de migrations
 Supabase) et vérifiée en relisant la policy après coup.
 
+**4. Création d'un compte vendeur depuis une demande impossible (403
+"Action réservée aux administrateurs").** Diagnostiqué via les logs
+Edge Function (`get_logs`, service `edge-function`) : `POST | 403 |
+.../functions/v1/create-vendor`. Root cause : la fonction elle-même
+vérifie `callerProfile?.role !== 'admin'` sur l'appelant — même bug,
+cette fois dans une Edge Function plutôt qu'une policy RLS ou une requête
+applicative. Le compte admin de Ferdinand a `role='visiteur'` +
+`est_admin=true`, donc rejeté systématiquement. Un balayage complet du
+projet (grep ciblé sur mobile/web/SQL, puis requêtes directes sur
+`pg_policies` et `pg_proc` du vrai projet pour toute condition
+`role = 'admin'` sans `est_admin` associé) a trouvé deux autres Edge
+Functions avec exactement le même défaut : `create-ambassadeur` et
+`get-attestation-url` (cette dernière contrôle aussi l'accès de
+l'ambassadeur assigné, logique inchangée). Les trois corrigées
+(`role !== 'admin' && !est_admin`) et redéployées
+(`create-vendor` v7→v8, `create-ambassadeur` v3→v4,
+`get-attestation-url` v2→v3) ; balayage confirmé propre sur le reste
+(RLS et fonctions SQL, Dart, TypeScript).
+
 Testé : `flutter analyze` et `npx eslint` propres sur les fichiers touchés
 des bugs 1 et 2 ; policy Storage vérifiée directement en base pour le bug
-3. **Non revérifié sur device/navigateur réel** au moment de la
+3 ; versions des trois Edge Functions confirmées incrémentées pour le
+bug 4. **Non revérifié sur device/navigateur réel** au moment de la
 rédaction — à confirmer par Ferdinand.
 
 ---
@@ -1257,18 +1277,23 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
   annonces, capture `?ref=` sur mboa-web. Un seul niveau de parrainage et
   crédits jamais convertibles en argent pour cette itération — Phase 3
   (versement réel Ambassadeur) toujours non commencée, séquencée à
-  dessein. Test réel en cours par Ferdinand, ayant révélé trois bugs
+  dessein. Test réel en cours par Ferdinand, ayant révélé quatre bugs
   préexistants sans rapport avec le parrainage (section 5undecies).
 - **Bugs préexistants corrigés en testant le parrainage (29/07, section
   5undecies)** : mise à niveau étudiant→vendeur bloquée par une valeur de
   statut invalide (`'traite'` au lieu de `'approuve'`), assignation
-  d'ambassadeur ne trouvant aucun candidat, et envoi du formulaire de
-  vérification terrain bloqué par une policy Storage — les trois filtraient
-  encore sur `role = 'ambassadeur'` sans tenir compte du privilège
-  superposé `est_ambassadeur` (même famille que le bug notifications de la
-  section 5sexies). Corrigés sur mobile et web ; la policy Storage
-  (bug 3) appliquée directement en production via le MCP Supabase. Non
-  revérifiés sur device/navigateur réel au moment de la rédaction.
+  d'ambassadeur ne trouvant aucun candidat, envoi du formulaire de
+  vérification terrain bloqué par une policy Storage, et création d'un
+  compte vendeur depuis une demande rejetée avec 403 — les quatre
+  filtraient encore sur `role = 'admin'`/`role = 'ambassadeur'` sans tenir
+  compte des privilèges superposés `est_admin`/`est_ambassadeur` (même
+  famille que le bug notifications de la section 5sexies), le dernier
+  dans trois Edge Functions (`create-vendor`, `create-ambassadeur`,
+  `get-attestation-url`). Corrigés sur mobile, web et Edge Functions ;
+  policy Storage et Edge Functions redéployées en production. Balayage
+  complet du projet (app + RLS + fonctions SQL) confirmé propre après
+  coup. Non revérifiés sur device/navigateur réel au moment de la
+  rédaction.
 - **Campagne de test manuel sur device réel** (Android, via `adb`,
   comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
   non inscrit et étudiant connecté couverts (section 3), plus des

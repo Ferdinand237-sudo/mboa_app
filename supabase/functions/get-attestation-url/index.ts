@@ -74,11 +74,14 @@ serve(async (req) => {
 
     const { data: callerProfile } = await supabaseAdmin
       .from('users')
-      .select('role')
+      .select('role, est_admin')
       .eq('id', callerId)
       .single()
 
-    const estAdmin = callerProfile?.role === 'admin'
+    // role='admin' OU privilège superposé est_admin (voir refonte des rôles,
+    // HISTORIQUE_PROJET_MBOA.md §4.9) : un admin nommé garde souvent
+    // role='visiteur', role seul ne suffit donc pas.
+    const estAdmin = callerProfile?.role === 'admin' || callerProfile?.est_admin === true
     const estAmbassadeurAssigne = verification.ambassadeur_id === callerId
 
     if (!estAdmin && !estAmbassadeurAssigne) {
