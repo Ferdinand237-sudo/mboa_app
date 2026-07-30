@@ -24,6 +24,15 @@ const GEMINI_TIMEOUT_MS = 15000;
 const HAMMING_SEUIL = 10;
 const MAX_IMAGES_GEMINI = 5;
 const MAX_HASHES_COMPARES = 2000;
+// Décoder une image entière en mémoire (imagescript charge le buffer RGBA
+// complet avant de la réduire à 9x8 pour le hash) coûte plusieurs dizaines
+// de Mo pour une photo de téléphone non compressée — au-delà de ces seuils,
+// on saute le traitement de CETTE image plutôt que de risquer de faire
+// planter tout le worker (WORKER_RESOURCE_LIMIT), ce qui bloquerait
+// l'annonce en statut_moderation='en_attente' indéfiniment. Dégradation
+// silencieuse et journalisée (voir skippedImages) plutôt qu'un crash.
+const MAX_IMAGE_BYTES_HASH = 2_500_000;
+const MAX_IMAGE_BYTES_GEMINI = 4_000_000;
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -143,6 +152,7 @@ serve(async (req) => {
     let fraudMatch = false;
     let fraudMatchAnnonceId: string | null = null;
     const nouveauxHashes: { url: string; hash: string }[] = [];
+    const imagesIgnoreesTaille: string[] = [];
 
     const { data: hashesExistants } = await supabaseAdmin
       .from("image_hashes")
@@ -153,6 +163,11 @@ serve(async (req) => {
 
     for (const img of images) {
       if (!img.bytes) continue;
+      if (img.bytes.length > MAX_IMAGE_BYTES_HASH) {
+        console.warn(`Image ignorée pour le hash (${img.bytes.length} octets > ${MAX_IMAGE_BYTES_HASH}):`, img.url);
+        imagesIgnoreesTaille.push(img.url);
+        continue;
+      }
       const hash = await calculerDHash(img.bytes);
       if (!hash) continue;
       nouveauxHashes.push({ url: img.url, hash });
@@ -202,14 +217,21 @@ serve(async (req) => {
             "paiement suspecte, contenu manifestement trompeur).\n\n" +
             `Titre: ${titre}\nDescription: ${description}`,
         }];
-        for (const img of images.slice(0, MAX_IMAGES_GEMINI)) {
+        let nbImagesEnvoyees = 0;
+        for (const img of images) {
+          if (nbImagesEnvoyees >= MAX_IMAGES_GEMINI) break;
           if (!img.bytes) continue;
+          if (img.bytes.length > MAX_IMAGE_BYTES_GEMINI) {
+            console.warn(`Image ignorée pour Gemini (${img.bytes.length} octets > ${MAX_IMAGE_BYTES_GEMINI}):`, img.url);
+            continue;
+          }
           parts.push({
             inline_data: {
               mime_type: mimeTypeDepuisUrl(img.url),
               data: encodeBase64(img.bytes),
             },
           });
+          nbImagesEnvoyees++;
         }
 
         const controller = new AbortController();
@@ -293,7 +315,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ annonce_id: annonceId, risk_score: riskScore, decision }),
+      JSON.stringify({ annonce_id: annonceId, risk_score: riskScore, decision, imagesIgnoreesTaille }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (e) {
