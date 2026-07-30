@@ -1189,6 +1189,55 @@ logement/article, création et édition) plutôt que dupliqué dans chacun.
 
 ---
 
+## 5quaterdecies. Galerie de photos + exclusion sélective dans l'écran Signalements (31 juillet 2026)
+
+Ferdinand a signalé que l'admin, face à une annonce "à vérifier" (souvent
+une détection IA sur `moderate-annonce`), ne voyait jamais les photos de
+l'annonce en cause — impossible de juger ce qui pose problème, ni de
+choisir quelles photos laisser passer plutôt que de valider ou rejeter
+l'annonce entière en aveugle.
+
+**Constat** : `admin_signalements_screen.dart`/`signalements-client.tsx`
+n'affichaient que la raison textuelle (`Détection automatique (modération
+IA)` + description), jamais les photos elles-mêmes — la seule granularité
+possible était "Ignorer"/"Résoudre" (republie l'annonce telle quelle),
+"Suspendre" (masque, prévient le vendeur) ou "Supprimer" (efface tout).
+
+**Ajouté sur les deux plateformes** :
+- Récupération des photos de l'annonce ciblée (`logements`/`articles`,
+  table inconnue a priori — deux requêtes groupées par lot plutôt qu'un
+  aller-retour par signalement) : `annonceTable`/`photos` sur
+  `AdminSignalement` (web), `_photos`/`_annonceTable` fusionnés dans
+  chaque `Map` signalement (mobile).
+- Galerie de vignettes dans chaque carte "annonce" : clic pour marquer une
+  photo comme exclue (icône ✕, opacité réduite), état local par
+  signalement (`photosExclues`/`_photosExclues`).
+- "Résoudre" republie désormais l'annonce en retirant les photos exclues
+  de son tableau `photos` (même appel que la republication du statut,
+  pas de round-trip supplémentaire) ; "Ignorer" suit la même logique
+  (il republiait déjà l'annonce telle quelle avant ce correctif, voir
+  section précédente sur `_republierAnnonceSiBloquee`).
+- Garde-fou : bouton "Résoudre" désactivé (+ message inline) si les
+  photos restantes tombent sous le minimum exigé à la publication
+  (`MIN_PHOTOS_LOGEMENT` = 3, réutilisée depuis `constants.ts` côté web ;
+  3/1 en dur côté mobile faute d'équivalent centralisé) — jamais de
+  republication en dessous du seuil normalement imposé aux vendeurs.
+
+**Limite connue, pas traitée ici** : l'admin voit toutes les photos de
+l'annonce mais rien n'indique CELLE précisément visée par la détection IA
+(fraude ou classification Gemini) — `moderate-annonce` ne persiste pas
+cette information par photo aujourd'hui (seul `fraud_match_annonce_id`,
+l'autre annonce en cause, est connu). Amélioration possible mais plus
+lourde (modifier l'Edge Function + `moderation_ia`), volontairement hors
+scope de ce correctif ciblé sur le manque le plus bloquant : l'absence
+totale de visuel.
+
+Testé : `npx eslint` et `npm run build` propres (39 routes) côté web,
+`flutter analyze` propre côté mobile. **Non vérifié sur device/navigateur
+réel** au moment de la rédaction.
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
@@ -1391,6 +1440,11 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
   côté client contrairement à mobile. Les deux corrigés et déployés en
   production (`moderate-annonce` v6), vérifiés sur une annonce réellement
   bloquée.
+- **Galerie photos + exclusion sélective dans Signalements (31/07,
+  section 5quaterdecies)** : l'admin voit désormais les photos de
+  l'annonce examinée et peut en exclure avant de republier, sur mobile et
+  web. Garde-fou sur le minimum de photos requis. Non vérifié sur
+  device/navigateur réel.
 - **Campagne de test manuel sur device réel** (Android, via `adb`,
   comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
   non inscrit et étudiant connecté couverts (section 3), plus des

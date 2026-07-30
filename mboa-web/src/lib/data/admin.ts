@@ -145,6 +145,15 @@ export type AdminSignalement = {
   estDetectionIa: boolean;
   signaleurNom: string | null;
   dateSignalement: string;
+  // Photos de l'annonce ciblée (vide pour utilisateur/avis) : sans ça,
+  // l'admin devait juger une détection IA "à vérifier" sans jamais voir
+  // les photos en cause, ni pouvoir en exclure une précise avant de
+  // republier — voir HISTORIQUE_PROJET_MBOA.md.
+  photos: string[];
+  // Table réelle de l'annonce (null pour utilisateur/avis, ou annonce
+  // introuvable) — connue ici sans coût supplémentaire, évite de la
+  // redéterminer par un aller-retour async côté composant.
+  annonceTable: "logements" | "articles" | null;
 };
 
 export async function getAdminSignalements(): Promise<AdminSignalement[]> {
@@ -156,7 +165,7 @@ export async function getAdminSignalements(): Promise<AdminSignalement[]> {
 
   if (error || !data) return [];
 
-  return (data as unknown as {
+  const rows = data as unknown as {
     id: string;
     statut: string | null;
     cible_type: string | null;
@@ -165,7 +174,31 @@ export async function getAdminSignalements(): Promise<AdminSignalement[]> {
     description: string | null;
     date_signalement: string;
     signaleur: { nom: string } | null;
-  }[]).map((s) => ({
+  }[];
+
+  // Un cible_id d'annonce peut être un logement ou un article : deux
+  // requêtes groupées plutôt qu'un aller-retour par signalement.
+  const idsAnnonces = rows
+    .filter((s) => (s.cible_type ?? "annonce") === "annonce")
+    .map((s) => s.cible_id);
+  const photosParId = new Map<string, string[]>();
+  const tableParId = new Map<string, "logements" | "articles">();
+  if (idsAnnonces.length > 0) {
+    const [{ data: logements }, { data: articles }] = await Promise.all([
+      supabase.from("logements").select("id, photos").in("id", idsAnnonces),
+      supabase.from("articles").select("id, photos").in("id", idsAnnonces),
+    ]);
+    for (const l of logements ?? []) {
+      photosParId.set(l.id, l.photos ?? []);
+      tableParId.set(l.id, "logements");
+    }
+    for (const a of articles ?? []) {
+      photosParId.set(a.id, a.photos ?? []);
+      tableParId.set(a.id, "articles");
+    }
+  }
+
+  return rows.map((s) => ({
     id: s.id,
     statut: s.statut ?? "en-attente",
     cibleType: s.cible_type ?? "annonce",
@@ -175,6 +208,8 @@ export async function getAdminSignalements(): Promise<AdminSignalement[]> {
     estDetectionIa: s.raison === "detection_ia",
     signaleurNom: s.signaleur?.nom ?? null,
     dateSignalement: s.date_signalement,
+    photos: photosParId.get(s.cible_id) ?? [],
+    annonceTable: tableParId.get(s.cible_id) ?? null,
   }));
 }
 

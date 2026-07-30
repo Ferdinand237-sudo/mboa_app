@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/mixins/realtime_table_mixin.dart';
+import '../../../core/widgets/mboa_cached_image.dart';
 
 class AdminSignalementsScreen extends StatefulWidget {
   // Appelé à chaque nouveau signalement reçu en temps réel — le parent
@@ -23,6 +24,13 @@ class _AdminSignalementsScreenState extends State<AdminSignalementsScreen>
   bool _isLoading = true;
   String _filtre = 'en-attente';
   bool _seulementIa = false;
+  // Photos que l'admin exclut avant de republier — vide par défaut (toutes
+  // les photos passent), clé = id du signalement.
+  final Map<String, Set<String>> _photosExclues = {};
+
+  // Minimum de photos exigé à la publication (publier_screen.dart) :
+  // republier avec moins reviendrait à contourner cette règle par la bande.
+  static const _photosMin = {'logements': 3, 'articles': 1};
 
   @override
   void initState() {
@@ -66,15 +74,74 @@ class _AdminSignalementsScreenState extends State<AdminSignalementsScreen>
       final data = await query
           .order('date_signalement', ascending: false);
 
+      final signalements = List<Map<String, dynamic>>.from(data);
+      await _chargerPhotosAnnonces(signalements);
+
       if (mounted) {
         setState(() {
-          _signalements = List<Map<String, dynamic>>.from(data);
+          _signalements = signalements;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // Un cible_id d'annonce peut être un logement ou un article : deux
+  // requêtes groupées plutôt qu'un aller-retour par signalement. Sans ça,
+  // l'admin devait juger une détection IA "à vérifier" sans jamais voir
+  // les photos en cause — voir HISTORIQUE_PROJET_MBOA.md.
+  Future<void> _chargerPhotosAnnonces(
+      List<Map<String, dynamic>> signalements) async {
+    final idsAnnonces = signalements
+        .where((s) => (s['cible_type'] ?? 'annonce') == 'annonce')
+        .map((s) => s['cible_id'] as String)
+        .toList();
+    if (idsAnnonces.isEmpty) return;
+
+    final logements = await _supabase
+        .from('logements')
+        .select('id, photos')
+        .filter('id', 'in', idsAnnonces);
+    final articles = await _supabase
+        .from('articles')
+        .select('id, photos')
+        .filter('id', 'in', idsAnnonces);
+
+    final photosParId = <String, List<String>>{};
+    final tableParId = <String, String>{};
+    for (final l in logements) {
+      photosParId[l['id']] = List<String>.from(l['photos'] ?? []);
+      tableParId[l['id']] = 'logements';
+    }
+    for (final a in articles) {
+      photosParId[a['id']] = List<String>.from(a['photos'] ?? []);
+      tableParId[a['id']] = 'articles';
+    }
+
+    for (final s in signalements) {
+      s['_photos'] = photosParId[s['cible_id']] ?? const <String>[];
+      s['_annonceTable'] = tableParId[s['cible_id']];
+    }
+  }
+
+  List<String> _photosRestantes(Map<String, dynamic> signalement) {
+    final photos = List<String>.from(signalement['_photos'] ?? const []);
+    final exclues = _photosExclues[signalement['id']];
+    if (exclues == null || exclues.isEmpty) return photos;
+    return photos.where((p) => !exclues.contains(p)).toList();
+  }
+
+  // Désactive "Résoudre" tant que l'admin n'a pas laissé au moins le
+  // minimum de photos requis pour ce type d'annonce.
+  bool _peutResoudre(Map<String, dynamic> signalement) {
+    final photos = List<String>.from(signalement['_photos'] ?? const []);
+    final table = signalement['_annonceTable'] as String?;
+    if (signalement['cible_type'] != 'annonce' || photos.isEmpty || table == null) {
+      return true;
+    }
+    return _photosRestantes(signalement).length >= _photosMin[table]!;
   }
 
   Future<void> _traiterSignalement(
@@ -111,38 +178,39 @@ class _AdminSignalementsScreenState extends State<AdminSignalementsScreen>
       Map<String, dynamic> signalement, String statut) async {
     await _traiterSignalement(signalement['id'], statut);
     if (signalement['cible_type'] == 'annonce') {
-      await _republierAnnonceSiBloquee(signalement['cible_id']);
+      final photos = List<String>.from(signalement['_photos'] ?? const []);
+      await _republierAnnonceSiBloquee(
+        signalement['cible_id'],
+        photosAConserver: photos.isNotEmpty ? _photosRestantes(signalement) : null,
+      );
     }
   }
 
-  Future<void> _republierAnnonceSiBloquee(String cibleId) async {
+  // photosAConserver (si fourni) retire du même mouvement les photos que
+  // l'admin a exclues avant de laisser passer l'annonce.
+  Future<void> _republierAnnonceSiBloquee(String cibleId,
+      {List<String>? photosAConserver}) async {
+    final updates = <String, dynamic>{'statut_moderation': 'publie'};
+    if (photosAConserver != null) updates['photos'] = photosAConserver;
     try {
       final logement = await _supabase
           .from('logements')
-          .select('id, statut_moderation')
+          .select('id')
           .eq('id', cibleId)
           .maybeSingle();
       if (logement != null) {
-        if (logement['statut_moderation'] != 'publie') {
-          await _supabase
-              .from('logements')
-              .update({'statut_moderation': 'publie'})
-              .eq('id', cibleId);
-        }
+        await _supabase.from('logements').update(updates).eq('id', cibleId);
         return;
       }
     } catch (_) {}
     try {
       final article = await _supabase
           .from('articles')
-          .select('id, statut_moderation')
+          .select('id')
           .eq('id', cibleId)
           .maybeSingle();
-      if (article != null && article['statut_moderation'] != 'publie') {
-        await _supabase
-            .from('articles')
-            .update({'statut_moderation': 'publie'})
-            .eq('id', cibleId);
+      if (article != null) {
+        await _supabase.from('articles').update(updates).eq('id', cibleId);
       }
     } catch (_) {}
   }
@@ -542,6 +610,7 @@ class _AdminSignalementsScreenState extends State<AdminSignalementsScreen>
     final signaleur = signalement['signaleur'];
     final cibleType = signalement['cible_type'] ?? 'annonce';
     final estDetectionIa = signalement['raison'] == AppConstants.raisonDetectionIa;
+    final peutResoudre = _peutResoudre(signalement);
 
     Color statutColor;
     switch (statut) {
@@ -699,6 +768,80 @@ class _AdminSignalementsScreenState extends State<AdminSignalementsScreen>
             ),
           ),
 
+          // ── Photos de l'annonce ────────────────────
+          if (cibleType == 'annonce' &&
+              (signalement['_photos'] as List?)?.isNotEmpty == true) ...[
+            const SizedBox(height: 12),
+            const Text(
+              '📷 Photos de l\'annonce — touche pour exclure une photo avant de republier',
+              style: MboaTextStyles.caption,
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final url in List<String>.from(signalement['_photos']))
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      final id = signalement['id'] as String;
+                      final exclues = _photosExclues.putIfAbsent(id, () => {});
+                      if (exclues.contains(url)) {
+                        exclues.remove(url);
+                      } else {
+                        exclues.add(url);
+                      }
+                    }),
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: SizedBox(
+                            width: 64,
+                            height: 64,
+                            child: Opacity(
+                              opacity: (_photosExclues[signalement['id']]
+                                          ?.contains(url) ??
+                                      false)
+                                  ? 0.4
+                                  : 1,
+                              child: MboaCachedImage(url: url),
+                            ),
+                          ),
+                        ),
+                        if (_photosExclues[signalement['id']]?.contains(url) ??
+                            false)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.black26,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.close_rounded,
+                                    color: Colors.white, size: 22),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            if (!_peutResoudre(signalement)) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Garde au moins ${_photosMin[signalement['_annonceTable']] ?? 1} photo(s) pour republier.',
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: MboaColors.danger,
+                ),
+              ),
+            ],
+          ],
+
           // ── Actions ──────────────────────────────
           if (statut == 'en-attente') ...[
             const SizedBox(height: 12),
@@ -753,43 +896,48 @@ class _AdminSignalementsScreenState extends State<AdminSignalementsScreen>
                 // Traiter sans supprimer
                 Expanded(
                   child: GestureDetector(
-                    onTap: () => _resoudreOuIgnorerSignalement(
-                        signalement, 'traite'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 9),
-                      decoration: BoxDecoration(
-                        color: MboaColors.verified
-                            .withValues(alpha: 0.08),
-                        borderRadius:
-                            BorderRadius.circular(10),
-                        border: Border.all(
+                    onTap: peutResoudre
+                        ? () => _resoudreOuIgnorerSignalement(
+                            signalement, 'traite')
+                        : null,
+                    child: Opacity(
+                      opacity: peutResoudre ? 1 : 0.4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 9),
+                        decoration: BoxDecoration(
                           color: MboaColors.verified
-                              .withValues(alpha: 0.3),
+                              .withValues(alpha: 0.08),
+                          borderRadius:
+                              BorderRadius.circular(10),
+                          border: Border.all(
+                            color: MboaColors.verified
+                                .withValues(alpha: 0.3),
+                          ),
                         ),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.check_rounded,
-                              size: 14,
-                              color: MboaColors.verified),
-                          SizedBox(width: 5),
-                          Flexible(
-                            child: Text(
-                              'Résoudre',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: MboaColors.verified,
+                        child: const Row(
+                          mainAxisAlignment:
+                              MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_rounded,
+                                size: 14,
+                                color: MboaColors.verified),
+                            SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                'Résoudre',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: MboaColors.verified,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),

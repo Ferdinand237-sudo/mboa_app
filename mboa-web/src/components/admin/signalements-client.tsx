@@ -5,7 +5,16 @@ import { createClient } from "@/lib/supabase/client";
 import { FilterPills } from "@/components/admin/filter-pills";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
+import { Photo } from "@/components/ui/photo";
+import { MIN_PHOTOS_LOGEMENT } from "@/lib/constants";
 import type { AdminSignalement } from "@/lib/data/admin";
+
+// Minimum de photos exigé à la publication (form-logement/form-article) :
+// republier avec moins reviendrait à contourner cette règle par la bande.
+const PHOTOS_MIN: Record<"logements" | "articles", number> = {
+  logements: MIN_PHOTOS_LOGEMENT,
+  articles: 1,
+};
 
 const FILTRES = [
   { value: "en-attente", label: "⏳ En attente" },
@@ -42,6 +51,18 @@ export function SignalementsClient({ signalements: initial }: { signalements: Ad
   const [suspendTarget, setSuspendTarget] = useState<AdminSignalement | null>(null);
   const [raison, setRaison] = useState("");
   const [busy, setBusy] = useState(false);
+  // Photos que l'admin exclut avant de republier — vide par défaut (toutes
+  // les photos passent), clé = id du signalement.
+  const [photosExclues, setPhotosExclues] = useState<Record<string, Set<string>>>({});
+
+  function togglePhotoExclue(signalementId: string, url: string) {
+    setPhotosExclues((prev) => {
+      const courant = new Set(prev[signalementId] ?? []);
+      if (courant.has(url)) courant.delete(url);
+      else courant.add(url);
+      return { ...prev, [signalementId]: courant };
+    });
+  }
 
   const affiches = signalements.filter((s) => {
     if (filtre !== "tous" && s.statut !== filtre) return false;
@@ -64,17 +85,38 @@ export function SignalementsClient({ signalements: initial }: { signalements: Ad
   // sans cette republication explicite, statut_moderation restait bloqué à
   // a_verifier/bloque pour toujours après un simple "Résoudre"/"Ignorer" —
   // l'annonce disparaissait du site et de la gestion du vendeur alors même
-  // que le signalement affichait "Traité".
-  async function republierAnnonceSiBloquee(cibleId: string) {
+  // que le signalement affichait "Traité". photosAConserver (si fourni)
+  // retire du même mouvement les photos que l'admin a exclues avant de
+  // laisser passer l'annonce.
+  async function republierAnnonceSiBloquee(cibleId: string, photosAConserver?: string[]) {
     const supabase = createClient();
     const annonce = await trouverAnnonce(cibleId);
     if (!annonce) return;
-    await supabase.from(annonce.table).update({ statut_moderation: "publie" }).eq("id", cibleId);
+    const updates: Record<string, unknown> = { statut_moderation: "publie" };
+    if (photosAConserver) updates.photos = photosAConserver;
+    await supabase.from(annonce.table).update(updates).eq("id", cibleId);
+  }
+
+  function photosRestantes(s: AdminSignalement): string[] {
+    const exclues = photosExclues[s.id];
+    if (!exclues || exclues.size === 0) return s.photos;
+    return s.photos.filter((p) => !exclues.has(p));
+  }
+
+  // Désactive "Résoudre" tant que l'admin n'a pas laissé au moins le
+  // minimum de photos requis pour ce type d'annonce (constante partagée
+  // avec les formulaires de publication) — republier en dessous
+  // reviendrait à contourner cette règle par la bande.
+  function peutResoudre(s: AdminSignalement): boolean {
+    if (s.cibleType !== "annonce" || s.photos.length === 0 || !s.annonceTable) return true;
+    return photosRestantes(s).length >= PHOTOS_MIN[s.annonceTable];
   }
 
   async function resoudreOuIgnorer(s: AdminSignalement, statut: "traite" | "rejete") {
     await traiter(s.id, statut);
-    if (s.cibleType === "annonce") await republierAnnonceSiBloquee(s.cibleId);
+    if (s.cibleType !== "annonce") return;
+    const restantes = s.photos.length > 0 ? photosRestantes(s) : undefined;
+    await republierAnnonceSiBloquee(s.cibleId, restantes);
   }
 
   async function supprimerAnnonce() {
@@ -216,6 +258,41 @@ export function SignalementsClient({ signalements: initial }: { signalements: Ad
                   {s.description && <p className="mt-1.5 text-sm text-mboa-text">{s.description}</p>}
                 </div>
 
+                {s.cibleType === "annonce" && s.photos.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-[11px] font-semibold text-mboa-text-muted">
+                      📷 Photos de l&apos;annonce — clique pour exclure une photo avant de republier
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {s.photos.map((url, i) => {
+                        const exclue = photosExclues[s.id]?.has(url) ?? false;
+                        return (
+                          <button
+                            key={url + i}
+                            type="button"
+                            onClick={() => togglePhotoExclue(s.id, url)}
+                            className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-mboa-md border-2 ${
+                              exclue ? "border-mboa-danger opacity-40" : "border-transparent"
+                            }`}
+                          >
+                            <Photo src={url} alt={`Photo ${i + 1}`} />
+                            {exclue && (
+                              <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-lg text-white">
+                                ✕
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {!peutResoudre(s) && (
+                      <p className="mt-1.5 text-[11px] font-semibold text-mboa-danger">
+                        Garde au moins {s.annonceTable ? PHOTOS_MIN[s.annonceTable] : 1} photo(s) pour republier.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {s.statut === "en-attente" && (
                   <div className="mt-3 flex gap-2 border-t border-mboa-border pt-2.5">
                     <button
@@ -228,7 +305,8 @@ export function SignalementsClient({ signalements: initial }: { signalements: Ad
                     <button
                       type="button"
                       onClick={() => resoudreOuIgnorer(s, "traite")}
-                      className="flex-1 rounded-mboa-md border border-mboa-verified/30 bg-mboa-verified/8 py-2 text-[11px] font-bold text-mboa-verified"
+                      disabled={!peutResoudre(s)}
+                      className="flex-1 rounded-mboa-md border border-mboa-verified/30 bg-mboa-verified/8 py-2 text-[11px] font-bold text-mboa-verified disabled:opacity-40"
                     >
                       ✔ Résoudre
                     </button>
