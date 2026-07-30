@@ -1108,6 +1108,45 @@ rédaction — à confirmer par Ferdinand.
 
 ---
 
+## 5duodecies. Régression auto-infligée : send-notification cassée par son propre redéploiement (29-30 juillet 2026)
+
+Ferdinand a signalé ne plus recevoir aucune notification push. Audit
+préventif de la publication d'articles (section précédente) n'ayant rien
+trouvé, root-cause identifié en croisant les timestamps exacts entre
+`public.notifications` (créées normalement, in-app fonctionnel) et les
+logs Edge Function : chaque appel à `send-notification` déclenché par un
+trigger SQL (`net.http_post`, sans header `Authorization` — ces triggers
+n'en ont jamais envoyé, voir `notifier_admin_demande_compte_push`,
+`notifier_admin_signalement_push`, `notifier_nouveau_message_push`)
+recevait **401** depuis exactement l'heure de mon propre redéploiement de
+`send-notification` plus tôt dans la session (section 5undecies, point 4).
+
+**Cause : `supabase/config.toml` n'avait aucune section
+`[functions.send-notification]`.** Seule `create-vendor` avait
+`verify_jwt = false` explicitement figé. `send-notification` avait
+probablement été déployée à l'origine avec `--no-verify-jwt` (manuel,
+hors CLI trackée), réglage qui vit uniquement côté serveur Supabase — un
+`supabase functions deploy` ultérieur sans ce flag et sans entrée
+`config.toml` réactive silencieusement la vérification JWT par défaut, ce
+qui rejette tout appel sans JWT valide. Un bug auto-infligé, pas un bug
+préexistant comme les précédents de cette session.
+
+Corrigé : ajout de `[functions.send-notification]` avec `verify_jwt =
+false` dans `config.toml` (pour que ça ne se reproduise plus au prochain
+redéploiement), redéploiement avec `--no-verify-jwt` explicite (v8→v9),
+vérifié directement par un `curl` sans header Authorization simulant
+l'appel d'un trigger → 200. Impact : environ 13h de push perdus (2
+notifications in-app créées mais jamais poussées pendant la fenêtre),
+aucune notification in-app perdue (mécanisme distinct, non affecté).
+
+**Leçon retenue** : tout futur `supabase functions deploy` sur une
+fonction appelée par un trigger SQL (sans JWT) doit soit avoir sa section
+`config.toml` dédiée, soit être redéployée avec `--no-verify-jwt`
+explicite — vérifier `config.toml` avant tout redéploiement d'Edge
+Function dans ce projet.
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)

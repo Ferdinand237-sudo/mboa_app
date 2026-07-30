@@ -422,3 +422,14 @@ entrypoint = "./functions/create-vendor/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/create-vendor/*.html" ]
+
+# verify_jwt = false est indispensable ici : send-notification est appelée
+# depuis des triggers SQL (net.http_post, voir 20260725000000_notifications_admin.sql
+# et 20260730000000_notifications_admin_push_complet.sql) qui n'envoient
+# aucun header Authorization. Sans cette section, un `functions deploy`
+# sans --no-verify-jwt réactive la vérification JWT par défaut et bloque
+# tous ces appels avec 401 (vécu le 29/07, voir HISTORIQUE_PROJET_MBOA.md).
+[functions.send-notification]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/send-notification/index.ts"
