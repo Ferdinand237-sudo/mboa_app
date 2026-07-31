@@ -124,6 +124,56 @@ class _AdminSignalementsScreenState extends State<AdminSignalementsScreen>
       s['_photos'] = photosParId[s['cible_id']] ?? const <String>[];
       s['_annonceTable'] = tableParId[s['cible_id']];
     }
+
+    await _chargerDiagnosticsPhotos(signalements, idsAnnonces);
+  }
+
+  static const _labelCategorie = {
+    'pornographie': 'Pornographie',
+    'violence': 'Violence',
+    'stupefiants': 'Stupéfiants',
+  };
+
+  // Dernière analyse moderate-annonce par annonce (triée décroissant, on ne
+  // garde que la première rencontrée par annonce_id) : construit le
+  // diagnostic par photo (clé = url) à partir de photos_fraude/
+  // photos_categories/photos_ignorees, pour que l'admin voie QUELLE photo
+  // précisément a déclenché la détection IA, pas juste un verdict global.
+  Future<void> _chargerDiagnosticsPhotos(
+      List<Map<String, dynamic>> signalements, List<String> idsAnnonces) async {
+    if (idsAnnonces.isEmpty) return;
+    final moderations = await _supabase
+        .from('moderation_ia')
+        .select('annonce_id, photos_fraude, photos_categories, photos_ignorees, created_at')
+        .filter('annonce_id', 'in', idsAnnonces)
+        .order('created_at', ascending: false);
+
+    final diagnosticsParId = <String, Map<String, Map<String, dynamic>>>{};
+    for (final m in moderations) {
+      final annonceId = m['annonce_id'] as String;
+      if (diagnosticsParId.containsKey(annonceId)) continue; // déjà la plus récente
+      final diag = <String, Map<String, dynamic>>{};
+      Map<String, dynamic> entree(String url) =>
+          diag.putIfAbsent(url, () => {'fraude': false, 'categories': <String>[], 'ignoree': false});
+
+      for (final f in List<Map<String, dynamic>>.from(m['photos_fraude'] ?? [])) {
+        entree(f['url'] as String)['fraude'] = true;
+      }
+      for (final c in List<Map<String, dynamic>>.from(m['photos_categories'] ?? [])) {
+        final e = entree(c['url'] as String);
+        for (final cle in _labelCategorie.keys) {
+          if (c[cle] == true) (e['categories'] as List<String>).add(_labelCategorie[cle]!);
+        }
+      }
+      for (final ig in List<Map<String, dynamic>>.from(m['photos_ignorees'] ?? [])) {
+        entree(ig['url'] as String)['ignoree'] = true;
+      }
+      diagnosticsParId[annonceId] = diag;
+    }
+
+    for (final s in signalements) {
+      s['_diagnosticsPhotos'] = diagnosticsParId[s['cible_id']] ?? const {};
+    }
   }
 
   List<String> _photosRestantes(Map<String, dynamic> signalement) {
@@ -604,6 +654,97 @@ class _AdminSignalementsScreenState extends State<AdminSignalementsScreen>
     );
   }
 
+  // Vignette d'une photo d'annonce : bordure rouge (pleine) si l'IA a
+  // détecté un problème précis sur CETTE photo (fraude ou catégorie
+  // Gemini), bordure orange pointillée si elle n'a jamais pu être
+  // analysée (trop lourde) — l'absence de badge ne veut alors pas dire
+  // "photo propre". Appui long affiche le détail exact via Tooltip.
+  Widget _buildPhotoVignette(Map<String, dynamic> signalement, String url) {
+    final id = signalement['id'] as String;
+    final exclue = _photosExclues[id]?.contains(url) ?? false;
+    final diag = (signalement['_diagnosticsPhotos']
+            as Map<String, dynamic>?)?[url] as Map<String, dynamic>?;
+    final categories = List<String>.from(diag?['categories'] ?? const []);
+    final fraude = diag?['fraude'] == true;
+    final ignoree = diag?['ignoree'] == true;
+    final suspecte = fraude || categories.isNotEmpty;
+
+    final messages = [
+      if (fraude) '🔁 Photo réutilisée d\'une autre annonce',
+      ...categories.map((c) => '🚫 Détecté : $c'),
+      if (ignoree) '⚠️ Non analysée par l\'IA (photo trop lourde)',
+    ];
+
+    final vignette = GestureDetector(
+      onTap: () => setState(() {
+        final exclues = _photosExclues.putIfAbsent(id, () => {});
+        if (exclues.contains(url)) {
+          exclues.remove(url);
+        } else {
+          exclues.add(url);
+        }
+      }),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                border: exclue
+                    ? null
+                    : suspecte
+                        ? Border.all(color: MboaColors.danger, width: 2)
+                        : ignoree
+                            ? Border.all(color: MboaColors.boost, width: 2)
+                            : null,
+              ),
+              child: Opacity(
+                opacity: exclue ? 0.4 : 1,
+                child: MboaCachedImage(url: url),
+              ),
+            ),
+          ),
+          if (!exclue && (suspecte || ignoree))
+            Positioned(
+              right: 2,
+              top: 2,
+              child: Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: suspecte ? MboaColors.danger : MboaColors.boost,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    suspecte ? (fraude ? '🔁' : '🚫') : '⚠️',
+                    style: const TextStyle(fontSize: 8),
+                  ),
+                ),
+              ),
+            ),
+          if (exclue)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Center(
+                  child: Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    if (messages.isEmpty) return vignette;
+    return Tooltip(message: messages.join(' · '), child: vignette);
+  }
+
   Widget _buildSignalementCard(
       Map<String, dynamic> signalement) {
     final statut = signalement['statut'] ?? 'en-attente';
@@ -782,52 +923,20 @@ class _AdminSignalementsScreenState extends State<AdminSignalementsScreen>
               runSpacing: 8,
               children: [
                 for (final url in List<String>.from(signalement['_photos']))
-                  GestureDetector(
-                    onTap: () => setState(() {
-                      final id = signalement['id'] as String;
-                      final exclues = _photosExclues.putIfAbsent(id, () => {});
-                      if (exclues.contains(url)) {
-                        exclues.remove(url);
-                      } else {
-                        exclues.add(url);
-                      }
-                    }),
-                    child: Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: SizedBox(
-                            width: 64,
-                            height: 64,
-                            child: Opacity(
-                              opacity: (_photosExclues[signalement['id']]
-                                          ?.contains(url) ??
-                                      false)
-                                  ? 0.4
-                                  : 1,
-                              child: MboaCachedImage(url: url),
-                            ),
-                          ),
-                        ),
-                        if (_photosExclues[signalement['id']]?.contains(url) ??
-                            false)
-                          Positioned.fill(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.black26,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Center(
-                                child: Icon(Icons.close_rounded,
-                                    color: Colors.white, size: 22),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
+                  _buildPhotoVignette(signalement, url),
               ],
             ),
+            if ((signalement['_diagnosticsPhotos'] as Map?)?.values.any((d) =>
+                    d['fraude'] == true ||
+                    (d['categories'] as List).isNotEmpty ||
+                    d['ignoree'] == true) ==
+                true) ...[
+              const SizedBox(height: 4),
+              const Text(
+                '🔁 réutilisée · 🚫 contenu détecté · ⚠️ non analysée (appui long sur une photo pour le détail)',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 10.5, color: MboaColors.textMuted),
+              ),
+            ],
             if (!_peutResoudre(signalement)) ...[
               const SizedBox(height: 4),
               Text(

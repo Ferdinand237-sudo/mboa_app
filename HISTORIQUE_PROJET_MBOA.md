@@ -1223,18 +1223,93 @@ possible était "Ignorer"/"Résoudre" (republie l'annonce telle quelle),
   3/1 en dur côté mobile faute d'équivalent centralisé) — jamais de
   republication en dessous du seuil normalement imposé aux vendeurs.
 
-**Limite connue, pas traitée ici** : l'admin voit toutes les photos de
-l'annonce mais rien n'indique CELLE précisément visée par la détection IA
-(fraude ou classification Gemini) — `moderate-annonce` ne persiste pas
-cette information par photo aujourd'hui (seul `fraud_match_annonce_id`,
-l'autre annonce en cause, est connu). Amélioration possible mais plus
-lourde (modifier l'Edge Function + `moderation_ia`), volontairement hors
-scope de ce correctif ciblé sur le manque le plus bloquant : l'absence
-totale de visuel.
+**Limite connue à l'origine, comblée dans la section suivante (5quindecies)** :
+cette première version montrait toutes les photos sans indiquer CELLE
+précisément visée par la détection IA.
 
 Testé : `npx eslint` et `npm run build` propres (39 routes) côté web,
 `flutter analyze` propre côté mobile. **Non vérifié sur device/navigateur
 réel** au moment de la rédaction.
+
+---
+
+## 5quindecies. Diagnostic par photo : quelle image précise pose problème (31 juillet 2026)
+
+Suite explicite de Ferdinand ("allons plus loin") sur la limite de la
+section précédente. Objectif : que l'admin voie, photo par photo,
+laquelle a déclenché la détection IA et pourquoi — pas juste "l'annonce
+est à vérifier".
+
+**Migration `20260801010000_moderation_ia_par_photo.sql`** : trois
+colonnes jsonb ajoutées à `moderation_ia` (`photos_fraude`,
+`photos_categories`, `photos_ignorees`), en plus du verdict global déjà
+existant (`fraud_match`, `categories`) conservé tel quel pour ne rien
+casser du calcul de `risk_score`.
+
+**`supabase/functions/moderate-annonce/index.ts` réécrite pour tracer
+chaque photo individuellement** :
+- Réutilisation frauduleuse : comparée pour CHAQUE photo (plus seulement
+  jusqu'à la première trouvée) — `photos_fraude` liste chaque photo de
+  l'annonce avec l'URL de la photo similaire chez l'autre vendeur
+  (`matchUrl`) et l'annonce en cause (`matchAnnonceId`).
+- Classification Gemini par photo : le prompt demande désormais un JSON
+  `{"global": {...4 catégories...}, "images": [{...3 catégories...}]}`
+  (le tableau `images` dans le même ordre que les photos envoyées ;
+  `arnaque_suspectee` reste global uniquement, elle dépend de la
+  cohérence texte/photos, pas d'une photo isolée). Zippé avec les URLs
+  effectivement envoyées à Gemini (pas de confiance dans un éventuel
+  "index" renvoyé par le modèle) ; repli silencieux sur le verdict global
+  seul si le tableau est absent, de taille inattendue, ou si Gemini
+  ignore l'enveloppe `"global"` et renvoie l'ancienne forme plate —
+  jamais d'echec de toute la modération pour un souci de parsing du
+  détail par photo.
+- `photos_ignorees` : les photos jamais réellement analysées (trop
+  lourdes pour le hash et/ou pour Gemini, seuils de la section 5terdecies)
+  sont désormais tracées avec leur raison (`trop_lourde_hash` /
+  `trop_lourde_gemini`), au lieu d'un simple `console.warn` perdu —
+  l'admin doit savoir qu'une absence de détection sur une photo ignorée
+  ne veut pas dire "photo vérifiée et propre".
+
+**Bug auto-infligé détecté et corrigé immédiatement** : le redéploiement
+de `moderate-annonce` a cassé la fonction exactement comme
+`send-notification` l'avait été (section 5duodecies) — aucune section
+`[functions.moderate-annonce]` dans `config.toml`, donc `verify_jwt`
+réactivé par défaut, 401 sur l'appel du trigger (aucun header
+Authorization). Repéré en testant immédiatement après déploiement (`curl`
+sans authentification), corrigé en < 5 minutes avant qu'aucune annonce
+réelle n'en pâtisse : section `config.toml` ajoutée, redéployée avec
+`--no-verify-jwt`. Par précaution, une section a aussi été ajoutée pour
+`notifier-nouvelle-annonce` (même mécanisme de trigger, pas cassée à ce
+jour mais désormais protégée pour la prochaine fois).
+
+**Testé en conditions réelles** via des appels `curl` directs sur la
+fonction déployée, avec de vraies photos existantes (URLs Storage
+réelles) mais un `annonce_id` fictif (aucune vraie annonce touchée,
+lignes de test supprimées après coup) :
+- Réutilisation détectée avec succès : `photos_fraude` identifie
+  exactement la photo dupliquée et son origine.
+- Photo trop lourde (>2,5 Mo, un article antérieur au correctif de
+  compression) correctement tracée dans `photos_ignorees`.
+- Classification Gemini par photo **non vérifiable en conditions
+  réelles** : la clé Gemini est toujours en quota dépassé (HTTP 429,
+  limitation déjà connue, voir section 9). La logique de parsing
+  elle-même a été testée séparément en local (Node) sur 4 cas : réponse
+  nominale, tableau `images` absent, ancienne forme plate, tableau de
+  taille incohérente — les 4 se comportent comme prévu (repli gracieux
+  sur le verdict global, jamais de crash).
+
+**Écrans admin (mobile + web)** : récupèrent désormais la dernière
+analyse `moderation_ia` par annonce (requête groupée par lot, comme les
+photos) et affichent un diagnostic par vignette — bordure rouge pleine
++ badge 🔁/🚫 si une détection précise existe sur cette photo, bordure
+orange pointillée + badge ⚠️ si la photo n'a jamais été analysée,
+info-bulle (survol web / appui long mobile) avec le détail exact.
+
+Testé : `npx eslint` + `npm run build` (39 routes) propres côté web,
+`flutter analyze` propre côté mobile (141 infos préexistantes,
+inchangées). **Non vérifié sur device/navigateur réel** au moment de la
+rédaction — et la classification par photo elle-même restera invérifiable
+tant que le quota Gemini n'est pas rétabli.
 
 ---
 
@@ -1443,8 +1518,17 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
 - **Galerie photos + exclusion sélective dans Signalements (31/07,
   section 5quaterdecies)** : l'admin voit désormais les photos de
   l'annonce examinée et peut en exclure avant de republier, sur mobile et
-  web. Garde-fou sur le minimum de photos requis. Non vérifié sur
-  device/navigateur réel.
+  web. Garde-fou sur le minimum de photos requis.
+- **Diagnostic par photo (31/07, section 5quindecies)** : `moderate-annonce`
+  trace désormais quelle photo précise a déclenché une réutilisation
+  frauduleuse ou une catégorie Gemini (colonnes `photos_fraude`/
+  `photos_categories`/`photos_ignorees`), affiché en badges sur chaque
+  vignette (mobile + web). Bug auto-infligé (`verify_jwt` réactivé par
+  le redéploiement, comme la section 5duodecies) détecté et corrigé en
+  quelques minutes, avant impact réel. Réutilisation frauduleuse et
+  photos ignorées testées en conditions réelles ; classification Gemini
+  par photo non vérifiable tant que le quota Gemini reste dépassé. Non
+  vérifié sur device/navigateur réel.
 - **Campagne de test manuel sur device réel** (Android, via `adb`,
   comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
   non inscrit et étudiant connecté couverts (section 3), plus des

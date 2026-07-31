@@ -135,6 +135,20 @@ export async function getAdminAnnonces(): Promise<{ logements: AdminAnnonce[]; a
 }
 
 // Miroir de _chargerSignalements (admin_signalements_screen.dart).
+// Diagnostic par photo, issu de la dernière analyse moderate-annonce pour
+// l'annonce ciblée — permet à l'admin de voir QUELLE photo précisément a
+// déclenché la détection IA (réutilisation frauduleuse, catégorie Gemini)
+// plutôt qu'un verdict global sans indice. `categories` reste vide si
+// Gemini n'a pas pu être appelé (clé en quota, timeout...) : l'absence de
+// détection par photo ne veut alors pas dire "photo propre", d'où
+// `ignoree` pour les photos jamais réellement analysées (trop lourdes).
+export type PhotoDiagnostic = {
+  fraude: boolean;
+  matchUrl: string | null;
+  categories: string[];
+  ignoree: boolean;
+};
+
 export type AdminSignalement = {
   id: string;
   statut: string;
@@ -154,6 +168,16 @@ export type AdminSignalement = {
   // introuvable) — connue ici sans coût supplémentaire, évite de la
   // redéterminer par un aller-retour async côté composant.
   annonceTable: "logements" | "articles" | null;
+  // Diagnostic par photo (clé = URL), vide si aucune analyse IA n'existe
+  // pour cette annonce (signalement d'utilisateur pur, ou annonce publiée
+  // avant l'introduction de ce suivi).
+  diagnosticsPhotos: Record<string, PhotoDiagnostic>;
+};
+
+const LABEL_CATEGORIE: Record<string, string> = {
+  pornographie: "Pornographie",
+  violence: "Violence",
+  stupefiants: "Stupéfiants",
 };
 
 export async function getAdminSignalements(): Promise<AdminSignalement[]> {
@@ -198,6 +222,50 @@ export async function getAdminSignalements(): Promise<AdminSignalement[]> {
     }
   }
 
+  // Dernière analyse moderate-annonce par annonce (triée décroissant, on
+  // ne garde que la première rencontrée par annonce_id) : construit le
+  // diagnostic par photo à partir des colonnes photos_fraude/
+  // photos_categories/photos_ignorees (voir
+  // 20260801010000_moderation_ia_par_photo.sql).
+  const diagnosticsParId = new Map<string, Record<string, PhotoDiagnostic>>();
+  if (idsAnnonces.length > 0) {
+    const { data: moderations } = await supabase
+      .from("moderation_ia")
+      .select("annonce_id, photos_fraude, photos_categories, photos_ignorees, created_at")
+      .in("annonce_id", idsAnnonces)
+      .order("created_at", { ascending: false });
+
+    type ModerationRow = {
+      annonce_id: string;
+      photos_fraude: { url: string; matchUrl: string }[] | null;
+      photos_categories: { url: string; pornographie?: boolean; violence?: boolean; stupefiants?: boolean }[] | null;
+      photos_ignorees: { url: string; raison: string }[] | null;
+      created_at: string;
+    };
+
+    for (const m of (moderations ?? []) as ModerationRow[]) {
+      if (diagnosticsParId.has(m.annonce_id)) continue; // déjà la plus récente
+      const diag: Record<string, PhotoDiagnostic> = {};
+      const get = (url: string) =>
+        (diag[url] ??= { fraude: false, matchUrl: null, categories: [], ignoree: false });
+      for (const f of m.photos_fraude ?? []) {
+        const d = get(f.url);
+        d.fraude = true;
+        d.matchUrl = f.matchUrl;
+      }
+      for (const c of m.photos_categories ?? []) {
+        const d = get(c.url);
+        for (const cle of ["pornographie", "violence", "stupefiants"] as const) {
+          if (c[cle] === true) d.categories.push(LABEL_CATEGORIE[cle]);
+        }
+      }
+      for (const ig of m.photos_ignorees ?? []) {
+        get(ig.url).ignoree = true;
+      }
+      diagnosticsParId.set(m.annonce_id, diag);
+    }
+  }
+
   return rows.map((s) => ({
     id: s.id,
     statut: s.statut ?? "en-attente",
@@ -210,6 +278,7 @@ export async function getAdminSignalements(): Promise<AdminSignalement[]> {
     dateSignalement: s.date_signalement,
     photos: photosParId.get(s.cible_id) ?? [],
     annonceTable: tableParId.get(s.cible_id) ?? null,
+    diagnosticsPhotos: diagnosticsParId.get(s.cible_id) ?? {},
   }));
 }
 

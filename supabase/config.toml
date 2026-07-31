@@ -433,3 +433,23 @@ entrypoint = "./functions/create-vendor/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/send-notification/index.ts"
+
+# Même raison que send-notification ci-dessus : moderate-annonce est
+# appelée par le trigger public.moderer_nouvelle_annonce() (net.http_post,
+# sans header Authorization). Découvert cassée (401) immédiatement après
+# un redéploiement sans --no-verify-jwt le 31/07, corrigé avant qu'aucune
+# annonce n'en pâtisse en production (testé juste après déploiement).
+[functions.moderate-annonce]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/moderate-annonce/index.ts"
+
+# notifier-nouvelle-annonce est logée à la même enseigne (trigger
+# public.notifier_nouvelle_annonce(), même mécanisme) — section ajoutée
+# préventivement même si son dernier déploiement (hors de cette session)
+# n'a pas cassé son réglage JWT actuel, pour que ça ne se reproduise plus
+# ici non plus.
+[functions.notifier-nouvelle-annonce]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/notifier-nouvelle-annonce/index.ts"

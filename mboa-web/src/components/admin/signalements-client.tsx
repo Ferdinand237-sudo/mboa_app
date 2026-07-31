@@ -266,16 +266,44 @@ export function SignalementsClient({ signalements: initial }: { signalements: Ad
                     <div className="mt-1.5 flex flex-wrap gap-2">
                       {s.photos.map((url, i) => {
                         const exclue = photosExclues[s.id]?.has(url) ?? false;
+                        const diag = s.diagnosticsPhotos[url];
+                        const suspecte = diag && (diag.fraude || diag.categories.length > 0);
+                        const titreBulle = diag
+                          ? [
+                              diag.fraude && "🔁 Photo réutilisée d'une autre annonce",
+                              ...diag.categories.map((c) => `🚫 Détecté : ${c}`),
+                              diag.ignoree && "⚠️ Non analysée par l'IA (photo trop lourde)",
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")
+                          : undefined;
                         return (
                           <button
                             key={url + i}
                             type="button"
+                            title={titreBulle}
                             onClick={() => togglePhotoExclue(s.id, url)}
                             className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-mboa-md border-2 ${
-                              exclue ? "border-mboa-danger opacity-40" : "border-transparent"
+                              exclue
+                                ? "border-mboa-danger opacity-40"
+                                : suspecte
+                                  ? "border-mboa-danger"
+                                  : diag?.ignoree
+                                    ? "border-dashed border-mboa-boost"
+                                    : "border-transparent"
                             }`}
                           >
                             <Photo src={url} alt={`Photo ${i + 1}`} />
+                            {!exclue && suspecte && (
+                              <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-mboa-danger text-[9px] text-white">
+                                {diag?.fraude ? "🔁" : "🚫"}
+                              </span>
+                            )}
+                            {!exclue && !suspecte && diag?.ignoree && (
+                              <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-mboa-boost text-[9px] text-white">
+                                ⚠️
+                              </span>
+                            )}
                             {exclue && (
                               <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-lg text-white">
                                 ✕
@@ -285,6 +313,11 @@ export function SignalementsClient({ signalements: initial }: { signalements: Ad
                         );
                       })}
                     </div>
+                    {Object.values(s.diagnosticsPhotos).some((d) => d.fraude || d.categories.length > 0 || d.ignoree) && (
+                      <p className="mt-1.5 text-[10.5px] text-mboa-text-muted">
+                        🔁 réutilisée · 🚫 contenu détecté · ⚠️ non analysée (survole une photo pour le détail)
+                      </p>
+                    )}
                     {!peutResoudre(s) && (
                       <p className="mt-1.5 text-[11px] font-semibold text-mboa-danger">
                         Garde au moins {s.annonceTable ? PHOTOS_MIN[s.annonceTable] : 1} photo(s) pour republier.

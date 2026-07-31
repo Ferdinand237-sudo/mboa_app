@@ -152,11 +152,15 @@ serve(async (req) => {
     let fraudMatch = false;
     let fraudMatchAnnonceId: string | null = null;
     const nouveauxHashes: { url: string; hash: string }[] = [];
-    const imagesIgnoreesTaille: string[] = [];
+    // Granularité par photo (voir 20260801010000_moderation_ia_par_photo.sql) :
+    // sans ça, l'écran Signalements ne pouvait montrer qu'un verdict global
+    // ("à vérifier"), jamais quelle photo précise pose problème.
+    const photosIgnorees: { url: string; raison: string }[] = [];
+    const photosFraude: { url: string; matchUrl: string; matchAnnonceId: string }[] = [];
 
     const { data: hashesExistants } = await supabaseAdmin
       .from("image_hashes")
-      .select("annonce_id, vendeur_id, hash")
+      .select("annonce_id, vendeur_id, hash, image_url")
       .neq("vendeur_id", vendeurId)
       .order("created_at", { ascending: false })
       .limit(MAX_HASHES_COMPARES);
@@ -165,19 +169,26 @@ serve(async (req) => {
       if (!img.bytes) continue;
       if (img.bytes.length > MAX_IMAGE_BYTES_HASH) {
         console.warn(`Image ignorée pour le hash (${img.bytes.length} octets > ${MAX_IMAGE_BYTES_HASH}):`, img.url);
-        imagesIgnoreesTaille.push(img.url);
+        photosIgnorees.push({ url: img.url, raison: "trop_lourde_hash" });
         continue;
       }
       const hash = await calculerDHash(img.bytes);
       if (!hash) continue;
       nouveauxHashes.push({ url: img.url, hash });
-      if (!fraudMatch) {
-        for (const existant of hashesExistants ?? []) {
-          if (distanceHamming(hash, existant.hash as string) <= HAMMING_SEUIL) {
-            fraudMatch = true;
-            fraudMatchAnnonceId = existant.annonce_id as string;
-            break;
-          }
+      // Comparé pour CHAQUE photo (pas seulement jusqu'à la première
+      // trouvée) : fraudMatch/fraudMatchAnnonceId gardent le comportement
+      // existant (premier match, utilisé pour le risk_score), mais
+      // photosFraude recense toutes les photos concernées.
+      for (const existant of hashesExistants ?? []) {
+        if (distanceHamming(hash, existant.hash as string) <= HAMMING_SEUIL) {
+          fraudMatch = true;
+          fraudMatchAnnonceId ??= existant.annonce_id as string;
+          photosFraude.push({
+            url: img.url,
+            matchUrl: existant.image_url as string,
+            matchAnnonceId: existant.annonce_id as string,
+          });
+          break;
         }
       }
     }
@@ -197,6 +208,8 @@ serve(async (req) => {
     // 3. Classification de contenu via Gemini (texte + jusqu'à 5 images)
     let categories: Categories | null = null;
     let geminiErreur: string | null = null;
+    const urlsEnvoyeesGemini: string[] = [];
+    let photosCategories: { url: string; pornographie: boolean; violence: boolean; stupefiants: boolean }[] = [];
 
     if (!GEMINI_API_KEY) {
       geminiErreur = "GEMINI_API_KEY non configurée";
@@ -208,8 +221,13 @@ serve(async (req) => {
             "à Sangmelima (Cameroun) de logements et d'articles d'occasion. " +
             "Analyse ce titre, cette description et ces photos d'annonce, et " +
             "réponds UNIQUEMENT avec un JSON strict de la forme " +
-            '{"pornographie":boolean,"violence":boolean,"stupefiants":boolean,' +
-            '"arnaque_suspectee":boolean}. ' +
+            '{"global":{"pornographie":boolean,"violence":boolean,"stupefiants":boolean,' +
+            '"arnaque_suspectee":boolean},"images":[{"pornographie":boolean,"violence":boolean,' +
+            '"stupefiants":boolean}]}. ' +
+            "Le tableau \"images\" doit contenir EXACTEMENT un objet par photo fournie, " +
+            "strictement dans le même ordre que les photos reçues (n'y inclus jamais " +
+            "arnaque_suspectee : ce champ ne s'évalue qu'au niveau global, il dépend de " +
+            "la cohérence entre le texte et les photos, pas d'une photo isolée). " +
             "N'utilise JAMAIS le prix comme signal : les prix varient légitimement " +
             "d'un quartier à l'autre et ne doivent jamais influencer ta réponse, " +
             "y compris pour arnaque_suspectee (base ce champ uniquement sur des " +
@@ -223,6 +241,7 @@ serve(async (req) => {
           if (!img.bytes) continue;
           if (img.bytes.length > MAX_IMAGE_BYTES_GEMINI) {
             console.warn(`Image ignorée pour Gemini (${img.bytes.length} octets > ${MAX_IMAGE_BYTES_GEMINI}):`, img.url);
+            photosIgnorees.push({ url: img.url, raison: "trop_lourde_gemini" });
             continue;
           }
           parts.push({
@@ -231,6 +250,7 @@ serve(async (req) => {
               data: encodeBase64(img.bytes),
             },
           });
+          urlsEnvoyeesGemini.push(img.url);
           nbImagesEnvoyees++;
         }
 
@@ -259,12 +279,32 @@ serve(async (req) => {
         const texte = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!texte) throw new Error("Réponse Gemini vide");
         const parsed = JSON.parse(texte);
+        // Repli sur l'ancienne forme plate (sans enveloppe "global") si
+        // jamais Gemini ne suit pas exactement le nouveau schéma demandé —
+        // le verdict global reste la source de vérité pour risk_score,
+        // jamais dégradé par un souci de parsing du détail par photo.
+        const global = parsed.global ?? parsed;
         categories = {
-          pornographie: Boolean(parsed.pornographie),
-          violence: Boolean(parsed.violence),
-          stupefiants: Boolean(parsed.stupefiants),
-          arnaque_suspectee: Boolean(parsed.arnaque_suspectee),
+          pornographie: Boolean(global.pornographie),
+          violence: Boolean(global.violence),
+          stupefiants: Boolean(global.stupefiants),
+          arnaque_suspectee: Boolean(global.arnaque_suspectee),
         };
+        if (Array.isArray(parsed.images) && parsed.images.length === urlsEnvoyeesGemini.length) {
+          photosCategories = urlsEnvoyeesGemini.map((url, i) => ({
+            url,
+            pornographie: Boolean(parsed.images[i]?.pornographie),
+            violence: Boolean(parsed.images[i]?.violence),
+            stupefiants: Boolean(parsed.images[i]?.stupefiants),
+          }));
+        } else if (parsed.images !== undefined) {
+          console.warn(
+            "Réponse Gemini: tableau images de taille inattendue, détail par photo ignoré",
+            Array.isArray(parsed.images) ? parsed.images.length : typeof parsed.images,
+            "attendu",
+            urlsEnvoyeesGemini.length,
+          );
+        }
       } catch (e) {
         geminiErreur = String(e);
       }
@@ -292,6 +332,9 @@ serve(async (req) => {
       fraud_match_annonce_id: fraudMatchAnnonceId,
       categories: categories ?? {},
       erreur: geminiErreur,
+      photos_fraude: photosFraude,
+      photos_categories: photosCategories,
+      photos_ignorees: photosIgnorees,
     });
 
     // 7. Signalement automatique si l'annonce nécessite une vérification
@@ -315,7 +358,14 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ annonce_id: annonceId, risk_score: riskScore, decision, imagesIgnoreesTaille }),
+      JSON.stringify({
+        annonce_id: annonceId,
+        risk_score: riskScore,
+        decision,
+        photosIgnorees,
+        photosFraude,
+        photosCategories,
+      }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (e) {
