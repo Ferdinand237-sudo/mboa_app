@@ -25,9 +25,15 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
 
   final List<String> _emojisPhotos = ['', '', '', ''];
 
+  // Affiché immédiatement en local (widget.article reste figé sur la valeur
+  // au moment de l'ouverture) pendant que l'incrément atomique part côté
+  // serveur, RLS interdisant un update direct depuis un visiteur non vendeur.
+  late int _vues = (widget.article['vues'] ?? 0) as int;
+
   @override
   void initState() {
     super.initState();
+    _incrementerVues();
     _verifierFavori();
     if (widget.article['accepte_avis'] == true) {
       _chargerAvis();
@@ -55,6 +61,15 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     _autoScrollTimer?.cancel();
     _photoPageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _incrementerVues() async {
+    final id = widget.article['id'];
+    if (id == null) return;
+    try {
+      await _supabase.rpc('increment_vues_article', params: {'p_id': id});
+      if (mounted) setState(() => _vues++);
+    } catch (_) {}
   }
 
   Future<void> _verifierFavori() async {
@@ -814,7 +829,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                             _buildInfoRow('📍', 'Localisation',
                                 _getArticleLocation(a)),
                             _buildInfoRow('📅', 'Publié',
-                                _formatPublicationDate(a['date_publication']),
+                                _formatPublicationDate(a['date_publication'])),
+                            _buildInfoRow('👁', 'Vues', '$_vues',
                                 isLast: true),
                           ],
                         ),

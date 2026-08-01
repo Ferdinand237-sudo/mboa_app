@@ -52,10 +52,9 @@ class LogementService {
           .eq('id', id)
           .single();
 
-      await _supabase
-          .from(AppConstants.tableLogements)
-          .update({'vues': (data['vues'] ?? 0) + 1})
-          .eq('id', id);
+      try {
+        await _supabase.rpc('increment_vues_logement', params: {'p_id': id});
+      } catch (_) {}
 
       return LogementModel.fromMap(data);
     } catch (e) {

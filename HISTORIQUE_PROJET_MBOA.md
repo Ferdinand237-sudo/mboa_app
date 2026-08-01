@@ -1392,6 +1392,64 @@ chemin par défaut pour aucune nouvelle demande.
 
 ---
 
+## 5septendecies. Compteur de vues par annonce (1er août 2026)
+
+Demande de Ferdinand : afficher, dans le détail d'une annonce
+(logement/article), le nombre de fois où elle a été consultée depuis sa
+publication.
+
+**Découverte en creusant** : la colonne `vues` existe en base depuis
+l'origine et le web l'affichait déjà (`👁 {vues} vues` en bas des pages
+`/logements/[id]` et `/marketplace/[id]`), mais **rien
+n'incrémentait jamais ce compteur** — ni sur le web (aucun appel
+d'update nulle part), ni sur mobile (`LogementService.getLogement()` /
+`ArticleService.getArticle()` contenaient bien un incrément, mais ces
+deux méthodes ne sont appelées par aucun écran : les écrans de détail
+reçoivent directement la `Map` de la liste appelante). Le chiffre
+affiché sur le web était donc figé à 0 pour toute annonce depuis le
+début du projet — pas juste un affichage manquant côté mobile.
+
+**Deuxième découverte** : même en branchant un incrément, un simple
+`update({vues: ...})` depuis le client échoue pour un visiteur qui
+n'est pas propriétaire/vendeur de l'annonce — les policies RLS
+`UPDATE` de `logements`/`articles` sont restreintes à
+`auth.uid() = proprietaire_id/vendeur_id` ou `is_admin()` (vérifié via
+`pg_policies`). Un visiteur (même connecté) consultant l'annonce d'un
+autre ne peut donc pas incrémenter la vue directement.
+
+**Solution** : deux fonctions Postgres `security definer`
+(`increment_vues_logement(p_id)`, `increment_vues_article(p_id)`,
+migration `20260802010000_incrementer_vues.sql`), limitées au seul
+`vues = vues + 1` atomique, exposées via RPC et accordées à
+`anon, authenticated`. Appelées :
+
+- **Mobile** : dans `initState()` des deux écrans de détail
+  (`logement_detail_screen.dart`, `article_detail_screen.dart`), en
+  fire-and-forget ; le compteur affiché part de la valeur reçue et est
+  incrémenté localement en cas de succès (`setState(() => _vues++)`),
+  pour un affichage immédiat sans dépendre d'un second aller-retour
+  réseau. `LogementService.getLogement()`/`ArticleService.getArticle()`
+  (dead code, non appelés, mais présents dans le codebase) corrigés au
+  passage pour utiliser la même RPC plutôt que leur `update()` RLS-cassé.
+- **Web** : nouveau `mboa-web/src/lib/data/vues.ts`
+  (`incrementerVues(type, id)`), appelé une seule fois dans le
+  composant de page (`app/logements/[id]/page.tsx`,
+  `app/marketplace/[id]/page.tsx`), volontairement **pas** dans
+  `getLogement()`/`getArticle()` qui sont aussi appelés par
+  `generateMetadata` — les y brancher aurait compté deux vues par
+  chargement de page. Affichage `vues + 1` (valeur locale connue avant
+  incrément, pas de refetch).
+
+Affichage : footer centré `👁 N vues` sous la galerie côté logement
+mobile (miroir du footer déjà existant sur le web) ; ligne `👁 Vues`
+ajoutée à la carte "Informations" déjà présente côté article mobile.
+
+**Vérifié** : `flutter analyze` (142 issues pré-existantes, aucune
+nouvelle), `npm run build` (39 routes) et `eslint` propres côté web.
+**Non vérifié sur device/navigateur réel** au moment de la rédaction.
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
@@ -1441,6 +1499,7 @@ chemin par défaut pour aucune nouvelle demande.
 | `articles.ville` n'a jamais existé en base | Colonne absente depuis l'origine (contrairement à `logements.ville`), lue en silence comme `null` ; trouvé en appliquant la migration multi-villes le 28/07 |
 | Bulle de la visite guidée soulignée en couleur (double soulignement) | Mobile, `OverlayEntry` monté hors du `Scaffold` sans ancêtre `Material` — style de repli de debug Flutter, pas un style voulu |
 | Dernière étape "Crée ton compte" de la visite guidée mal ciblée | Mobile, distinct du délai de scroll déjà corrigé (ligne ci-dessus) — halo figé sur une position obsolète si le contenu au-dessus finit de charger juste après le calcul initial |
+| Compteur `vues` jamais incrémenté (toutes plateformes) | Colonne affichée sur le web depuis l'origine mais aucun code, sur aucune plateforme, ne l'incrémentait réellement — figée à 0 ; trouvé et corrigé le 1er août 2026 (section 5septendecies) |
 
 ---
 

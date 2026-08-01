@@ -64,6 +64,11 @@ class _LogementDetailScreenState
   double _noteProprietaire = 0;
   int _nbAvisProprietaire = 0;
 
+  // Affiché immédiatement en local (widget.logement reste figé sur la valeur
+  // au moment de l'ouverture) pendant que l'incrément atomique part côté
+  // serveur, RLS interdisant un update direct depuis un visiteur non propriétaire.
+  late int _vues = (widget.logement['vues'] ?? 0) as int;
+
   @override
   void initState() {
     super.initState();
@@ -72,6 +77,7 @@ class _LogementDetailScreenState
     _chargerNoteProprietaire();
     _verifierFavori();
     _chargerProximite();
+    _incrementerVues();
     final photos = widget.logement['photos'] as List? ?? [];
     if (photos.length > 1) {
       _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
@@ -129,6 +135,15 @@ class _LogementDetailScreenState
 
   void _ouvrirVisionneuse(List photos, int indexDepart) {
     PhotoViewerFullscreen.ouvrir(context, photos, indexDepart, placeholder: '🏠');
+  }
+
+  Future<void> _incrementerVues() async {
+    final id = widget.logement['id'];
+    if (id == null) return;
+    try {
+      await _supabase.rpc('increment_vues_logement', params: {'p_id': id});
+      if (mounted) setState(() => _vues++);
+    } catch (_) {}
   }
 
   Future<void> _verifierFavori() async {
@@ -1032,6 +1047,13 @@ class _LogementDetailScreenState
                               color: MboaColors.danger,
                             ),
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Text(
+                          '👁 $_vues vues',
+                          style: MboaTextStyles.muted,
                         ),
                       ),
                       const SizedBox(height: 90),

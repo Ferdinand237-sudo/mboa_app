@@ -5,6 +5,7 @@ import { getArticle } from "@/lib/data/articles";
 import { getCurrentUser } from "@/lib/data/auth";
 import { getIsFavori } from "@/lib/data/favoris";
 import { getAvisAnnonce } from "@/lib/data/avis";
+import { incrementerVues } from "@/lib/data/vues";
 import { formatPrix, formatRelativeDate, initiales } from "@/lib/utils/format";
 import { GalleryHero } from "@/components/logement/gallery-hero";
 import { BackButton } from "@/components/ui/back-button";
@@ -76,6 +77,8 @@ export default async function ArticleDetailPage({
   ]);
 
   if (!article) notFound();
+
+  await incrementerVues("article", id);
 
   const isFavori = user ? await getIsFavori(user.id, "article", id) : false;
   const etatColor = ETAT_COLORS[article.etat] ?? "var(--color-mboa-text-muted)";
@@ -237,7 +240,7 @@ export default async function ArticleDetailPage({
         </div>
 
         <p className="mt-6 text-center text-xs text-mboa-text-muted">
-          👁 {article.vues} vues
+          👁 {article.vues + 1} vues
         </p>
       </div>
 

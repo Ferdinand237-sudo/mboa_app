@@ -51,10 +51,9 @@ class ArticleService {
           .eq('id', id)
           .single();
 
-      await _supabase
-          .from(AppConstants.tableArticles)
-          .update({'vues': (data['vues'] ?? 0) + 1})
-          .eq('id', id);
+      try {
+        await _supabase.rpc('increment_vues_article', params: {'p_id': id});
+      } catch (_) {}
 
       return ArticleModel.fromMap(data);
     } catch (e) {

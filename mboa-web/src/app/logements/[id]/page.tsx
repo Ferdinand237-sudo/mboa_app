@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/data/auth";
 import { getIsFavori } from "@/lib/data/favoris";
 import { getAvisAnnonce } from "@/lib/data/avis";
 import { getLieuxPublics } from "@/lib/data/home";
+import { incrementerVues } from "@/lib/data/vues";
 import { formatPrix, formatDateFr, initiales } from "@/lib/utils/format";
 import { distanceMetres, formatDistance } from "@/lib/utils/geo";
 import { CATEGORIE_STYLE_PROXIMITE } from "@/lib/constants";
@@ -70,6 +71,8 @@ export default async function LogementDetailPage({
   ]);
 
   if (!logement) notFound();
+
+  await incrementerVues("logement", id);
 
   const isFavori = user ? await getIsFavori(user.id, "logement", id) : false;
 
@@ -278,7 +281,7 @@ export default async function LogementDetailPage({
         </div>
 
         <p className="mt-6 text-center text-xs text-mboa-text-muted">
-          👁 {logement.vues} vues · Publié le {formatDateFr(logement.datePublication)}
+          👁 {logement.vues + 1} vues · Publié le {formatDateFr(logement.datePublication)}
         </p>
       </div>
 
