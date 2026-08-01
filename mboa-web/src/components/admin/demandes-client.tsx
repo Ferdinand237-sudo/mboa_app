@@ -87,9 +87,16 @@ export function DemandesClient({ demandes: initial }: { demandes: AdminDemande[]
                   </div>
 
                   <p className="mt-3 flex items-center gap-1.5 text-sm text-mboa-text-muted">📞 {d.whatsapp}</p>
-                  <span className="mt-1.5 inline-block rounded-lg bg-mboa-secondary/8 px-2.5 py-1 text-xs font-semibold text-mboa-secondary">
-                    🏷 {d.typeActivite}
-                  </span>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    <span className="inline-block rounded-lg bg-mboa-secondary/8 px-2.5 py-1 text-xs font-semibold text-mboa-secondary">
+                      🏷 {d.typeActivite}
+                    </span>
+                    {d.ville && (
+                      <span className="inline-block rounded-lg bg-mboa-primary/8 px-2.5 py-1 text-xs font-semibold text-mboa-primary">
+                        📍 {d.ville}
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-2 rounded-mboa-md bg-mboa-background p-2.5 text-sm leading-relaxed text-mboa-text">
                     {d.description}
                   </p>

@@ -293,6 +293,11 @@ export type AdminDemande = {
   description: string;
   statut: string;
   createdAt: string;
+  // Choisies par le candidat lui-même à l'inscription (voir
+  // register/vendeur/page.tsx) : pré-remplissent le dialogue de
+  // validation admin (create-vendor-dialog.tsx) au lieu de partir vide.
+  ville: string | null;
+  sousRolesDemandees: string[];
 };
 
 export async function getAdminDemandes(): Promise<AdminDemande[]> {
@@ -309,6 +314,8 @@ export async function getAdminDemandes(): Promise<AdminDemande[]> {
     description: d.description ?? "",
     statut: d.statut ?? "en-attente",
     createdAt: d.created_at,
+    ville: d.ville ?? null,
+    sousRolesDemandees: d.sous_roles_demandees ?? [],
   }));
 }
 

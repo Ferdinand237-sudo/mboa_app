@@ -94,6 +94,12 @@ export function FormArticle({ villeActuelle }: { villeActuelle: VilleModel }) {
       return;
     }
 
+    // Aucune position GPS pour un article : priorité à la ville déclarée au
+    // profil du vendeur (register/vendeur/page.tsx), repli sur la ville
+    // actuellement parcourue si elle n'est pas renseignée.
+    const { data: profil } = await supabase.from("users").select("ville").eq("id", user.id).single();
+    const villeArticle = profil?.ville ?? villeActuelle.nom;
+
     try {
       const photoUrls = await uploadPhotos(user.id);
       const { data: inserted, error: insertError } = await supabase
@@ -107,7 +113,7 @@ export function FormArticle({ villeActuelle }: { villeActuelle: VilleModel }) {
           negociable,
           accepte_avis: accepteAvis,
           photos: photoUrls,
-          ville: villeActuelle.nom,
+          ville: villeArticle,
           vendeur_id: user.id,
           statut: "disponible",
           boosted: false,

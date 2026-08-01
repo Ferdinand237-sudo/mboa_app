@@ -1313,6 +1313,85 @@ tant que le quota Gemini n'est pas rétabli.
 
 ---
 
+## 5sedecies. Inscription vendeur autonome : mot de passe, catégorie et ville choisis par le candidat (1er août 2026)
+
+Objectif de Ferdinand : que l'admin n'ait plus qu'à lire une demande Pro
+et valider en un clic, sans inventer un mot de passe ni re-choisir la
+catégorie d'activité à la place du candidat.
+
+**Constat de départ** : deux chemins de demande existaient déjà —
+`register/vendeur` (visiteur inconnu, formulaire public sans compte,
+mot de passe inventé par l'admin via l'Edge Function `create-vendor`) et
+`profil/devenir-contributeur` (étudiant déjà inscrit, simple mise à
+niveau de rôle — le chemin déjà corrigé en section 5undecies). Décision
+actée avec Ferdinand : unifier les deux en transformant `register/vendeur`
+en une vraie inscription (email + mot de passe, comme `register/etudiant`)
+plutôt que d'ajouter un champ mot de passe à un formulaire sans compte.
+Chaque demande a donc désormais systématiquement un `user_id`, et passe
+par le chemin "mise à niveau de compte existant" déjà testé — le mot de
+passe ne transite jamais par `demandes_compte`, uniquement par
+`supabase.auth.signUp()` comme partout ailleurs dans l'app.
+
+**Migration `20260802000000_vendeur_autonome.sql`** :
+- `demandes_compte.ville` (text) et `sous_roles_demandees` (text[]) :
+  déclarés par le candidat à l'inscription, pré-remplissent le dialogue
+  de validation admin au lieu de partir vide.
+- `users.ville` (text) : nouveauté dans le modèle de données — jusqu'ici
+  `ville` n'existait que par annonce (déterminée au moment de publier),
+  jamais au niveau du compte. Sert de repli à la publication.
+
+**Décisions actées avec Ferdinand** (posées explicitement avant
+implémentation) : la catégorie choisie par le candidat pré-remplit le
+dialogue admin mais reste modifiable avant validation (pas totalement
+verrouillée) ; la ville de profil sert de valeur par défaut à la
+publication, la détection GPS reste toujours prioritaire quand elle est
+disponible (comportement déjà testé de la section 5bis, non remplacé).
+
+**Web (`register/vendeur/page.tsx`)** : réécrite sur le modèle de
+`register/etudiant/page.tsx` — mot de passe + confirmation,
+sélecteur de ville (liste des villes actives interrogée directement
+côté client, `getVilles()` dépendant de `next/headers` n'étant pas
+utilisable dans un composant client — erreur de build rencontrée et
+corrigée immédiatement). `supabase.auth.signUp()` puis mise à jour de
+`users.ville`, puis insertion de la demande avec `user_id`,
+`sous_roles_demandees` (mappées 1:1 depuis les 4 cartes de rôle
+existantes, y compris la carte combinée "Propriétaire + Commerçant") et
+`ville`. Message de confirmation mis à jour : "tu peux déjà te
+connecter" au lieu de "identifiants sous 24h".
+
+`create-vendor-dialog.tsx` / `demandes-client.tsx` : `sousRoles`
+pré-rempli depuis `demande.sousRolesDemandees`, ville affichée en badge
+📍 sur la carte de la liste et dans le dialogue de validation.
+
+`form-logement.tsx` / `form-article.tsx` : `users.ville` du vendeur
+ajouté comme palier de repli — logement : GPS le plus proche > ville de
+profil > ville actuellement parcourue ; article (aucun GPS) : ville de
+profil > ville actuellement parcourue.
+
+**Mobile** : même refonte sur `demande_vendeur_screen.dart` (champs mot
+de passe visible/masqué comme `register_etudiant_screen.dart`, ville via
+`VilleService.instance.villesActives`), `admin_demandes_screen.dart`
+(pré-remplissage + badge ville, sur la carte de liste et dans le
+dialogue), `publier_screen.dart` (même palier de repli, nouvelle méthode
+`VilleService.villeParNom()` pour convertir la ville texte du profil en
+`VilleModel`).
+
+Testé : `flutter analyze` (142 infos préexistantes, aucune nouvelle
+erreur — y compris les avertissements *BuildContext across async gaps*
+introduits par les nouveaux `await` dans `_publier`, corrigés avec des
+gardes `mounted`) et `npm run build`/`eslint` propres côté web (39
+routes). **Non vérifié sur device/navigateur réel** au moment de la
+rédaction — le parcours complet (inscription → demande → validation
+admin → première publication avec ville de profil) reste à tester par
+Ferdinand.
+
+**Non traité, volontairement** : l'Edge Function `create-vendor`
+(création directe par l'admin, sans passer par le formulaire) reste en
+place en secours pour un usage manuel ponctuel, mais n'est plus le
+chemin par défaut pour aucune nouvelle demande.
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
@@ -1529,6 +1608,12 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
   photos ignorées testées en conditions réelles ; classification Gemini
   par photo non vérifiable tant que le quota Gemini reste dépassé. Non
   vérifié sur device/navigateur réel.
+- **Inscription vendeur autonome (01/08, section 5sedecies)** : `register/
+  vendeur` devient une vraie inscription (mot de passe + ville choisis par
+  le candidat), catégorie et ville pré-remplissent le dialogue de
+  validation admin (toujours modifiables). `users.ville` sert de repli à
+  la publication, GPS toujours prioritaire. Mobile et web. Non vérifié sur
+  device/navigateur réel — parcours complet à tester par Ferdinand.
 - **Campagne de test manuel sur device réel** (Android, via `adb`,
   comptes de `COMPTES_TEST.md`) commencée le 22/07 : parcours visiteur
   non inscrit et étudiant connecté couverts (section 3), plus des

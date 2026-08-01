@@ -189,10 +189,14 @@ export function FormLogement({
     }
 
     // Ville dérivée de la position GPS captée du bien (la plus proche parmi
-    // les villes couvertes), repli sur la ville actuellement parcourue si
-    // aucune position n'a été captée ou qu'elle tombe hors de toute ville
-    // couverte — même logique que _publier (publier_screen.dart).
-    const villeLogement = (lat !== null && lng !== null ? villeProchePosition(lat, lng, villes) : null) ?? villeActuelle;
+    // les villes couvertes) en priorité ; repli sur la ville déclarée au
+    // profil du vendeur (voir register/vendeur/page.tsx), puis sur la ville
+    // actuellement parcourue si ni l'un ni l'autre n'est disponible — même
+    // logique que _publier (publier_screen.dart).
+    const { data: profil } = await supabase.from("users").select("ville").eq("id", user.id).single();
+    const villeProfil = villes.find((v) => v.nom === profil?.ville) ?? null;
+    const villeLogement =
+      (lat !== null && lng !== null ? villeProchePosition(lat, lng, villes) : null) ?? villeProfil ?? villeActuelle;
 
     try {
       const photoUrls = await uploadPhotos(user.id);

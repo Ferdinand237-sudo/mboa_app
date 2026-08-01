@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/validators.dart';
+import '../../../core/services/ville_service.dart';
+import '../../../core/models/ville_model.dart';
 import '../../../app/router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -18,31 +20,56 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
   final _emailController = TextEditingController();
   final _whatsappController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
   int _selectedRole = -1;
   bool _isLoading = false;
+  List<VilleModel> _villes = [];
+  String? _selectedVille;
 
   final List<_RoleOption> _roles = [
     _RoleOption(
       icon: '🏠',
       titre: 'Propriétaire immobilier',
       description: 'Je mets des logements en location',
+      sousRoles: ['proprietaire'],
     ),
     _RoleOption(
       icon: '🛒',
       titre: 'Commerçant / Boutique',
       description: 'Je vends des produits depuis ma boutique',
+      sousRoles: ['commercant'],
     ),
     _RoleOption(
       icon: '📦',
       titre: 'Vendeur indépendant',
       description: 'Je vends des articles sur la marketplace',
+      sousRoles: ['vendeur_independant'],
     ),
     _RoleOption(
       icon: '🏠🛒',
       titre: 'Propriétaire + Commerçant',
       description: 'Je loue des logements ET je vends des produits',
+      sousRoles: ['proprietaire', 'commercant'],
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _chargerVilles();
+  }
+
+  Future<void> _chargerVilles() async {
+    await VilleService.instance.init();
+    if (!mounted) return;
+    setState(() {
+      _villes = VilleService.instance.villesActives;
+      if (_villes.isNotEmpty) _selectedVille = _villes.first.nom;
+    });
+  }
 
   @override
   void dispose() {
@@ -50,6 +77,8 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
     _emailController.dispose();
     _whatsappController.dispose();
     _descriptionController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -64,18 +93,61 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
       );
       return;
     }
+    if (_selectedVille == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez sélectionner votre ville'),
+          backgroundColor: MboaColors.danger,
+        ),
+      );
+      return;
+    }
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Les mots de passe ne correspondent pas'),
+          backgroundColor: MboaColors.danger,
+        ),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
 
     final supabase = Supabase.instance.client;
     try {
+      final response = await supabase.auth.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        data: {
+          'nom': _nomController.text.trim(),
+          'telephone': _whatsappController.text.trim(),
+          'role': 'visiteur',
+        },
+      );
+      final userId = response.user?.id;
+      if (userId == null) throw Exception('Compte non créé');
+
+      // Sert de repli à la publication (GPS prioritaire pour un logement,
+      // aucun GPS pour un article) — voir publier_screen.dart.
+      await supabase.from('users').update({'ville': _selectedVille}).eq('id', userId);
+
       await supabase.from('demandes_compte').insert({
+        'user_id': userId,
         'nom': _nomController.text.trim(),
         'email': _emailController.text.trim(),
         'whatsapp': _whatsappController.text.trim(),
         'type_activite': _roles[_selectedRole].titre,
+        'sous_roles_demandees': _roles[_selectedRole].sousRoles,
+        'ville': _selectedVille,
         'description': _descriptionController.text.trim(),
       });
       if (mounted) _showSuccessDialog();
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: MboaColors.danger),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -115,7 +187,7 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
               ),
               const SizedBox(height: 20),
               const Text(
-                'Demande envoyée !',
+                'Compte créé, demande envoyée !',
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 20,
@@ -126,7 +198,7 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Un administrateur Mboa va étudier votre demande et vous contacter sur WhatsApp ou email sous 24h avec vos identifiants de connexion.',
+                'Tu peux déjà te connecter avec ton email et ton mot de passe. Un administrateur Mboa va étudier ta demande Pro et l\'activer sous 24h.',
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 13,
@@ -142,9 +214,9 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.of(context).pop();
-                    context.go(AppRoutes.main);
+                    context.go(AppRoutes.login);
                   },
-                  child: const Text('Visiter l\'application'),
+                  child: const Text('Me connecter'),
                 ),
               ),
               const SizedBox(height: 8),
@@ -208,7 +280,7 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Remplis ce formulaire et notre équipe te contacte sous 24h',
+                      'Crée ton compte, notre équipe valide ta demande sous 24h',
                       style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 13,
@@ -245,7 +317,7 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'Un administrateur Mboa créera votre compte sur mesure et vous enverra vos identifiants de connexion sous 24h.',
+                                'Ton compte est créé immédiatement avec le mot de passe que tu choisis ici. Un administrateur Mboa valide ensuite ta demande Pro, généralement sous 24h.',
                                 style: TextStyle(
                                   fontFamily: 'Poppins',
                                   fontSize: 12,
@@ -302,6 +374,78 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
                           prefixIcon: Icon(Icons.phone_outlined),
                         ),
                         validator: Validators.telephone,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Mot de passe
+                      _buildLabel('Mot de passe'),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        textInputAction: TextInputAction.next,
+                        decoration: InputDecoration(
+                          hintText: '••••••••',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                            onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
+                          ),
+                        ),
+                        validator: Validators.motDePasse,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Confirmer le mot de passe
+                      _buildLabel('Confirmer le mot de passe'),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _confirmPasswordController,
+                        obscureText: _obscureConfirm,
+                        textInputAction: TextInputAction.next,
+                        decoration: InputDecoration(
+                          hintText: '••••••••',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirm
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                            onPressed: () => setState(
+                              () => _obscureConfirm = !_obscureConfirm,
+                            ),
+                          ),
+                        ),
+                        validator: Validators.motDePasse,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Ville
+                      _buildLabel('Ta ville'),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedVille,
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.location_on_outlined),
+                        ),
+                        hint: const Text('Chargement…'),
+                        items: _villes
+                            .map((v) => DropdownMenuItem(value: v.nom, child: Text(v.nom)))
+                            .toList(),
+                        onChanged: (v) => setState(() => _selectedVille = v),
+                        validator: (v) => v == null ? 'Requis' : null,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tes annonces apparaîtront par défaut dans cette ville.',
+                        style: MboaTextStyles.caption,
                       ),
                       const SizedBox(height: 24),
 
@@ -486,10 +630,12 @@ class _RoleOption {
   final String icon;
   final String titre;
   final String description;
+  final List<String> sousRoles;
 
   _RoleOption({
     required this.icon,
     required this.titre,
     required this.description,
+    required this.sousRoles,
   });
 }

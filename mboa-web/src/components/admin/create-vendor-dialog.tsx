@@ -26,7 +26,10 @@ export function CreateVendorDialog({
   onSuccess: () => void;
 }) {
   const [password, setPassword] = useState("");
-  const [sousRoles, setSousRoles] = useState<string[]>([]);
+  // Pré-rempli avec la catégorie choisie par le candidat lui-même à
+  // l'inscription (register/vendeur/page.tsx) : l'admin n'a plus qu'à
+  // valider dans le cas normal, tout en gardant la main pour corriger.
+  const [sousRoles, setSousRoles] = useState<string[]>(demande.sousRolesDemandees);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const compteExistant = demande.userId != null;
@@ -95,9 +98,16 @@ export function CreateVendorDialog({
         <p className="text-sm font-bold text-mboa-text">{demande.nom}</p>
         <p className="text-xs text-mboa-text-muted">{demande.email}</p>
         <p className="text-xs text-mboa-text-muted">📱 {demande.whatsapp}</p>
-        <span className="mt-1.5 inline-block rounded-lg bg-mboa-secondary/10 px-2 py-1 text-[11px] font-semibold text-mboa-secondary">
-          {demande.typeActivite}
-        </span>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <span className="inline-block rounded-lg bg-mboa-secondary/10 px-2 py-1 text-[11px] font-semibold text-mboa-secondary">
+            {demande.typeActivite}
+          </span>
+          {demande.ville && (
+            <span className="inline-block rounded-lg bg-mboa-primary/10 px-2 py-1 text-[11px] font-semibold text-mboa-primary">
+              📍 {demande.ville}
+            </span>
+          )}
+        </div>
         <p className="mt-1.5 line-clamp-3 text-xs text-mboa-text-muted">{demande.description}</p>
       </div>
 

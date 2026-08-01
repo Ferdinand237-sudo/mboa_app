@@ -550,15 +550,22 @@ class _FormLogementState extends State<_FormLogement> {
       return;
     }
 
-    // Ville dérivée de la position GPS captée du bien (la ville la plus
-    // proche) plutôt que de la ville actuellement parcourue par le vendeur —
-    // un logement doit être tagué avec la ville où il se trouve réellement.
-    // Repli sur la ville en cours si aucune position n'a été captée ou
-    // qu'elle tombe hors de toute ville couverte.
+    // Ville dérivée en priorité de la position GPS captée du bien (la ville
+    // la plus proche) — un logement doit être tagué avec la ville où il se
+    // trouve réellement. Repli sur la ville déclarée au profil du vendeur
+    // (voir demande_vendeur_screen.dart), puis sur la ville actuellement
+    // parcourue si aucune des deux n'est disponible.
+    final profil = await _supabase
+        .from('users')
+        .select('ville')
+        .eq('id', _supabase.auth.currentUser!.id)
+        .maybeSingle();
     final villeLogement = (_lat != null && _lng != null
             ? VilleService.instance.villeProchePosition(_lat!, _lng!)
             : null) ??
+        VilleService.instance.villeParNom(profil?['ville'] as String?) ??
         VilleService.instance.selectedVille.value;
+    if (!mounted) return;
     if (villeLogement == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1260,9 +1267,17 @@ class _FormArticleState extends State<_FormArticle> {
     }
 
     // Aucune position GPS n'est captée pour un article (contrairement à un
-    // logement) : la ville est celle actuellement sélectionnée par le
-    // vendeur au moment de la publication.
-    final villeArticle = VilleService.instance.selectedVille.value;
+    // logement) : priorité à la ville déclarée au profil du vendeur (voir
+    // demande_vendeur_screen.dart), repli sur la ville actuellement
+    // sélectionnée si elle n'est pas renseignée.
+    final profil = await _supabase
+        .from('users')
+        .select('ville')
+        .eq('id', _supabase.auth.currentUser!.id)
+        .maybeSingle();
+    if (!mounted) return;
+    final villeArticle = VilleService.instance.villeParNom(profil?['ville'] as String?) ??
+        VilleService.instance.selectedVille.value;
     if (villeArticle == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

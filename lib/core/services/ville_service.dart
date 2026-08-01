@@ -108,6 +108,17 @@ class VilleService {
     return plusProche;
   }
 
+  /// Ville active portant ce nom, ou null si aucune (ville désactivée
+  /// depuis, ou nom vide) — utilisé pour convertir la ville déclarée au
+  /// profil d'un vendeur (texte libre en base) en VilleModel exploitable.
+  VilleModel? villeParNom(String? nom) {
+    if (nom == null) return null;
+    for (final v in villesActives) {
+      if (v.nom == nom) return v;
+    }
+    return null;
+  }
+
   Future<void> selectVille(VilleModel ville) async {
     selectedVille.value = ville;
     await _persister(ville.nom);

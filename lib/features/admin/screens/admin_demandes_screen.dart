@@ -56,7 +56,11 @@ class _AdminDemandesScreenState
       Map<String, dynamic> demande) async {
     final formKey = GlobalKey<FormState>();
     final passwordController = TextEditingController();
-    List<String> selectedSousRoles = [];
+    // Pré-rempli avec la catégorie choisie par le candidat lui-même à
+    // l'inscription (demande_vendeur_screen.dart) : l'admin n'a plus qu'à
+    // valider dans le cas normal, tout en gardant la main pour corriger.
+    List<String> selectedSousRoles =
+        List<String>.from(demande['sous_roles_demandees'] ?? const []);
 
     await showDialog(
       context: context,
@@ -111,24 +115,50 @@ class _AdminDemandesScreenState
                           style: MboaTextStyles.muted,
                         ),
                         const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: MboaColors.secondary
-                                .withValues(alpha: 0.1),
-                            borderRadius:
-                                BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            demande['type_activite'] ?? '',
-                            style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 11,
-                              color: MboaColors.secondary,
-                              fontWeight: FontWeight.w600,
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: MboaColors.secondary
+                                    .withValues(alpha: 0.1),
+                                borderRadius:
+                                    BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                demande['type_activite'] ?? '',
+                                style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 11,
+                                  color: MboaColors.secondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
-                          ),
+                            if (demande['ville'] != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: MboaColors.primary
+                                      .withValues(alpha: 0.1),
+                                  borderRadius:
+                                      BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '📍 ${demande['ville']}',
+                                  style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 11,
+                                    color: MboaColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 6),
                         Text(
@@ -754,23 +784,48 @@ class _AdminDemandesScreenState
             ],
           ),
           const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: MboaColors.secondary
-                  .withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              '🏷 ${demande['type_activite'] ?? ''}',
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: MboaColors.secondary,
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: MboaColors.secondary
+                      .withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '🏷 ${demande['type_activite'] ?? ''}',
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: MboaColors.secondary,
+                  ),
+                ),
               ),
-            ),
+              if (demande['ville'] != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: MboaColors.primary
+                        .withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '📍 ${demande['ville']}',
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: MboaColors.primary,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
           Container(
