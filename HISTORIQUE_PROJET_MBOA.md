@@ -1584,6 +1584,52 @@ device/navigateur réel** au moment de la rédaction — en particulier
 qu'un article publié avec deux villes apparaît bien dans les deux listes
 filtrées.
 
+**Audit demandé après coup par Ferdinand** : "vérifie que rien ne bloque
+la publication des annonces par les vendeurs et propriétaires". Vérifié :
+- **Base de données** : les 5 triggers `articles` (modération IA,
+  notification push, notification in-app par alerte, parrainage,
+  protection des colonnes de confiance) et les 3 triggers `logements`
+  inspectés un par un (`pg_proc.prosrc`) — aucun ne référence `ville`.
+  Insert + update réels testés en direct sur la base de prod avec un
+  `ville` à deux éléments (`{'Sangmelima','Kribi'}`) : les deux passent
+  sans erreur, les 4 triggers `AFTER INSERT` se déclenchent normalement
+  (dont l'appel à `moderate-annonce`, vérifié via la ligne
+  `moderation_ia` produite), le filtre `ville @> array[...]` renvoie le
+  bon résultat pour chaque ville. Aucune contrainte CHECK sur `ville`.
+  Ligne de test et sa ligne `moderation_ia` supprimées après coup.
+- **Bug réel trouvé et corrigé, introduit par ce changement** :
+  `VilleService.init()` (mobile) posait un flag booléen `_initialise`
+  *avant* d'attendre le chargement réseau — un deuxième appelant
+  concurrent (ex. le nouvel écran Publier→Article, monté par
+  l'`IndexedStack` de `MainScreen` en même temps que Home, qui appelle
+  aussi `init()`) voyait le flag déjà à `true` et retournait aussitôt,
+  **avant** que `villesActives` soit réellement rempli — l'écran de
+  publication d'article n'avait alors aucune ville à proposer, et
+  restait figé ainsi indéfiniment (aucun re-render déclenché quand
+  Home terminait son propre chargement). Pour un vendeur avec
+  uniquement le sous-rôle `commercant`/`vendeur_independant` (le seul
+  cas où le formulaire Article se monte directement, sans passer par un
+  `TabBarView`), ceci aurait bloqué toute publication d'article. Corrigé
+  en mémoïsant le `Future` lui-même (`_initFuture ??= _chargerVilles()`)
+  plutôt qu'un booléen, pour que tout appelant concurrent attende
+  réellement la même requête au lieu de croire l'initialisation déjà
+  terminée ; `_FormArticleState._initVilleParDefaut()` déclenche aussi
+  désormais un `setState` inconditionnel après ce chargement (pas
+  seulement quand une ville par défaut est trouvée), pour que la liste
+  de chips se peuple même sans présélection.
+- **Publication de logement** : non touchée par ce chantier (`ville`
+  reste dérivée du GPS, un seul formulaire) — confirmée saine par simple
+  inspection, aucune dépendance partagée modifiée à part le correctif
+  `VilleService.init()` ci-dessus, qui la rend strictement plus fiable
+  (bénéficie aussi `demande_vendeur_screen.dart`, qui appelait déjà
+  `init()` de façon correcte mais aurait pu subir la même course dans
+  d'autres contextes concurrents).
+- **Advisors Supabase** (sécurité + performance) : aucune alerte nouvelle
+  liée à la migration, hormis l'attendu "index `idx_articles_ville`
+  jamais utilisé" (normal, minutes après sa création, se résorbera avec
+  le trafic réel). `flutter analyze` re-exécuté après ces deux
+  correctifs : toujours 143 issues, 0 erreur, 0 warning.
+
 ---
 
 ## 6. Infrastructure technique

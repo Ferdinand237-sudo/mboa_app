@@ -27,12 +27,20 @@ class VilleService {
   final ValueNotifier<VilleModel?> selectedVille = ValueNotifier(null);
 
   List<VilleModel> villesActives = [];
-  bool _initialise = false;
+  Future<void>? _initFuture;
 
-  Future<void> init() async {
-    if (_initialise) return;
-    _initialise = true;
+  // Mémoïse le Future lui-même (pas un simple booléen) : plusieurs écrans
+  // appellent init() depuis leur initState au même instant (ex. Home et
+  // Publier, montés simultanément par l'IndexedStack de MainScreen). Avec
+  // un simple flag "déjà lancé", le deuxième appelant retournait aussitôt
+  // sans attendre la fin du chargement du premier — villesActives restait
+  // vide pour lui, et toute UI basée dessus (ex. sélection de ville à la
+  // publication d'un article) restait figée sans jamais se mettre à jour.
+  // En renvoyant le même Future à tous les appelants concurrents, chacun
+  // attend réellement la fin du chargement, une seule fois.
+  Future<void> init() => _initFuture ??= _chargerVilles();
 
+  Future<void> _chargerVilles() async {
     try {
       final data = await _supabase
           .from('villes')

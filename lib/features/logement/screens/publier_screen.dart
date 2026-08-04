@@ -1230,10 +1230,17 @@ class _FormArticleState extends State<_FormArticle> {
     } catch (_) {}
     if (!mounted) return;
     final defaut = villeProfil ?? VilleService.instance.selectedVille.value?.nom;
-    if (defaut != null &&
-        VilleService.instance.villesActives.any((v) => v.nom == defaut)) {
-      setState(() => _villesSelectionnees.add(defaut));
-    }
+    setState(() {
+      // Le rebuild doit avoir lieu même sans ville par défaut trouvée : la
+      // liste de villes elle-même (VilleService.instance.villesActives) ne
+      // peut être connue qu'après cet await, et sans ce setState les chips
+      // resteraient invisibles si Publier a démarré son chargement en même
+      // temps que Home (les deux montés par l'IndexedStack de MainScreen).
+      if (defaut != null &&
+          VilleService.instance.villesActives.any((v) => v.nom == defaut)) {
+        _villesSelectionnees.add(defaut);
+      }
+    });
   }
 
   @override
