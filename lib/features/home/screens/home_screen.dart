@@ -191,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
           .select('*, vendeur:users!vendeur_id(nom, verified)')
           .eq('statut', 'disponible')
           .eq('statut_moderation', 'publie')
-          .eq('ville', ville.nom)
+          .contains('ville', [ville.nom])
           .order('boosted', ascending: false)
           .order('date_publication', ascending: false)
           .limit(6);

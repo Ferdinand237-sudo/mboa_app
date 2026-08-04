@@ -17,9 +17,20 @@ import {
 import type { VilleModel } from "@/lib/data/villes";
 
 // Miroir de _FormArticle (publier_screen.dart). Aucune position GPS n'est
-// captée pour un article (contrairement à un logement) : la ville est
-// celle actuellement parcourue par le vendeur au moment de la publication.
-export function FormArticle({ villeActuelle }: { villeActuelle: VilleModel }) {
+// captée pour un article (contrairement à un logement) : le vendeur choisit
+// explicitement une ou plusieurs villes de publication — un vendeur en
+// déplacement peut être basé n'importe où et publier vers plusieurs villes
+// à la fois. `villeProfil`/`villeActuelle` ne servent plus qu'à présélectionner
+// une case par défaut (repli, jamais silencieux).
+export function FormArticle({
+  villes,
+  villeProfil,
+  villeActuelle,
+}: {
+  villes: VilleModel[];
+  villeProfil: string | null;
+  villeActuelle: VilleModel;
+}) {
   const [titre, setTitre] = useState("");
   const [description, setDescription] = useState("");
   const [prix, setPrix] = useState("");
@@ -28,10 +39,20 @@ export function FormArticle({ villeActuelle }: { villeActuelle: VilleModel }) {
   const [negociable, setNegociable] = useState(false);
   const [accepteAvis, setAccepteAvis] = useState(false);
   const [newPhotos, setNewPhotos] = useState<{ file: File; preview: string }[]>([]);
+  const [villesSelectionnees, setVillesSelectionnees] = useState<string[]>(() => {
+    const defaut = villeProfil ?? villeActuelle.nom;
+    return villes.some((v) => v.nom === defaut) ? [defaut] : [];
+  });
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ message: string; tone: ToneResultat } | null>(null);
   const [loading, setLoading] = useState(false);
   const [analyseEnCours, setAnalyseEnCours] = useState(false);
+
+  function toggleVille(nom: string) {
+    setVillesSelectionnees((prev) =>
+      prev.includes(nom) ? prev.filter((v) => v !== nom) : [...prev, nom],
+    );
+  }
 
   const photos: PhotoItem[] = newPhotos.map((p) => ({ kind: "new", preview: p.preview }));
 
@@ -81,6 +102,10 @@ export function FormArticle({ villeActuelle }: { villeActuelle: VilleModel }) {
       setError("Au moins 1 photo requise");
       return;
     }
+    if (villesSelectionnees.length === 0) {
+      setError("Sélectionne au moins une ville de publication");
+      return;
+    }
     setError(null);
     setResult(null);
     setLoading(true);
@@ -93,12 +118,6 @@ export function FormArticle({ villeActuelle }: { villeActuelle: VilleModel }) {
       setLoading(false);
       return;
     }
-
-    // Aucune position GPS pour un article : priorité à la ville déclarée au
-    // profil du vendeur (register/vendeur/page.tsx), repli sur la ville
-    // actuellement parcourue si elle n'est pas renseignée.
-    const { data: profil } = await supabase.from("users").select("ville").eq("id", user.id).single();
-    const villeArticle = profil?.ville ?? villeActuelle.nom;
 
     try {
       const photoUrls = await uploadPhotos(user.id);
@@ -113,7 +132,7 @@ export function FormArticle({ villeActuelle }: { villeActuelle: VilleModel }) {
           negociable,
           accepte_avis: accepteAvis,
           photos: photoUrls,
-          ville: villeArticle,
+          ville: villesSelectionnees,
           vendeur_id: user.id,
           statut: "disponible",
           boosted: false,
@@ -259,6 +278,32 @@ export function FormArticle({ villeActuelle }: { villeActuelle: VilleModel }) {
           className="w-full rounded-mboa-md border-[1.5px] border-mboa-border bg-mboa-background px-4 py-3.5 text-sm text-mboa-text outline-none focus:border-2 focus:border-mboa-primary"
         />
       </label>
+
+      <div>
+        <p className="text-[13px] font-bold text-mboa-text">🏙️ Publier dans quelle(s) ville(s) ?</p>
+        <p className="mt-1 text-xs text-mboa-text-muted">
+          Choisis une ou plusieurs villes, où que tu te trouves — l&apos;article sera visible dans chacune d&apos;elles.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {villes.map((v) => {
+            const isSelected = villesSelectionnees.includes(v.nom);
+            return (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => toggleVille(v.nom)}
+                className={`rounded-full border-[1.5px] px-3.5 py-2 text-xs font-semibold ${
+                  isSelected
+                    ? "border-mboa-primary bg-mboa-primary text-white"
+                    : "border-mboa-border bg-mboa-card text-mboa-text"
+                }`}
+              >
+                {isSelected ? `✓  ${v.nom}` : `📍 ${v.nom}`}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <button
         type="submit"

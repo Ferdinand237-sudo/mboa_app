@@ -21,7 +21,7 @@ export async function getArticles(params: {
     .select(SELECT_WITH_VENDEUR)
     .eq("statut", "disponible")
     .eq("statut_moderation", "publie")
-    .eq("ville", ville);
+    .contains("ville", [ville]);
 
   if (categorie && categorie !== "Tous") {
     query = query.eq("categorie", categorie);

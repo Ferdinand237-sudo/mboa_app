@@ -1205,6 +1205,37 @@ class _FormArticleState extends State<_FormArticle> {
   bool _isLoading = false;
   bool _analyseEnCours = false;
 
+  // Un vendeur en déplacement peut vouloir publier vers une ou plusieurs
+  // villes différentes de celle où il se trouve/parcourt actuellement —
+  // c'est un choix explicite ici, plus jamais dérivé silencieusement de la
+  // ville de profil ou de la ville actuellement sélectionnée dans l'app.
+  final Set<String> _villesSelectionnees = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _initVilleParDefaut();
+  }
+
+  Future<void> _initVilleParDefaut() async {
+    await VilleService.instance.init();
+    String? villeProfil;
+    try {
+      final profil = await _supabase
+          .from('users')
+          .select('ville')
+          .eq('id', _supabase.auth.currentUser!.id)
+          .maybeSingle();
+      villeProfil = profil?['ville'] as String?;
+    } catch (_) {}
+    if (!mounted) return;
+    final defaut = villeProfil ?? VilleService.instance.selectedVille.value?.nom;
+    if (defaut != null &&
+        VilleService.instance.villesActives.any((v) => v.nom == defaut)) {
+      setState(() => _villesSelectionnees.add(defaut));
+    }
+  }
+
   @override
   void dispose() {
     _titreController.dispose();
@@ -1266,22 +1297,10 @@ class _FormArticleState extends State<_FormArticle> {
       return;
     }
 
-    // Aucune position GPS n'est captée pour un article (contrairement à un
-    // logement) : priorité à la ville déclarée au profil du vendeur (voir
-    // demande_vendeur_screen.dart), repli sur la ville actuellement
-    // sélectionnée si elle n'est pas renseignée.
-    final profil = await _supabase
-        .from('users')
-        .select('ville')
-        .eq('id', _supabase.auth.currentUser!.id)
-        .maybeSingle();
-    if (!mounted) return;
-    final villeArticle = VilleService.instance.villeParNom(profil?['ville'] as String?) ??
-        VilleService.instance.selectedVille.value;
-    if (villeArticle == null) {
+    if (_villesSelectionnees.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Sélectionnez d\'abord votre ville depuis l\'accueil'),
+          content: Text('Sélectionnez au moins une ville de publication'),
           backgroundColor: MboaColors.danger,
         ),
       );
@@ -1303,7 +1322,7 @@ class _FormArticleState extends State<_FormArticle> {
         'negociable': _negociable,
         'accepte_avis': _accepteAvis,
         'photos': photoUrls,
-        'ville': villeArticle.nom,
+        'ville': _villesSelectionnees.toList(),
         'vendeur_id': _supabase.auth.currentUser!.id,
         'statut': AppConstants.statutDisponible,
         'boosted': false,
@@ -1697,6 +1716,60 @@ class _FormArticleState extends State<_FormArticle> {
                   return 'Minimum 20 caractères';
                 return null;
               },
+            ),
+            const SizedBox(height: 20),
+
+            // ── Villes de publication ────────────────
+            _buildSectionTitle('🏙️ Publier dans quelle(s) ville(s) ?'),
+            const SizedBox(height: 4),
+            Text(
+              'Choisis une ou plusieurs villes, où que tu te trouves — l\'article sera visible dans chacune d\'elles.',
+              style: MboaTextStyles.caption,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: VilleService.instance.villesActives.map((ville) {
+                final isSelected = _villesSelectionnees.contains(ville.nom);
+                return GestureDetector(
+                  onTap: () => setState(() {
+                    if (isSelected) {
+                      _villesSelectionnees.remove(ville.nom);
+                    } else {
+                      _villesSelectionnees.add(ville.nom);
+                    }
+                  }),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? MboaColors.primary
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected
+                            ? MboaColors.primary
+                            : MboaColors.border,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Text(
+                      isSelected ? '✓  ${ville.nom}' : '📍 ${ville.nom}',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected
+                            ? Colors.white
+                            : MboaColors.text,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
             const SizedBox(height: 32),
 

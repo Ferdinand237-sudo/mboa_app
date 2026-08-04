@@ -143,13 +143,14 @@ export type ArticleAModifier = {
   negociable: boolean;
   accepteAvis: boolean;
   photos: string[];
+  ville: string[];
 };
 
 export async function getArticleAModifier(id: string, userId: string): Promise<ArticleAModifier | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("articles")
-    .select("id, titre, description, categorie, etat, prix, negociable, accepte_avis, photos, vendeur_id")
+    .select("id, titre, description, categorie, etat, prix, negociable, accepte_avis, photos, ville, vendeur_id")
     .eq("id", id)
     .single();
 
@@ -165,5 +166,6 @@ export async function getArticleAModifier(id: string, userId: string): Promise<A
     negociable: data.negociable === true,
     accepteAvis: data.accepte_avis === true,
     photos: data.photos ?? [],
+    ville: data.ville ?? [],
   };
 }

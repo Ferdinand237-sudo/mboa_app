@@ -12,17 +12,22 @@ export function PublierTabs({
   peutArticle,
   compteActifPublication,
   villeActuelle,
+  villes,
+  villeProfil,
 }: {
   peutLogement: boolean;
   peutArticle: boolean;
   compteActifPublication: boolean;
   villeActuelle: VilleModel;
+  villes: VilleModel[];
+  villeProfil: string | null;
 }) {
   const [tab, setTab] = useState<"logement" | "article">(peutLogement ? "logement" : "article");
 
   if (peutLogement && !peutArticle)
     return <FormLogement compteActifPublication={compteActifPublication} villeActuelle={villeActuelle} />;
-  if (peutArticle && !peutLogement) return <FormArticle villeActuelle={villeActuelle} />;
+  if (peutArticle && !peutLogement)
+    return <FormArticle villes={villes} villeProfil={villeProfil} villeActuelle={villeActuelle} />;
 
   return (
     <div>
@@ -49,7 +54,7 @@ export function PublierTabs({
       {tab === "logement" ? (
         <FormLogement compteActifPublication={compteActifPublication} villeActuelle={villeActuelle} />
       ) : (
-        <FormArticle villeActuelle={villeActuelle} />
+        <FormArticle villes={villes} villeProfil={villeProfil} villeActuelle={villeActuelle} />
       )}
     </div>
   );

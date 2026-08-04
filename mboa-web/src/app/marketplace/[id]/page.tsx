@@ -56,13 +56,6 @@ const ETAT_COLORS: Record<string, string> = {
   "Bon état": "var(--color-mboa-primary-light)",
 };
 
-function localisation(article: { lat: number | null; lng: number | null }) {
-  if (article.lat != null && article.lng != null) {
-    return `${article.lat.toFixed(4)}, ${article.lng.toFixed(4)}`;
-  }
-  return "Localisation inconnue";
-}
-
 export default async function ArticleDetailPage({
   params,
 }: {
@@ -178,7 +171,7 @@ export default async function ArticleDetailPage({
             {[
               ["📦", "Catégorie", article.categorie],
               ["🏷️", "État", article.etat],
-              ["📍", "Localisation", localisation(article)],
+              ["📍", "Villes", article.ville.length > 0 ? article.ville.join(", ") : "Non renseigné"],
               ["📅", "Publié", formatRelativeDate(article.datePublication)],
             ].map(([icon, label, value]) => (
               <div key={label} className="flex items-center justify-between px-4 py-3 text-sm">

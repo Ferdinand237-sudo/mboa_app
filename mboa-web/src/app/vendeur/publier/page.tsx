@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/data/auth";
+import { createClient } from "@/lib/supabase/server";
 import { getVendeurPermissions } from "@/lib/data/vendeur-annonces";
-import { getVilleActuelle } from "@/lib/data/villes";
+import { getVilleActuelle, getVilles } from "@/lib/data/villes";
 import { PublierTabs } from "@/components/vendeur/publier-tabs";
 import { TourButton } from "@/components/onboarding/tour-button";
 import { TOUR_PUBLIER } from "@/components/onboarding/tours";
@@ -16,9 +17,12 @@ export default async function PublierPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const [permissions, { ville: villeActuelle }] = await Promise.all([
+  const supabase = await createClient();
+  const [permissions, { ville: villeActuelle }, villes, { data: profil }] = await Promise.all([
     getVendeurPermissions(user.id),
     getVilleActuelle(),
+    getVilles(),
+    supabase.from("users").select("ville").eq("id", user.id).single(),
   ]);
 
   if (!permissions.peutLogement && !permissions.peutArticle) {
@@ -61,6 +65,8 @@ export default async function PublierPage() {
         peutArticle={permissions.peutArticle}
         compteActifPublication={permissions.compteActifPublication}
         villeActuelle={villeActuelle}
+        villes={villes}
+        villeProfil={profil?.ville ?? null}
       />
     </div>
   );

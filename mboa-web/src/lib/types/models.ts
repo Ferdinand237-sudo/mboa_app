@@ -175,7 +175,7 @@ export type ArticleModel = {
   vendeurNote: number;
   statut: string;
   statutModeration: string;
-  ville: string;
+  ville: string[];
   lat: number | null;
   lng: number | null;
   boosted: boolean;
@@ -206,7 +206,7 @@ export function articleFromRow(row: SupabaseRow): ArticleModel {
     vendeurNote: num(row.vendeur_note ?? vendeur.note_globale),
     statut: str(row.statut, "disponible"),
     statutModeration: str(row.statut_moderation, "publie"),
-    ville: str(row.ville, "Sangmelima"),
+    ville: strArr(row.ville),
     lat: numOrNull(row.lat),
     lng: numOrNull(row.lng),
     boosted: bool(row.boosted),

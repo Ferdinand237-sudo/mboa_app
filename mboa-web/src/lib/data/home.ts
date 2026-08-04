@@ -35,7 +35,7 @@ export async function getHomeArticles(ville: string): Promise<ArticleModel[]> {
     .select(SELECT_ARTICLE_HOME)
     .eq("statut", "disponible")
     .eq("statut_moderation", "publie")
-    .eq("ville", ville)
+    .contains("ville", [ville])
     .order("boosted", { ascending: false })
     .order("date_publication", { ascending: false })
     .limit(6);

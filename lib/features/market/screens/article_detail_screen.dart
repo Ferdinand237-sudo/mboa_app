@@ -337,7 +337,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
 
   String _getArticleLocation(Map<String, dynamic> a) {
     final quartier = a['quartier']?.toString().trim();
-    final ville = a['ville']?.toString().trim();
+    final villes = a['ville'] is List ? List<String>.from(a['ville']) : <String>[];
+    final ville = villes.isNotEmpty ? villes.join(', ') : null;
     final adresse = a['adresse_approx']?.toString().trim();
 
     if (quartier != null && quartier.isNotEmpty && ville != null && ville.isNotEmpty) {

@@ -9,9 +9,10 @@ import { Switch } from "@/components/ui/switch";
 import { SaveIcon } from "@/components/ui/icons";
 import { CATEGORIES_MARKET, ETATS_ARTICLE, BUCKET_ARTICLES, MAX_PHOTOS_ARTICLE, MIN_PHOTOS_ARTICLE } from "@/lib/constants";
 import type { ArticleAModifier } from "@/lib/data/vendeur-annonces";
+import type { VilleModel } from "@/lib/data/villes";
 
 // Miroir de edit_article_screen.dart.
-export function EditArticleForm({ article }: { article: ArticleAModifier }) {
+export function EditArticleForm({ article, villes }: { article: ArticleAModifier; villes: VilleModel[] }) {
   const router = useRouter();
   const [titre, setTitre] = useState(article.titre);
   const [description, setDescription] = useState(article.description);
@@ -22,8 +23,15 @@ export function EditArticleForm({ article }: { article: ArticleAModifier }) {
   const [accepteAvis, setAccepteAvis] = useState(article.accepteAvis);
   const [existingPhotos, setExistingPhotos] = useState<string[]>(article.photos);
   const [newPhotos, setNewPhotos] = useState<{ file: File; preview: string }[]>([]);
+  const [villesSelectionnees, setVillesSelectionnees] = useState<string[]>(article.ville);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  function toggleVille(nom: string) {
+    setVillesSelectionnees((prev) =>
+      prev.includes(nom) ? prev.filter((v) => v !== nom) : [...prev, nom],
+    );
+  }
 
   const totalPhotos = existingPhotos.length + newPhotos.length;
   const photos: PhotoItem[] = [
@@ -67,6 +75,10 @@ export function EditArticleForm({ article }: { article: ArticleAModifier }) {
       setError("Au moins 1 photo requise");
       return;
     }
+    if (villesSelectionnees.length === 0) {
+      setError("Sélectionne au moins une ville de publication");
+      return;
+    }
     setError(null);
     setLoading(true);
 
@@ -103,6 +115,7 @@ export function EditArticleForm({ article }: { article: ArticleAModifier }) {
           negociable,
           accepte_avis: accepteAvis,
           photos: [...existingPhotos, ...nouvellesUrls],
+          ville: villesSelectionnees,
         })
         .eq("id", article.id);
       if (updateError) throw updateError;
@@ -223,6 +236,29 @@ export function EditArticleForm({ article }: { article: ArticleAModifier }) {
           className="w-full rounded-mboa-md border-[1.5px] border-mboa-border bg-mboa-background px-4 py-3.5 text-sm text-mboa-text outline-none focus:border-2 focus:border-mboa-primary"
         />
       </label>
+
+      <div>
+        <p className="text-[13px] font-bold text-mboa-text">🏙️ Villes de publication</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {villes.map((v) => {
+            const isSelected = villesSelectionnees.includes(v.nom);
+            return (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => toggleVille(v.nom)}
+                className={`rounded-full border-[1.5px] px-3.5 py-2 text-xs font-semibold ${
+                  isSelected
+                    ? "border-mboa-primary bg-mboa-primary text-white"
+                    : "border-mboa-border bg-mboa-card text-mboa-text"
+                }`}
+              >
+                {isSelected ? `✓  ${v.nom}` : `📍 ${v.nom}`}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <button
         type="submit"

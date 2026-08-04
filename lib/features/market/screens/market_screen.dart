@@ -66,7 +66,7 @@ class _MarketScreenState extends State<MarketScreen> with RefreshableState {
               '*, vendeur:users!vendeur_id(nom, photo_url, verified, note_globale)')
           .eq('statut', 'disponible')
           .eq('statut_moderation', 'publie')
-          .eq('ville', ville.nom);
+          .contains('ville', [ville.nom]);
 
       if (_selectedCategorie != 'Tous') {
         query = query.eq('categorie', _selectedCategorie);

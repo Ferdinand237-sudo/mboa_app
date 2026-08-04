@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/services/ville_service.dart';
 
 class EditArticleScreen extends StatefulWidget {
   final Map<String, dynamic> article;
@@ -29,6 +30,7 @@ class _EditArticleScreenState extends State<EditArticleScreen> {
   late bool _accepteAvis;
   late List<String> _photosExistantes;
   final List<File> _nouvellesPhotos = [];
+  late final Set<String> _villesSelectionnees;
   bool _isLoading = false;
 
   @override
@@ -43,6 +45,10 @@ class _EditArticleScreenState extends State<EditArticleScreen> {
     _negociable = a['negociable'] == true;
     _accepteAvis = a['accepte_avis'] == true;
     _photosExistantes = List<String>.from(a['photos'] ?? []);
+    _villesSelectionnees = List<String>.from(a['ville'] ?? []).toSet();
+    VilleService.instance.init().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -84,6 +90,12 @@ class _EditArticleScreenState extends State<EditArticleScreen> {
       );
       return;
     }
+    if (_villesSelectionnees.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sélectionnez au moins une ville de publication'), backgroundColor: MboaColors.danger),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       final nouvellesUrls = await _uploadNouvellesPhotos();
@@ -96,6 +108,7 @@ class _EditArticleScreenState extends State<EditArticleScreen> {
         'negociable': _negociable,
         'accepte_avis': _accepteAvis,
         'photos': [..._photosExistantes, ...nouvellesUrls],
+        'ville': _villesSelectionnees.toList(),
       }).eq('id', widget.article['id']);
 
       if (mounted) {
@@ -219,6 +232,37 @@ class _EditArticleScreenState extends State<EditArticleScreen> {
                         border: Border.all(color: isSelected ? MboaColors.accent : MboaColors.border, width: 1.5),
                       ),
                       child: Text(etat,
+                          style: TextStyle(
+                              fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600,
+                              color: isSelected ? Colors.white : MboaColors.text)),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+              _buildLabel('🏙️ Villes de publication'),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: VilleService.instance.villesActives.map((ville) {
+                  final isSelected = _villesSelectionnees.contains(ville.nom);
+                  return GestureDetector(
+                    onTap: () => setState(() {
+                      if (isSelected) {
+                        _villesSelectionnees.remove(ville.nom);
+                      } else {
+                        _villesSelectionnees.add(ville.nom);
+                      }
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? MboaColors.primary : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: isSelected ? MboaColors.primary : MboaColors.border, width: 1.5),
+                      ),
+                      child: Text(isSelected ? '✓  ${ville.nom}' : '📍 ${ville.nom}',
                           style: TextStyle(
                               fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600,
                               color: isSelected ? Colors.white : MboaColors.text)),

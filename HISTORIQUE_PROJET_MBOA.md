@@ -1503,6 +1503,89 @@ Android/iOS et l'aperçu de lien WhatsApp en conditions réelles.
 
 ---
 
+## 5novodecies. Un article peut cibler plusieurs villes (1er août 2026)
+
+Bug signalé par Ferdinand : une vendeuse basée à Sangmelima publie un
+article, qui apparaît sous le filtre Kribi. Demande : que le vendeur
+choisisse explicitement une ou plusieurs villes de publication par
+article, quel que soit l'endroit où il se trouve au moment de publier
+(les vendeurs sont souvent en déplacement).
+
+**Root cause confirmée** (audit avant tout correctif) : `articles.ville`
+n'était jamais choisi explicitement. À la publication, la logique était
+`profil.ville (users.ville) ?? villeActuelle` — et `villeActuelle` est
+l'état mutable "ville actuellement parcourue" (cookie `mboa_ville` côté
+web, `SharedPreferences` côté mobile via `VilleService`), pensé pour la
+*navigation* (n'importe quel visiteur peut le changer à tout moment pour
+parcourir une autre ville) et réutilisé à tort comme repli de
+publication. Un vendeur dont le profil `ville` était vide/non renseigné,
+et qui avait parcouru le Marketplace de Kribi (ou y avait été
+géolocalisé) juste avant de publier, voyait son article silencieusement
+associé à Kribi — sans le savoir, et sans pouvoir corriger après coup
+(aucun des deux écrans d'édition d'article, mobile ou web, ne touchait
+jamais `ville`).
+
+**Décision** : `articles.ville` passe de `text` à `text[]` — un article
+peut désormais être visible dans plusieurs villes simultanément. Toujours
+un choix **explicite** du vendeur (cases à cocher parmi les villes
+actives), plus jamais dérivé implicitement. `logements.ville` reste
+inchangé (`text` unique, dérivé du GPS) : un logement est un lieu
+physique, ça n'a pas de sens de le rattacher à plusieurs villes — seul
+`articles.ville` (biens mobiles, vendeur potentiellement itinérant) est
+concerné.
+
+**Migration** (`20260803000000_articles_ville_multiple.sql`) : conversion
+`text` → `text[]` (`using array[ville]`, sûr car les 48 lignes
+existantes avaient déjà toutes une valeur non vide), `not null default
+'{}'`, index GIN pour les requêtes de containment. Appliquée en direct
+via `supabase db query --linked -f ...` (MCP Supabase déconnecté cette
+session).
+
+**Web** :
+- `ArticleModel.ville: string[]` (`strArr(row.ville)`), filtres
+  `getArticles`/`getHomeArticles` passés de `.eq("ville", ville)` à
+  `.contains("ville", [ville])`.
+- `FormArticle` (publication) : nouveau prop `villes: VilleModel[]`
+  (chargé une fois dans `vendeur/publier/page.tsx` via `getVilles()`,
+  transmis par `PublierTabs`) + cases à cocher pill-style ; présélection
+  = `villeProfil ?? villeActuelle.nom` (même repli qu'avant, mais visible
+  et modifiable, jamais silencieux). Validation : au moins une ville.
+- `EditArticleForm` : même sélecteur ajouté, permet enfin de corriger la
+  ville d'un article déjà publié — ce qui est aussi la façon dont un
+  vendeur touché par ce bug peut réparer lui-même son annonce mal placée.
+  `getArticleAModifier`/`ArticleAModifier` étendus avec `ville`.
+- `/marketplace/[id]` : la ligne "📍 Localisation" (qui affichait en
+  réalité `lat/lng` bruts, jamais renseignés pour un article) remplacée
+  par "📍 Villes" = `article.ville.join(", ")` — l'info utile existe enfin.
+
+**Mobile** :
+- `_FormArticleState` (`publier_screen.dart`) : `Set<String>
+  _villesSelectionnees`, mêmes chips que les équipements du formulaire
+  logement, présélection identique (profil ville sinon ville
+  actuellement sélectionnée), validation "au moins une ville".
+- `EditArticleScreen` : même sélecteur ajouté, initialisé depuis
+  `a['ville']` existant (déjà un tableau après migration).
+- `market_screen.dart`/`home_screen.dart` : `.eq('ville', ...)` → 
+  `.contains('ville', [...])` pour les requêtes articles (les requêtes
+  logements/lieux_publics, elles, restent `.eq` — colonne toujours
+  singulière côté logements).
+- `article_detail_screen.dart` (`_getArticleLocation`) : lit désormais
+  `a['ville']` comme `List`, jointes par `, ` pour l'affichage — avant ce
+  correctif, `.toString()` sur une liste aurait affiché `[Sangmelima,
+  Kribi]` littéralement.
+
+**Vérifié** : `flutter analyze` (143 issues, aucune nouvelle sur les
+lignes touchées — les infos pré-existantes de style n'ont pas bougé),
+`npm run build` (39 routes) et `eslint` propres côté web. Migration
+vérifiée en base (`information_schema.columns` confirme `ARRAY`/`_text`,
+`not null`, default `'{}'`) et sur un échantillon de lignes existantes
+(bien converties en tableau à un élément). **Non vérifié sur
+device/navigateur réel** au moment de la rédaction — en particulier
+qu'un article publié avec deux villes apparaît bien dans les deux listes
+filtrées.
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
@@ -1553,6 +1636,7 @@ Android/iOS et l'aperçu de lien WhatsApp en conditions réelles.
 | Bulle de la visite guidée soulignée en couleur (double soulignement) | Mobile, `OverlayEntry` monté hors du `Scaffold` sans ancêtre `Material` — style de repli de debug Flutter, pas un style voulu |
 | Dernière étape "Crée ton compte" de la visite guidée mal ciblée | Mobile, distinct du délai de scroll déjà corrigé (ligne ci-dessus) — halo figé sur une position obsolète si le contenu au-dessus finit de charger juste après le calcul initial |
 | Compteur `vues` jamais incrémenté (toutes plateformes) | Colonne affichée sur le web depuis l'origine mais aucun code, sur aucune plateforme, ne l'incrémentait réellement — figée à 0 ; trouvé et corrigé le 1er août 2026 (section 5septendecies) |
+| Article publié sous la mauvaise ville | `ville` dérivée silencieusement de l'état de navigation (cookie/SharedPreferences), pas d'un choix explicite du vendeur, et non corrigeable après coup ; corrigé le 1er août 2026 en passant à une sélection multi-ville explicite (section 5novodecies) |
 
 ---
 
