@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
@@ -112,6 +113,17 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
     } catch (_) {
       return '—';
     }
+  }
+
+  Future<void> _partagerCatalogue(Map<String, dynamic> v) async {
+    final id = _vendeurId;
+    if (id == null) return;
+    final nom = v['nom_commerce'] ?? v['nom'] ?? 'ce contributeur';
+    final lien = '${AppConstants.siteUrl}/vendeur/$id';
+    await Share.share(
+      'Découvre le catalogue de $nom sur Mboa : $lien',
+      subject: 'Catalogue Mboa — $nom',
+    );
   }
 
   void _voirPhoto(String? url, {required String placeholder}) {
@@ -264,6 +276,20 @@ class _ProfilVendeurScreenState extends State<ProfilVendeurScreen>
                 child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
               ),
             ),
+            actions: [
+              GestureDetector(
+                onTap: () => _partagerCatalogue(v),
+                child: Container(
+                  margin: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: const Icon(Icons.share_rounded, color: Colors.white, size: 20),
+                ),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(gradient: MboaColors.primaryGradient),

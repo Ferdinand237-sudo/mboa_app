@@ -16,6 +16,13 @@ class AppConstants {
   static const double defaultLat     = 2.9333;
   static const double defaultLng     = 11.9833;
 
+  // ── Site web (liens de partage) ───────────────────────────
+  // Domaine stable de production Vercel — l'app mobile n'a pas de deep
+  // link vers un profil/annonce précis, donc tout partage (catalogue
+  // vendeur, futur partage d'annonce depuis mobile) pointe ici, comme le
+  // fait déjà le web pour ses propres liens de partage (getSiteUrl()).
+  static const String siteUrl        = 'https://mboa-web.vercel.app';
+
   // ── Collections Supabase (tables) ─────────────────────────
   static const String tableUsers          = 'users';
   static const String tableLogements      = 'logements';

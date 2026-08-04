@@ -1450,6 +1450,59 @@ nouvelle), `npm run build` (39 routes) et `eslint` propres côté web.
 
 ---
 
+## 5octodecies. Partage du catalogue vendeur (1er août 2026)
+
+Demande de Ferdinand : qu'un vendeur/contributeur puisse partager son
+compte (comme un catalogue) pour se faire de la publicité, et que
+n'importe qui puisse aussi le partager à un tiers.
+
+**Domaine de production introuvable dans le repo** : `getSiteUrl()`
+(web) déduit toujours l'URL des headers de la requête entrante, aucun
+domaine n'est codé en dur nulle part. Retrouvé via l'API GitHub
+(`gh api .../deployments` → statuses → `target_url` du déploiement
+Vercel du dernier commit `main`) : projet `teka3/mboa-web`, domaine de
+production stable `https://mboa-web.vercel.app` (confirmé par un `curl`
+direct, page Mboa servie). Stocké côté mobile dans
+`AppConstants.siteUrl`, seul endroit qui en a besoin (le web le déduit
+dynamiquement).
+
+**Web** — `/vendeur/[id]` (le profil public vendeur, déjà une page
+"catalogue" avec logements + articles + avis) :
+- `generateMetadata` ajoute désormais description + meta Open
+  Graph/Twitter (titre, description, `photo_commerce` en image), même
+  schéma que `/logements/[id]`/`/marketplace/[id]`, pour un bel aperçu
+  quand le lien est collé dans WhatsApp.
+- `ShareButtons` (composant déjà existant pour les annonces individuelles,
+  Phase 1 croissance) reçoit un nouveau prop optionnel `label` (défaut
+  inchangé "📤 Partager cette annonce") pour être réutilisé tel quel ici
+  avec "📤 Partager ce catalogue", plutôt que dupliquer le composant.
+  Affiché en haut de la page, visible par tout visiteur y compris le
+  vendeur regardant son propre profil.
+
+**Mobile** — aucune infrastructure de partage n'existait avant
+(`share_plus` absent de `pubspec.yaml`, aucun deep link http(s) déclaré
+dans `AndroidManifest.xml` — seulement les schémas custom
+`com.mboa.app://` pour l'auth). Le partage mobile pointe donc vers la
+page web `/vendeur/[id]`, seul lien universel qui s'ouvre partout
+(WhatsApp preview, navigateur) sans nécessiter de deep link applicatif.
+- Ajout de `share_plus: ^10.1.2` (résolu en 10.1.4).
+- `profil_vendeur_screen.dart` (profil public, vu par un visiteur ou
+  par le vendeur lui-même) : bouton partage dans les `actions` du
+  `SliverAppBar`, à côté du bouton retour — `Share.share(...)` avec le
+  lien `AppConstants.siteUrl/vendeur/<id>`.
+- `profil_screen.dart` (profil privé du vendeur connecté) : nouvel item
+  "Partager mon catalogue" dans "Mes activités" (visible seulement si
+  `role == 'vendeur'`), même mécanique — évite au vendeur de devoir
+  naviguer jusqu'à sa propre page publique pour se partager lui-même.
+
+**Vérifié** : `flutter analyze` (142 issues, identique à l'état
+précédent, aucune nouvelle), `npm run build` et `eslint` propres côté
+web. **Non vérifié sur device/navigateur réel** au moment de la
+rédaction — en particulier le rendu de la feuille de partage native
+Android/iOS et l'aperçu de lien WhatsApp en conditions réelles.
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)

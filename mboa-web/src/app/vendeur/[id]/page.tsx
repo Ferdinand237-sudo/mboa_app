@@ -9,6 +9,8 @@ import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { LogementCard } from "@/components/logement/logement-card";
 import { ArticleCard } from "@/components/market/article-card";
 import { ContactButtons } from "@/components/vendeur/contact-buttons";
+import { ShareButtons } from "@/components/ui/share-buttons";
+import { getSiteUrl } from "@/lib/utils/url";
 
 export async function generateMetadata({
   params,
@@ -18,7 +20,35 @@ export async function generateMetadata({
   const { id } = await params;
   const profil = await getVendeurProfil(id);
   if (!profil) return { title: "Profil introuvable" };
-  return { title: profil.user.nomCommerce ?? profil.user.nom };
+
+  const { user, logements, articles } = profil;
+  const titre = user.nomCommerce ?? user.nom;
+  const description =
+    user.descriptionCommerce ??
+    `Découvre le catalogue de ${titre} sur Mboa : ${logements.length} logement(s) et ${articles.length} article(s).`;
+  const siteUrl = await getSiteUrl();
+  const url = `${siteUrl}/vendeur/${id}`;
+  const image = user.photoCommerce;
+
+  return {
+    title: titre,
+    description,
+    // Carte de partage affichée par WhatsApp/Facebook/X quand le lien est
+    // collé ou partagé — voir ShareButtons plus bas dans la page.
+    openGraph: {
+      title: titre,
+      description,
+      url,
+      type: "website",
+      images: image ? [{ url: image, width: 1200, height: 630, alt: titre }] : undefined,
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title: titre,
+      description,
+      images: image ? [image] : undefined,
+    },
+  };
 }
 
 export default async function VendeurPage({
@@ -27,10 +57,11 @@ export default async function VendeurPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [profil, avis, currentUser] = await Promise.all([
+  const [profil, avis, currentUser, siteUrl] = await Promise.all([
     getVendeurProfil(id),
     getAvisUtilisateur(id),
     getCurrentUser(),
+    getSiteUrl(),
   ]);
 
   if (!profil) notFound();
@@ -80,6 +111,14 @@ export default async function VendeurPage({
       </div>
 
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+        <div className="mb-8">
+          <ShareButtons
+            url={`${siteUrl}/vendeur/${id}`}
+            title={`${user.nomCommerce ?? user.nom} sur Mboa`}
+            label="📤 Partager ce catalogue"
+          />
+        </div>
+
         {logements.length > 0 && (
           <div className="mb-10">
             <h2 className="text-lg font-bold text-mboa-text">

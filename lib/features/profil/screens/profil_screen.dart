@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_constants.dart';
@@ -145,6 +146,17 @@ class _ProfilScreenState extends State<ProfilScreen> with RefreshableState {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _partagerCatalogue() async {
+    final id = _user?['id'];
+    if (id == null) return;
+    final nom = _user?['nom_commerce'] ?? _user?['nom'] ?? 'mon compte';
+    final lien = '${AppConstants.siteUrl}/vendeur/$id';
+    await Share.share(
+      'Découvre le catalogue de $nom sur Mboa : $lien',
+      subject: 'Mon catalogue Mboa',
+    );
   }
 
   Future<void> _ouvrirModifierProfil() async {
@@ -629,6 +641,14 @@ class _ProfilScreenState extends State<ProfilScreen> with RefreshableState {
                     );
                     _chargerNbAvisEnAttente();
                   },
+                ),
+              if (_user?['role'] == 'vendeur')
+                _buildMenuItem(
+                  icon: Icons.share_rounded,
+                  color: MboaColors.primaryLight,
+                  label: 'Partager mon catalogue',
+                  subtitle: 'Fais découvrir tes annonces autour de toi',
+                  onTap: _partagerCatalogue,
                 ),
             ],
           ),

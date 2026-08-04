@@ -45,7 +45,15 @@ function IconInstagram() {
 // Instagram n'en propose aucun (l'app mobile ne consomme pas de lien
 // pré-rempli), d'où le repli sur le partage natif du système (qui liste
 // Instagram parmi les cibles sur mobile) ou, à défaut, la copie du lien.
-export function ShareButtons({ url, title }: { url: string; title: string }) {
+export function ShareButtons({
+  url,
+  title,
+  label = "📤 Partager cette annonce",
+}: {
+  url: string;
+  title: string;
+  label?: string;
+}) {
   const [copie, setCopie] = useState(false);
 
   const encodedUrl = encodeURIComponent(url);
@@ -88,7 +96,7 @@ export function ShareButtons({ url, title }: { url: string; title: string }) {
 
   return (
     <div className="rounded-mboa-lg border border-mboa-border bg-mboa-card p-4">
-      <p className="text-sm font-bold text-mboa-text">📤 Partager cette annonce</p>
+      <p className="text-sm font-bold text-mboa-text">{label}</p>
       <div className="mt-3 flex items-center gap-2.5">
         {liens.map((l) => (
           <a
