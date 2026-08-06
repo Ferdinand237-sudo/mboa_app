@@ -92,6 +92,7 @@ class _PublierScreenState extends State<PublierScreen>
   bool _isLoading = true;
   bool _peutLogement = false;
   bool _peutArticle = false;
+  bool _peutHebergement = false;
   bool _compteActifPublication = true;
 
   final _tourHeroKey = GlobalKey();
@@ -101,13 +102,19 @@ class _PublierScreenState extends State<PublierScreen>
   final _tourSubmitKeyLogement = GlobalKey();
   final _tourPhotosKeyArticle = GlobalKey();
   final _tourSubmitKeyArticle = GlobalKey();
+  final _tourPhotosKeyHebergement = GlobalKey();
+  final _tourGpsKeyHebergement = GlobalKey();
+  final _tourSubmitKeyHebergement = GlobalKey();
 
-  GlobalKey? get _tourTabsKeyOuNull => (_peutLogement && _peutArticle) ? _tourTabsKey : null;
+  int get _nbTypesActifs =>
+      [_peutLogement, _peutArticle, _peutHebergement].where((v) => v).length;
+
+  GlobalKey? get _tourTabsKeyOuNull => _nbTypesActifs > 1 ? _tourTabsKey : null;
 
   // La visite pointe vers le formulaire réellement affiché par défaut
-  // (Logement si l'utilisateur peut en publier, sinon Article) — l'autre
-  // formulaire n'est pas monté tant qu'on ne bascule pas d'onglet, ses
-  // cibles seraient donc absentes.
+  // (Logement si l'utilisateur peut en publier, sinon Article, sinon
+  // Hébergement) — les autres formulaires ne sont montés qu'au changement
+  // d'onglet, leurs cibles seraient donc absentes.
   List<TourStep> get _tourSteps {
     if (_peutLogement) {
       return buildTourSteps(
@@ -115,8 +122,14 @@ class _PublierScreenState extends State<PublierScreen>
         tourPublierTexts,
       );
     }
+    if (_peutArticle) {
+      return buildTourSteps(
+        [_tourHeroKey, _tourTabsKeyOuNull, _tourPhotosKeyArticle, null, _tourSubmitKeyArticle],
+        tourPublierTexts,
+      );
+    }
     return buildTourSteps(
-      [_tourHeroKey, _tourTabsKeyOuNull, _tourPhotosKeyArticle, null, _tourSubmitKeyArticle],
+      [_tourHeroKey, _tourTabsKeyOuNull, _tourPhotosKeyHebergement, _tourGpsKeyHebergement, _tourSubmitKeyHebergement],
       tourPublierTexts,
     );
   }
@@ -145,13 +158,15 @@ class _PublierScreenState extends State<PublierScreen>
       final sousRoles = List<String>.from(data['sous_roles'] ?? []);
       final peutLogement = sousRoles.contains('proprietaire');
       final peutArticle = sousRoles.contains('commercant') || sousRoles.contains('vendeur_independant');
+      final peutHebergement = sousRoles.contains('hotelier');
       if (mounted) {
         setState(() {
           _peutLogement = peutLogement;
           _peutArticle = peutArticle;
+          _peutHebergement = peutHebergement;
           _compteActifPublication = data['compte_actif_publication'] ?? true;
-          if (peutLogement && peutArticle) {
-            _tabController = TabController(length: 2, vsync: this);
+          if (_nbTypesActifs > 1) {
+            _tabController = TabController(length: _nbTypesActifs, vsync: this);
           }
           _isLoading = false;
         });
@@ -176,7 +191,7 @@ class _PublierScreenState extends State<PublierScreen>
       );
     }
 
-    if (!_peutLogement && !_peutArticle) {
+    if (_nbTypesActifs == 0) {
       return Scaffold(
         backgroundColor: MboaColors.background,
         body: Center(
@@ -204,8 +219,46 @@ class _PublierScreenState extends State<PublierScreen>
       );
     }
 
+    // Un widget + un libellé d'onglet par type actif, dans un ordre stable
+    // (Logement, Article, Hébergement) — construit une seule fois pour
+    // servir à la fois au cas "un seul type" et au TabBar/TabBarView.
+    final formulaires = <MapEntry<String, Widget>>[
+      if (_peutLogement)
+        MapEntry(
+          '🏠 Logement',
+          _FormLogement(
+            compteActifPublication: _compteActifPublication,
+            tourPhotosKey: _tourPhotosKeyLogement,
+            tourGpsKey: _tourGpsKeyLogement,
+            tourSubmitKey: _tourSubmitKeyLogement,
+          ),
+        ),
+      if (_peutArticle)
+        MapEntry(
+          '🛒 Article',
+          _FormArticle(
+            tourPhotosKey: _tourPhotosKeyArticle,
+            tourSubmitKey: _tourSubmitKeyArticle,
+          ),
+        ),
+      if (_peutHebergement)
+        MapEntry(
+          '🏨 Hébergement',
+          _FormHebergement(
+            tourPhotosKey: _tourPhotosKeyHebergement,
+            tourGpsKey: _tourGpsKeyHebergement,
+            tourSubmitKey: _tourSubmitKeyHebergement,
+          ),
+        ),
+    ];
+
     // Un seul type autorisé : on affiche directement le formulaire, sans onglets.
-    if (!(_peutLogement && _peutArticle)) {
+    if (_nbTypesActifs <= 1) {
+      final titre = _peutLogement
+          ? '🏠 Publier un logement'
+          : _peutArticle
+              ? '🛒 Publier un article'
+              : '🏨 Publier un hébergement';
       return Scaffold(
         backgroundColor: MboaColors.background,
         body: SafeArea(
@@ -222,7 +275,7 @@ class _PublierScreenState extends State<PublierScreen>
                       child: KeyedSubtree(
                         key: _tourHeroKey,
                         child: Text(
-                          _peutLogement ? '🏠 Publier un logement' : '🛒 Publier un article',
+                          titre,
                           style: const TextStyle(fontFamily: 'Poppins', fontSize: 22, fontWeight: FontWeight.w800, color: MboaColors.text),
                         ),
                       ),
@@ -231,19 +284,7 @@ class _PublierScreenState extends State<PublierScreen>
                   ],
                 ),
               ),
-              Expanded(
-                child: _peutLogement
-                    ? _FormLogement(
-                        compteActifPublication: _compteActifPublication,
-                        tourPhotosKey: _tourPhotosKeyLogement,
-                        tourGpsKey: _tourGpsKeyLogement,
-                        tourSubmitKey: _tourSubmitKeyLogement,
-                      )
-                    : _FormArticle(
-                        tourPhotosKey: _tourPhotosKeyArticle,
-                        tourSubmitKey: _tourSubmitKeyArticle,
-                      ),
-              ),
+              Expanded(child: formulaires.first.value),
             ],
           ),
         ),
@@ -291,6 +332,7 @@ class _PublierScreenState extends State<PublierScreen>
                     key: _tourTabsKey,
                     child: TabBar(
                       controller: _tabController,
+                      isScrollable: formulaires.length > 2,
                       indicatorColor: MboaColors.primary,
                       indicatorWeight: 3,
                       labelColor: MboaColors.primary,
@@ -300,10 +342,9 @@ class _PublierScreenState extends State<PublierScreen>
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
-                      tabs: const [
-                        Tab(text: '🏠 Logement'),
-                        Tab(text: '🛒 Article'),
-                      ],
+                      tabs: formulaires
+                          .map((f) => Tab(text: f.key))
+                          .toList(),
                     ),
                   ),
                 ],
@@ -312,18 +353,7 @@ class _PublierScreenState extends State<PublierScreen>
             Expanded(
               child: TabBarView(
                 controller: _tabController,
-                children: [
-                  _FormLogement(
-                    compteActifPublication: _compteActifPublication,
-                    tourPhotosKey: _tourPhotosKeyLogement,
-                    tourGpsKey: _tourGpsKeyLogement,
-                    tourSubmitKey: _tourSubmitKeyLogement,
-                  ),
-                  _FormArticle(
-                    tourPhotosKey: _tourPhotosKeyArticle,
-                    tourSubmitKey: _tourSubmitKeyArticle,
-                  ),
-                ],
+                children: formulaires.map((f) => f.value).toList(),
               ),
             ),
           ],
@@ -1808,6 +1838,592 @@ class _FormArticleState extends State<_FormArticle> {
                         : 'Publication en cours...')
                     : 'Publier l\'article'),
               ),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontFamily: 'Poppins',
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: MboaColors.text,
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// FORMULAIRE HÉBERGEMENT (hôtel, motel, auberge, appart-hôtel...)
+// ════════════════════════════════════════════════════════════
+// Pas de vérification terrain (contrairement à _FormLogement) : publication
+// immédiate dès validation admin du compte, décision actée avec Ferdinand
+// (priorité à la vitesse d'onboarding des hôteliers).
+class _FormHebergement extends StatefulWidget {
+  final GlobalKey? tourPhotosKey;
+  final GlobalKey? tourGpsKey;
+  final GlobalKey? tourSubmitKey;
+  const _FormHebergement({
+    this.tourPhotosKey,
+    this.tourGpsKey,
+    this.tourSubmitKey,
+  });
+
+  @override
+  State<_FormHebergement> createState() => _FormHebergementState();
+}
+
+class _FormHebergementState extends State<_FormHebergement> {
+  final _formKey = GlobalKey<FormState>();
+  final _supabase = Supabase.instance.client;
+  final _picker = ImagePicker();
+
+  final _titreController = TextEditingController();
+  final _descController = TextEditingController();
+  final _prixController = TextEditingController();
+
+  String _selectedType = 'hotel';
+  int _capacitePersonnes = 1;
+  List<String> _selectedEquipements = [];
+  List<File> _photos = [];
+  bool _isLoading = false;
+  bool _analyseEnCours = false;
+  double? _lat;
+  double? _lng;
+  bool _isGettingLocation = false;
+
+  @override
+  void dispose() {
+    _titreController.dispose();
+    _descController.dispose();
+    _prixController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _ajouterPhoto() async {
+    if (_photos.length >= AppConstants.maxPhotosHebergement) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Maximum ${AppConstants.maxPhotosHebergement} photos'),
+          backgroundColor: MboaColors.danger,
+        ),
+      );
+      return;
+    }
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 80,
+    );
+    if (picked != null) {
+      setState(() => _photos.add(File(picked.path)));
+    }
+  }
+
+  void _supprimerPhoto(int index) {
+    setState(() => _photos.removeAt(index));
+  }
+
+  Future<void> _obtenirPosition() async {
+    setState(() => _isGettingLocation = true);
+    try {
+      bool serviceActive = await Geolocator.isLocationServiceEnabled();
+      if (!serviceActive) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Activez la localisation de votre téléphone'),
+              backgroundColor: MboaColors.danger,
+            ),
+          );
+        }
+        return;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Permission de localisation refusée'),
+                backgroundColor: MboaColors.danger,
+              ),
+            );
+          }
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Autorisez la localisation dans les paramètres de l\'app'),
+              backgroundColor: MboaColors.danger,
+            ),
+          );
+        }
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        timeLimit: const Duration(seconds: 15),
+      );
+      if (mounted) {
+        setState(() {
+          _lat = position.latitude;
+          _lng = position.longitude;
+        });
+      }
+    } on TimeoutException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Signal GPS trop faible. Réessaie en extérieur ou près d\'une fenêtre.'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de localisation : ${e.toString()}'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isGettingLocation = false);
+    }
+  }
+
+  Future<List<String>> _uploadPhotos() async {
+    final userId = _supabase.auth.currentUser!.id;
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return Future.wait(_photos.asMap().entries.map((entry) async {
+      final fileName = '$userId/${timestamp}_${entry.key}.jpg';
+      await _supabase.storage
+          .from(AppConstants.bucketHebergements)
+          .upload(fileName, entry.value)
+          .timeout(const Duration(seconds: 30));
+      return _supabase.storage
+          .from(AppConstants.bucketHebergements)
+          .getPublicUrl(fileName);
+    }));
+  }
+
+  Future<void> _publier() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_photos.length < AppConstants.minPhotosHebergement) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Minimum ${AppConstants.minPhotosHebergement} photos requises'),
+          backgroundColor: MboaColors.danger,
+        ),
+      );
+      return;
+    }
+
+    // Même logique de résolution de ville que pour un logement : lieu
+    // physique, GPS en priorité.
+    final profil = await _supabase
+        .from('users')
+        .select('ville')
+        .eq('id', _supabase.auth.currentUser!.id)
+        .maybeSingle();
+    final villeHebergement = (_lat != null && _lng != null
+            ? VilleService.instance.villeProchePosition(_lat!, _lng!)
+            : null) ??
+        VilleService.instance.villeParNom(profil?['ville'] as String?) ??
+        VilleService.instance.selectedVille.value;
+    if (!mounted) return;
+    if (villeHebergement == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de déterminer la ville : capturez la position GPS de l\'établissement'),
+          backgroundColor: MboaColors.danger,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final photoUrls = await _uploadPhotos();
+
+      final insere = await _supabase.from(AppConstants.tableHebergements).insert({
+        'titre': _titreController.text.trim(),
+        'description': _descController.text.trim(),
+        'type_etablissement': _selectedType,
+        'capacite_personnes': _capacitePersonnes,
+        'prix': int.parse(_prixController.text.trim().replaceAll(' ', '')),
+        'photos': photoUrls,
+        'equipements': _selectedEquipements,
+        'ville': villeHebergement.nom,
+        'lat': _lat,
+        'lng': _lng,
+        'proprietaire_id': _supabase.auth.currentUser!.id,
+        'statut': AppConstants.statutDisponible,
+        'boosted': false,
+        'vues': 0,
+        'signalements': 0,
+      }).select('id').single();
+
+      if (mounted) setState(() => _analyseEnCours = true);
+      final decision = await attendreDecisionModeration(
+        _supabase,
+        AppConstants.tableHebergements,
+        insere['id'] as String,
+      );
+
+      if (mounted) {
+        afficherResultatModeration(context, decision, 'Hébergement');
+        _formKey.currentState!.reset();
+        setState(() {
+          _photos = [];
+          _selectedEquipements = [];
+          _selectedType = 'hotel';
+          _capacitePersonnes = 1;
+          _lat = null;
+          _lng = null;
+        });
+      }
+    } on TimeoutException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Envoi des photos trop lent. Vérifie ta connexion et réessaie.'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur : ${e.toString()}'),
+            backgroundColor: MboaColors.danger,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _analyseEnCours = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+
+            // ── Photos ──────────────────────────────
+            _buildSectionTitle('📷 Photos de l\'établissement/chambre'),
+            const SizedBox(height: 4),
+            RichText(
+              text: TextSpan(
+                style: MboaTextStyles.caption,
+                children: [
+                  TextSpan(
+                    text: 'Minimum ${AppConstants.minPhotosHebergement} photos · ',
+                    style: const TextStyle(color: MboaColors.danger),
+                  ),
+                  TextSpan(
+                    text: '${_photos.length}/${AppConstants.maxPhotosHebergement} ajoutées',
+                    style: const TextStyle(color: MboaColors.secondary, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            KeyedSubtree(
+              key: widget.tourPhotosKey,
+              child: SizedBox(
+                height: 100,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    ..._photos.asMap().entries.map((entry) {
+                      return Stack(
+                        children: [
+                          Container(
+                            width: 100,
+                            height: 100,
+                            margin: const EdgeInsets.only(right: 10),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              image: DecorationImage(image: FileImage(entry.value), fit: BoxFit.cover),
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 14,
+                            child: GestureDetector(
+                              onTap: () => _supprimerPhoto(entry.key),
+                              child: Container(
+                                width: 22,
+                                height: 22,
+                                decoration: const BoxDecoration(color: MboaColors.danger, shape: BoxShape.circle),
+                                child: const Icon(Icons.close_rounded, color: Colors.white, size: 14),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
+                    if (_photos.length < AppConstants.maxPhotosHebergement)
+                      GestureDetector(
+                        onTap: _ajouterPhoto,
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: MboaColors.secondary.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: MboaColors.secondary.withValues(alpha: 0.3), width: 1.5),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.add_photo_alternate_outlined, color: MboaColors.secondary, size: 28),
+                              const SizedBox(height: 6),
+                              Text(
+                                _photos.isEmpty ? 'Ajouter' : '+ Photo',
+                                style: const TextStyle(fontFamily: 'Poppins', fontSize: 11, fontWeight: FontWeight.w600, color: MboaColors.secondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // ── Type d'établissement ──────────────────
+            _buildSectionTitle('Type d\'établissement'),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: AppConstants.typesEtablissement.map((t) {
+                final isSelected = _selectedType == t['valeur'];
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedType = t['valeur']!),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? MboaColors.primary : Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: isSelected ? MboaColors.primary : MboaColors.border, width: 1.5),
+                    ),
+                    child: Text(
+                      '${t['icon']} ${t['label']}',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? Colors.white : MboaColors.text,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Titre ───────────────────────────────
+            _buildSectionTitle('Nom de la chambre/du logement'),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _titreController,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                hintText: 'Ex: Chambre Standard, Suite Executive...',
+              ),
+              validator: (v) => v == null || v.isEmpty ? 'Requis' : null,
+            ),
+            const SizedBox(height: 20),
+
+            // ── Prix + capacité ───────────────────────
+            _buildSectionTitle('Prix par nuit (FCFA)'),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _prixController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(hintText: '15000', suffixText: 'FCFA'),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Requis';
+                      if (int.tryParse(v.replaceAll(' ', '')) == null) return 'Invalide';
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: _capacitePersonnes > 1
+                          ? () => setState(() => _capacitePersonnes--)
+                          : null,
+                      icon: const Icon(Icons.remove_circle_outline),
+                      color: MboaColors.primary,
+                    ),
+                    Text('$_capacitePersonnes 👤',
+                        style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w700, color: MboaColors.text)),
+                    IconButton(
+                      onPressed: () => setState(() => _capacitePersonnes++),
+                      icon: const Icon(Icons.add_circle_outline),
+                      color: MboaColors.primary,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // ── Équipements ──────────────────────────
+            _buildSectionTitle('Équipements disponibles'),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: AppConstants.equipementsHebergement.map((eq) {
+                final isSelected = _selectedEquipements.contains(eq['label']);
+                return GestureDetector(
+                  onTap: () => setState(() {
+                    if (isSelected) {
+                      _selectedEquipements.remove(eq['label']);
+                    } else {
+                      _selectedEquipements.add(eq['label']!);
+                    }
+                  }),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? MboaColors.primary : Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: isSelected ? MboaColors.primary : MboaColors.border, width: 1.5),
+                    ),
+                    child: Text(
+                      isSelected ? '✓  ${eq['label']}' : '${eq['icon']}  ${eq['label']}',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? Colors.white : MboaColors.text,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Description ──────────────────────────
+            _buildSectionTitle('Description'),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _descController,
+              maxLines: 4,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                hintText: 'Décrivez la chambre/le logement : équipements, quartier, règles...',
+              ),
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Requis';
+                if (v.length < 20) return 'Minimum 20 caractères';
+                return null;
+              },
+            ),
+            const SizedBox(height: 20),
+
+            // ── Position GPS ──────────────────────────
+            KeyedSubtree(
+              key: widget.tourGpsKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionTitle('📍 Position de l\'établissement'),
+                  const SizedBox(height: 8),
+                  if (_lat != null && _lng != null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: MboaColors.primary.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(MboaSizes.radiusMd),
+                        border: Border.all(color: MboaColors.primary.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, color: MboaColors.primary, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Position captée : ${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}',
+                              style: MboaTextStyles.caption,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _isGettingLocation ? null : _obtenirPosition,
+                        icon: _isGettingLocation
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.my_location_rounded),
+                        label: Text(_isGettingLocation ? 'Localisation...' : 'Capturer ma position GPS'),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // ── Bouton publier ───────────────────────
+            KeyedSubtree(
+              key: widget.tourSubmitKey,
+              child: SizedBox(
+                width: double.infinity,
+                height: MboaSizes.buttonHeight,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _publier,
+                  style: ElevatedButton.styleFrom(backgroundColor: MboaColors.secondary),
+                  icon: _isLoading
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                      : const Icon(Icons.publish_rounded, size: 20),
+                  label: Text(_isLoading
+                      ? (_analyseEnCours ? 'Analyse en cours...' : 'Publication en cours...')
+                      : 'Publier l\'hébergement'),
+                ),
               ),
             ),
             const SizedBox(height: 20),

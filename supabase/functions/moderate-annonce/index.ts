@@ -39,7 +39,7 @@ const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-type AnnonceType = "logement" | "article";
+type AnnonceType = "logement" | "article" | "hebergement";
 
 interface Categories {
   pornographie: boolean;
@@ -122,8 +122,16 @@ serve(async (req) => {
     const payload = await req.json();
     const table: string = payload.table;
     const record: Record<string, unknown> = payload.record ?? {};
-    const annonceType: AnnonceType = table === "articles" ? "article" : "logement";
-    const tableName = table === "articles" ? "articles" : "logements";
+    const annonceType: AnnonceType = table === "articles"
+      ? "article"
+      : table === "hebergements"
+      ? "hebergement"
+      : "logement";
+    const tableName = table === "articles"
+      ? "articles"
+      : table === "hebergements"
+      ? "hebergements"
+      : "logements";
     const annonceId = String(record.id);
     const vendeurId = String(
       annonceType === "article" ? record.vendeur_id : record.proprietaire_id,

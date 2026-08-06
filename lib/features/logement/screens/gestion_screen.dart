@@ -3,8 +3,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../logement/screens/logement_detail_screen.dart';
 import '../../market/screens/article_detail_screen.dart';
+import '../../hebergement/screens/hebergement_detail_screen.dart';
 import 'edit_logement_screen.dart';
 import '../../market/screens/edit_article_screen.dart';
+import '../../hebergement/screens/edit_hebergement_screen.dart';
+import '../../reservation/screens/mes_reservations_hote_screen.dart';
 import '../../../core/mixins/refreshable_state.dart';
 import '../../../core/onboarding/tour_step.dart';
 import '../../../core/onboarding/tour_texts.dart';
@@ -24,8 +27,14 @@ class _GestionScreenState extends State<GestionScreen>
   bool _isLoading = true;
   bool _peutLogement = false;
   bool _peutArticle = false;
+  bool _peutHebergement = false;
   List<Map<String, dynamic>> _logements = [];
   List<Map<String, dynamic>> _articles = [];
+  List<Map<String, dynamic>> _hebergements = [];
+  int _nbReservationsEnAttente = 0;
+
+  int get _nbTypesActifs =>
+      [_peutLogement, _peutArticle, _peutHebergement].where((v) => v).length;
 
   final _tourHeroKey = GlobalKey();
   final _tourTabsKey = GlobalKey();
@@ -72,6 +81,7 @@ class _GestionScreenState extends State<GestionScreen>
       final sousRoles = List<String>.from(profil['sous_roles'] ?? []);
       final peutLogement = sousRoles.contains('proprietaire');
       final peutArticle = sousRoles.contains('commercant') || sousRoles.contains('vendeur_independant');
+      final peutHebergement = sousRoles.contains('hotelier');
 
       final resultats = await Future.wait([
         if (peutLogement)
@@ -82,16 +92,27 @@ class _GestionScreenState extends State<GestionScreen>
           _supabase.from('articles').select().eq('vendeur_id', userId).order('date_publication', ascending: false)
         else
           Future.value(<Map<String, dynamic>>[]),
+        if (peutHebergement)
+          _supabase.from('hebergements').select().eq('proprietaire_id', userId).order('date_publication', ascending: false)
+        else
+          Future.value(<Map<String, dynamic>>[]),
+        if (peutHebergement)
+          _supabase.from('reservations').select('id').eq('proprietaire_id', userId).eq('statut', 'en_attente')
+        else
+          Future.value(<Map<String, dynamic>>[]),
       ]);
 
       if (mounted) {
         setState(() {
           _peutLogement = peutLogement;
           _peutArticle = peutArticle;
+          _peutHebergement = peutHebergement;
           _logements = List<Map<String, dynamic>>.from(resultats[0] as List);
           _articles = List<Map<String, dynamic>>.from(resultats[1] as List);
-          if (peutLogement && peutArticle) {
-            _tabController = TabController(length: 2, vsync: this);
+          _hebergements = List<Map<String, dynamic>>.from(resultats[2] as List);
+          _nbReservationsEnAttente = (resultats[3] as List).length;
+          if (_nbTypesActifs > 1) {
+            _tabController = TabController(length: _nbTypesActifs, vsync: this);
           }
           _isLoading = false;
         });
@@ -176,14 +197,50 @@ class _GestionScreenState extends State<GestionScreen>
       );
     }
 
-    if (!_peutLogement && !_peutArticle) {
+    if (_nbTypesActifs == 0) {
       return const Scaffold(
         backgroundColor: MboaColors.background,
         body: Center(child: Text('Aucune annonce à gérer', style: MboaTextStyles.muted)),
       );
     }
 
-    if (!(_peutLogement && _peutArticle)) {
+    final reservationsAction = _peutHebergement
+        ? Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.event_note_rounded, color: MboaColors.text),
+                  tooltip: 'Réservations reçues',
+                  onPressed: () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const MesReservationsHoteScreen()));
+                    _charger();
+                  },
+                ),
+                if (_nbReservationsEnAttente > 0)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: MboaColors.danger, shape: BoxShape.circle),
+                      child: Text('$_nbReservationsEnAttente',
+                          style: const TextStyle(fontFamily: 'Poppins', fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white)),
+                    ),
+                  ),
+              ],
+            ),
+          )
+        : null;
+
+    final sections = <MapEntry<String, Widget>>[
+      if (_peutLogement) MapEntry('🏠 Logements (${_logements.length})', _buildListeLogements()),
+      if (_peutArticle) MapEntry('🛒 Articles (${_articles.length})', _buildListeArticles()),
+      if (_peutHebergement) MapEntry('🏨 Hébergements (${_hebergements.length})', _buildListeHebergements()),
+    ];
+
+    if (_nbTypesActifs <= 1) {
       return Scaffold(
         backgroundColor: MboaColors.background,
         appBar: AppBar(
@@ -195,6 +252,7 @@ class _GestionScreenState extends State<GestionScreen>
                 style: TextStyle(fontFamily: 'Poppins', fontSize: 18, fontWeight: FontWeight.w800, color: MboaColors.text)),
           ),
           actions: [
+            if (reservationsAction != null) reservationsAction,
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: TourButton(steps: _tourSteps),
@@ -204,7 +262,7 @@ class _GestionScreenState extends State<GestionScreen>
         body: RefreshIndicator(
           color: MboaColors.primary,
           onRefresh: _charger,
-          child: _peutLogement ? _buildListeLogements() : _buildListeArticles(),
+          child: sections.first.value,
         ),
       );
     }
@@ -220,6 +278,7 @@ class _GestionScreenState extends State<GestionScreen>
               style: TextStyle(fontFamily: 'Poppins', fontSize: 18, fontWeight: FontWeight.w800, color: MboaColors.text)),
         ),
         actions: [
+          if (reservationsAction != null) reservationsAction,
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: TourButton(steps: _tourSteps),
@@ -231,14 +290,12 @@ class _GestionScreenState extends State<GestionScreen>
             key: _tourTabsKey,
             child: TabBar(
               controller: _tabController,
+              isScrollable: sections.length > 2,
               labelColor: MboaColors.primary,
               unselectedLabelColor: MboaColors.textMuted,
               indicatorColor: MboaColors.primary,
               labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w700),
-              tabs: [
-                Tab(text: '🏠 Logements (${_logements.length})'),
-                Tab(text: '🛒 Articles (${_articles.length})'),
-              ],
+              tabs: sections.map((s) => Tab(text: s.key)).toList(),
             ),
           ),
         ),
@@ -248,7 +305,7 @@ class _GestionScreenState extends State<GestionScreen>
         onRefresh: _charger,
         child: TabBarView(
           controller: _tabController,
-          children: [_buildListeLogements(), _buildListeArticles()],
+          children: sections.map((s) => s.value).toList(),
         ),
       ),
     );
@@ -294,6 +351,26 @@ class _GestionScreenState extends State<GestionScreen>
         },
         tourKey: _tourKeyPourItem(false, index),
         actionsTourKey: _tourKeyPourItem(false, index) != null ? _tourActionsKey : null,
+      ),
+    );
+  }
+
+  Widget _buildListeHebergements() {
+    if (_hebergements.isEmpty) return _buildVide('🏨', 'Aucun hébergement publié');
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: _hebergements.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) => _buildCard(
+        item: _hebergements[index],
+        table: 'hebergements',
+        emoji: '🏨',
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HebergementDetailScreen(hebergement: _hebergements[index]))),
+        onEdit: () async {
+          final modifie = await Navigator.push<bool>(
+              context, MaterialPageRoute(builder: (_) => EditHebergementScreen(hebergement: _hebergements[index])));
+          if (modifie == true) _charger();
+        },
       ),
     );
   }

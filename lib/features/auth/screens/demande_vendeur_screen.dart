@@ -54,6 +54,12 @@ class _DemandeVendeurScreenState extends State<DemandeVendeurScreen> {
       description: 'Je loue des logements ET je vends des produits',
       sousRoles: ['proprietaire', 'commercant'],
     ),
+    _RoleOption(
+      icon: '🏨',
+      titre: 'Hôtel / Motel / Auberge',
+      description: 'Je propose des chambres ou logements à réserver',
+      sousRoles: ['hotelier'],
+    ),
   ];
 
   @override

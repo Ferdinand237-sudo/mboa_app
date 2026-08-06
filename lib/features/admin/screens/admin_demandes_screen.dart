@@ -233,6 +233,10 @@ class _AdminDemandesScreenState
                       'label': '📦 Vendeur indépendant',
                       'value': 'vendeur_independant'
                     },
+                    {
+                      'label': '🏨 Hôtelier',
+                      'value': 'hotelier'
+                    },
                   ].map((opt) {
                     final isSelected = selectedSousRoles
                         .contains(opt['value']);

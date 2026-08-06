@@ -10,6 +10,7 @@ import 'admin_signalements_screen.dart';
 import 'admin_demandes_screen.dart';
 import 'admin_verifications_screen.dart';
 import 'admin_villes_screen.dart';
+import 'admin_reservations_screen.dart';
 import '../../../core/mixins/refreshable_state.dart';
 import '../../../core/services/ville_service.dart';
 import '../../chat/screens/chat_screen.dart';
@@ -355,6 +356,14 @@ class _DashboardTabState extends State<_DashboardTab> with RefreshableState {
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.event_note_rounded, color: MboaColors.primary),
+              title: const Text('Réservations', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminReservationsScreen()));
               },
             ),
             const Divider(height: 1),

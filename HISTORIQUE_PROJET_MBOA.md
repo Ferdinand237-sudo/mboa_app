@@ -1632,6 +1632,110 @@ la publication des annonces par les vendeurs et propriétaires". Vérifié :
 
 ---
 
+## 5vicies. Réservation d'hébergements — hôtels, motels, auberges (5 août 2026)
+
+Demande de Ferdinand : donner de la visibilité aux hôtels/motels/auberges
+sur Mboa, avec un système de réservation et de notation par les
+visiteurs. Décisions actées avant conception : **v1 = mise en relation
+seulement** (Mboa n'encaisse rien, l'établissement confirme et gère le
+paiement lui-même) et **pas de vérification terrain pour les hôteliers**
+(publication immédiate après validation admin, comme un `commercant`
+aujourd'hui — priorité à la vitesse d'onboarding). Plan complet
+(architecture, schéma, RLS, hors-scope v1) écrit et approuvé avant tout
+code, voir `/home/lohove/.claude/plans/sunny-dazzling-frost.md`.
+
+**Modèle de données** : pas de table `etablissements` séparée — un
+hôtelier avec plusieurs types de chambres est traité comme un
+propriétaire avec plusieurs logements (déjà supporté nativement).
+L'identité de l'établissement réutilise `users.nom_commerce`/
+`description_commerce`/`photo_commerce` (déjà le rôle de ces colonnes
+pour un `commercant`). Chaque chambre/suite/appartement = une ligne dans
+la nouvelle table `hebergements` (colonnes alignées sur `logements`/
+`articles` : titre, description, photos, statut, statut_moderation,
+ville, lat/lng, proprietaire_id, boosted/vues/signalements,
+date_publication ; spécifique : `type_etablissement`, `capacite_personnes`,
+`equipements`). Volontairement **pas** de `note_globale`/`nb_avis` sur
+cette table (colonnes mortes constatées sur `logements`, pas reproduites).
+
+**Nouvelle table `reservations`** : modélisée sur `verifications_terrain`
+(seul précédent de machine à états avec RLS empêchant le demandeur de
+trancher un statut terminal en sa faveur) — `en_attente → confirmee |
+refusee`, ou `annulee` par le visiteur. RLS testée en direct sur la
+base de prod (`set local role authenticated` + `set_config
+request.jwt.claim.sub`) : spoof de `proprietaire_id` bloqué, visiteur ne
+peut pas confirmer sa propre demande, un tiers ne peut rien modifier,
+le propriétaire confirme normalement, `date_reponse` posée
+automatiquement par trigger. Notifications in-app dédiées (nouvelle
+demande → propriétaire, réponse → visiteur), CHECK `notifications.type`
+étendu (6 valeurs existantes + `reservation`).
+
+**Modération IA** : `hebergements` suit exactement le pattern
+logements/articles (`proteger_colonnes_confiance_hebergements()`,
+trigger `moderer_nouvelle_annonce()` déjà générique par `TG_TABLE_NAME`,
+extension des CHECK `moderation_ia.annonce_type`/`image_hashes.annonce_type`).
+**`moderate-annonce/index.ts` modifié** (pas juste configuré) : le
+ternaire binaire `articles ? article : logement` devient un switch à 3
+branches. Testé par insert réel : `annonce_type` se résolvait d'abord à
+`'logement'` par défaut (bug attendu, confirmait que l'ancien code
+tombait dans le mauvais cas), puis correctement à `'hebergement'` après
+le correctif et le redéploiement.
+
+**Avis/notation** : réutilisation à l'identique, aucun changement de
+schéma — `avis.cible_id` pointe déjà vers le propriétaire (jamais
+l'annonce), le trigger `trg_recalculer_note_utilisateur` se déclenche
+peu importe le type d'annonce référencé par `annonce_id`. Seuls 2
+fichiers étendus pour la résolution `annonce_id → titre` en modération
+(`avis_moderation_screen.dart`, requête `logements`+`articles`+
+`hebergements` au lieu de 2 tables).
+
+**Navigation** : aucun 6e onglet ajouté (bottom nav mobile et admin déjà
+saturées à 5, précédent de réduction 6→5 documenté §admin_screen.dart).
+Découverte visiteur via une 4e tuile "🏨 Hôtels" dans la section Explorer
+de Home (même pattern que "Carte", `Navigator.push` direct, pas de
+route nommée). Réservations reçues accessibles depuis un bouton à badge
+sur l'onglet Hébergements de Gestion. Supervision admin via le `Drawer`
+hamburger (même pattern que "Demandes"), pas un 6e onglet.
+
+**Bug trouvé et corrigé pendant la construction** : la migration
+initiale déclarait `hebergements.prix` en `numeric` — or PostgREST
+sérialise `numeric` en chaîne JSON (pas en nombre) pour préserver la
+précision, ce qui aurait fait planter le cast `as int` déjà utilisé côté
+client (`_formatPrix`). Corrigé en `integer`, comme `logements.prix`/
+`articles.prix` (aucune donnée existante à l'époque, migration corrective
+sans risque).
+
+**Nouveaux fichiers mobile** : `core/models/hebergement_model.dart`,
+`core/models/reservation_model.dart`, `features/hebergement/screens/`
+(hebergements_screen, hebergement_detail_screen, edit_hebergement_screen),
+`features/reservation/screens/` (mes_reservations_screen,
+mes_reservations_hote_screen), `features/admin/screens/admin_reservations_screen.dart`.
+Modifiés : `publier_screen.dart`/`gestion_screen.dart` (3e onglet
+dynamique — le `TabController` était codé en dur à 2 onglets, généralisé
+à N onglets actifs), `demande_vendeur_screen.dart`/`admin_demandes_screen.dart`
+(sous-rôle `hotelier`), `home_screen.dart` (tuile Explorer),
+`profil_screen.dart` (menu "Mes réservations"), `admin_screen.dart`
+(menu "Réservations"), `app_constants.dart`.
+
+**Vérifié** : migrations testées en direct sur la base de prod (insert/
+update SQL, RLS, triggers, modération, nettoyage sans résidu) ;
+`moderate-annonce` redéployé et testé par insert réel ; `flutter
+analyze` sur l'ensemble du projet après toutes les modifications : 169
+issues (+26 vs baseline, uniquement des suggestions de style
+`prefer_const_constructors` sur les nouveaux fichiers), **0 erreur, 0
+warning**. **Non testé en conditions réelles sur device** au moment de
+la rédaction — le téléphone s'est déconnecté en cours de session ; à
+tester dès reconnexion : publier un hébergement, demander une
+réservation depuis un second compte, confirmer/refuser côté hôtelier,
+vérifier la notification, laisser un avis.
+
+**Hors scope v1** (voir le plan pour le détail complet) : pas de
+calendrier de disponibilité par date, pas de paiement/Mobile Money, pas
+de commission Mboa, pas d'expiration automatique d'une demande, pas de
+gestion multi-établissements par compte (un hôtelier = une identité
+`nom_commerce`).
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
@@ -1864,3 +1968,11 @@ mobile du 22/07 et le travail web/notifications qui a suivi).*
   admin). Parcours vendeur/propriétaire et administrateur restent à
   tester de façon exhaustive, mis en pause à la demande de Ferdinand
   pour reprise ultérieure.
+- **Réservation d'hébergements (05/08, section 5vicies)** : nouveau
+  sous-rôle `hotelier`, table `hebergements` + `reservations`,
+  modération IA étendue, notation réutilisée à l'identique. Backend
+  testé en direct en production (RLS, triggers, modération). `flutter
+  analyze` propre sur tout le projet (0 erreur/warning). **Non testé sur
+  device réel** — téléphone déconnecté en cours de session, à reprendre
+  dès reconnexion (parcours complet : publier → demander → confirmer →
+  noter). Web pas commencé (mobile-first, comme prévu au plan).

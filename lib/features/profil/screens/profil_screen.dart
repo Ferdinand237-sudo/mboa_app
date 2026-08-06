@@ -12,6 +12,7 @@ import 'favoris_screen.dart';
 import 'avis_moderation_screen.dart';
 import 'devenir_contributeur_screen.dart';
 import 'alertes_recherche_screen.dart';
+import '../../reservation/screens/mes_reservations_screen.dart';
 import '../../../core/mixins/refreshable_state.dart';
 
 class ProfilScreen extends StatefulWidget {
@@ -625,6 +626,15 @@ class _ProfilScreenState extends State<ProfilScreen> with RefreshableState {
                     widget.onOuvrirMessages!();
                   }
                 },
+              ),
+              _buildMenuItem(
+                icon: Icons.event_note_rounded,
+                color: MboaColors.secondary,
+                label: 'Mes réservations',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MesReservationsScreen()),
+                ),
               ),
               if (_user?['role'] == 'vendeur')
                 _buildMenuItem(

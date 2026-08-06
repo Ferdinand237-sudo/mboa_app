@@ -35,6 +35,8 @@ class AppConstants {
   static const String tableImageHashes    = 'image_hashes';
   static const String tableVerificationsTerrain    = 'verifications_terrain';
   static const String tableAttestationsAccesLog    = 'attestations_acces_log';
+  static const String tableHebergements   = 'hebergements';
+  static const String tableReservations   = 'reservations';
 
   // ── Storage Supabase (buckets) ────────────────────────────
   static const String bucketLogements     = 'logements';
@@ -42,6 +44,7 @@ class AppConstants {
   static const String bucketProfils       = 'profils';
   static const String bucketBoutiques     = 'boutiques';
   static const String bucketAttestations  = 'attestations-proprietaires';
+  static const String bucketHebergements  = 'hebergements';
 
   // ── Pagination ────────────────────────────────────────────
   static const int pageSize              = 10;
@@ -52,6 +55,8 @@ class AppConstants {
   static const int minPhotosLogement     = 3;
   static const int maxPhotosArticle      = 5;
   static const int minPhotosArticle      = 1;
+  static const int maxPhotosHebergement  = 8;
+  static const int minPhotosHebergement  = 3;
   static const int seuilSignalement      = 5;
   static const int maxAnnoncesParJour    = 5;
   static const int joursAvantExpiration  = 60;
@@ -108,6 +113,27 @@ class AppConstants {
     'Correct',
   ];
 
+  // ── Types d'établissement hôtelier ────────────────────────
+  static const List<Map<String, String>> typesEtablissement = [
+    {'valeur': 'hotel',              'label': 'Hôtel',              'icon': '🏨'},
+    {'valeur': 'motel',              'label': 'Motel',               'icon': '🏩'},
+    {'valeur': 'auberge',            'label': 'Auberge',             'icon': '🛖'},
+    {'valeur': 'appart_hotel',       'label': 'Appart-hôtel',        'icon': '🏢'},
+    {'valeur': 'residence_meublee',  'label': 'Résidence meublée',   'icon': '🛋'},
+  ];
+
+  // ── Équipements hébergement ───────────────────────────────
+  static const List<Map<String, String>> equipementsHebergement = [
+    {'label': 'Wifi',           'icon': '📶'},
+    {'label': 'Climatisation',  'icon': '❄️'},
+    {'label': 'Petit-déjeuner', 'icon': '🍳'},
+    {'label': 'Parking',        'icon': '🚗'},
+    {'label': 'Piscine',        'icon': '🏊'},
+    {'label': 'Eau chaude',     'icon': '🚿'},
+    {'label': 'Télévision',     'icon': '📺'},
+    {'label': 'Sécurité',       'icon': '🔒'},
+  ];
+
   // ── Rôles utilisateurs ────────────────────────────────────
   static const String roleVisiteur     = 'visiteur';
   static const String roleVendeur      = 'vendeur';
@@ -118,6 +144,7 @@ class AppConstants {
   static const String sousRoleProprietaire       = 'proprietaire';
   static const String sousRoleCommercant         = 'commercant';
   static const String sousRoleVendeurIndependant = 'vendeur_independant';
+  static const String sousRoleHotelier           = 'hotelier';
 
   // ── Statuts annonces ──────────────────────────────────────
   static const String statutDisponible  = 'disponible';
@@ -152,6 +179,12 @@ class AppConstants {
   static const String statutVerificationVisiteEffectuee        = 'visite_effectuee';
   static const String statutVerificationValidee                = 'validee';
   static const String statutVerificationRejetee                = 'rejetee';
+
+  // ── Statuts de réservation ─────────────────────────────────
+  static const String statutReservationEnAttente = 'en_attente';
+  static const String statutReservationConfirmee = 'confirmee';
+  static const String statutReservationRefusee   = 'refusee';
+  static const String statutReservationAnnulee   = 'annulee';
 
   // ── Types de justificatif (jamais le numéro de pièce en clair) ──
   static const List<String> typesJustificatif = [

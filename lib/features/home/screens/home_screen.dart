@@ -9,6 +9,7 @@ import '../../logement/screens/logement_detail_screen.dart';
 import '../../market/screens/article_detail_screen.dart';
 import '../../map/screens/map_screen.dart';
 import '../../map/screens/lieux_recherche_resultats_screen.dart';
+import '../../hebergement/screens/hebergements_screen.dart';
 import 'home_search_screen.dart';
 import 'notifications_screen.dart';
 import 'contributeurs_screen.dart';
@@ -640,6 +641,13 @@ class _HomeScreenState extends State<HomeScreen> with RefreshableState {
                             Navigator.push(context, MaterialPageRoute(builder: (_) => const MapScreen()));
                           },
                           tourKey: widget.tourCarteKey,
+                        ),
+                        const SizedBox(width: 12),
+                        _buildCategoryCard(
+                          '🏨',
+                          'Hôtels',
+                          MboaColors.boost,
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HebergementsScreen())),
                         ),
                       ],
                     ),

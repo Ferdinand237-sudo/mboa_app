@@ -36,15 +36,18 @@ class _AvisModerationScreenState extends State<AvisModerationScreen> {
           .order('date_publication', ascending: false);
       final avis = List<Map<String, dynamic>>.from(data);
 
-      // annonce_id n'a pas de FK unique (logement ou article) : on
-      // récupère les titres séparément plutôt que via une jointure.
+      // annonce_id n'a pas de FK unique (logement, article ou
+      // hébergement) : on récupère les titres séparément plutôt que via
+      // une jointure.
       final annonceIds = avis.map((a) => a['annonce_id']).whereType<String>().toSet().toList();
       if (annonceIds.isNotEmpty) {
         final titresLogements = await _supabase.from('logements').select('id, titre').filter('id', 'in', annonceIds);
         final titresArticles = await _supabase.from('articles').select('id, titre').filter('id', 'in', annonceIds);
+        final titresHebergements = await _supabase.from('hebergements').select('id, titre').filter('id', 'in', annonceIds);
         final mapTitres = <String, String>{
           for (final l in List<Map<String, dynamic>>.from(titresLogements)) l['id']: l['titre'] ?? '',
           for (final a in List<Map<String, dynamic>>.from(titresArticles)) a['id']: a['titre'] ?? '',
+          for (final h in List<Map<String, dynamic>>.from(titresHebergements)) h['id']: h['titre'] ?? '',
         };
         for (final a in avis) {
           a['titre_annonce'] = mapTitres[a['annonce_id']];
