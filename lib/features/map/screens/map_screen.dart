@@ -112,10 +112,13 @@ class _MapScreenState extends State<MapScreen> {
     try {
       final data = await _supabase
           .from('users')
-          .select('role')
+          .select('role, est_admin')
           .eq('id', user.id)
           .single();
-      if (mounted) setState(() => _isAdmin = data['role'] == 'admin');
+      if (mounted) {
+        setState(() =>
+            _isAdmin = data['role'] == 'admin' || data['est_admin'] == true);
+      }
     } catch (_) {}
   }
 
