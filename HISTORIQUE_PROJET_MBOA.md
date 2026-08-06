@@ -1683,6 +1683,7 @@ la publication des annonces par les vendeurs et propriétaires". Vérifié :
 | Dernière étape "Crée ton compte" de la visite guidée mal ciblée | Mobile, distinct du délai de scroll déjà corrigé (ligne ci-dessus) — halo figé sur une position obsolète si le contenu au-dessus finit de charger juste après le calcul initial |
 | Compteur `vues` jamais incrémenté (toutes plateformes) | Colonne affichée sur le web depuis l'origine mais aucun code, sur aucune plateforme, ne l'incrémentait réellement — figée à 0 ; trouvé et corrigé le 1er août 2026 (section 5septendecies) |
 | Article publié sous la mauvaise ville | `ville` dérivée silencieusement de l'état de navigation (cookie/SharedPreferences), pas d'un choix explicite du vendeur, et non corrigeable après coup ; corrigé le 1er août 2026 en passant à une sélection multi-ville explicite (section 5novodecies) |
+| Bouton "Ajouter un lieu ici" invisible pour un admin réel | Mobile, `map_screen.dart` — même pattern que ci-dessus, oublié lors du balayage du 27/07 : `_isAdmin` testait `role == 'admin'` littéralement alors que la policy RLS de `lieux_publics`, elle, était déjà correcte (`is_admin()`) ; signalé par Ferdinand le 5 août 2026, corrigé le jour même |
 
 ---
 
