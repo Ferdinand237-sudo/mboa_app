@@ -504,6 +504,13 @@ class _LogementDetailScreenState
         ' FCFA';
   }
 
+  String _getDescription(Map<String, dynamic> l) {
+    final description = l['description']?.toString().trim();
+    return description != null && description.isNotEmpty
+        ? description
+        : 'Aucune description disponible.';
+  }
+
   String _getInitiales(String nom) {
     final parts = nom.trim().split(' ');
     if (parts.length >= 2) {
@@ -642,6 +649,29 @@ class _LogementDetailScreenState
                           _buildInfoChip(
                               '✅', 'Disponible'),
                         ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // ── Description ───────────────
+                      _buildSectionTitle('Description'),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius:
+                              BorderRadius.circular(MboaSizes.radiusMd),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _getDescription(l),
+                          style: MboaTextStyles.body.copyWith(height: 1.6),
+                        ),
                       ),
                       const SizedBox(height: 24),
 

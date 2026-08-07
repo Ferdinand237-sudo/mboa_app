@@ -49,6 +49,22 @@ Future<String?> attendreDecisionModeration(
   return decision;
 }
 
+// Precision "high" (~10m) au lieu du "best" par défaut de Geolocator
+// (~0-3m, exige un vrai fix GPS satellite) : best mettait fréquemment plus
+// de 15s à converger en intérieur, provoquant le timeout. En repli, tente
+// la dernière position connue du téléphone (souvent suffisante pour situer
+// une annonce à quelques mètres près) avant d'abandonner.
+Future<Position?> _obtenirPositionAvecRepli() async {
+  try {
+    return await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+      timeLimit: const Duration(seconds: 20),
+    );
+  } on TimeoutException {
+    return await Geolocator.getLastKnownPosition();
+  }
+}
+
 void afficherResultatModeration(
   BuildContext context,
   String? decision,
@@ -506,23 +522,23 @@ class _FormLogementState extends State<_FormLogement> {
         return;
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        timeLimit: const Duration(seconds: 15),
-      );
+      final position = await _obtenirPositionAvecRepli();
+      if (position == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Signal GPS trop faible. Réessaie en extérieur ou près d\'une fenêtre.'),
+              backgroundColor: MboaColors.danger,
+            ),
+          );
+        }
+        return;
+      }
       if (mounted) {
         setState(() {
           _lat = position.latitude;
           _lng = position.longitude;
         });
-      }
-    } on TimeoutException {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Signal GPS trop faible. Réessaie en extérieur ou près d\'une fenêtre.'),
-            backgroundColor: MboaColors.danger,
-          ),
-        );
       }
     } catch (e) {
       if (mounted) {
@@ -1973,23 +1989,23 @@ class _FormHebergementState extends State<_FormHebergement> {
         }
         return;
       }
-      final position = await Geolocator.getCurrentPosition(
-        timeLimit: const Duration(seconds: 15),
-      );
+      final position = await _obtenirPositionAvecRepli();
+      if (position == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Signal GPS trop faible. Réessaie en extérieur ou près d\'une fenêtre.'),
+              backgroundColor: MboaColors.danger,
+            ),
+          );
+        }
+        return;
+      }
       if (mounted) {
         setState(() {
           _lat = position.latitude;
           _lng = position.longitude;
         });
-      }
-    } on TimeoutException {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Signal GPS trop faible. Réessaie en extérieur ou près d\'une fenêtre.'),
-            backgroundColor: MboaColors.danger,
-          ),
-        );
       }
     } catch (e) {
       if (mounted) {

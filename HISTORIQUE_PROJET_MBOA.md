@@ -1736,6 +1736,46 @@ gestion multi-établissements par compte (un hôtelier = une identité
 
 ---
 
+## 5unvicies. Description absente sur le détail logement + timeout GPS à la publication (7 août 2026)
+
+Deux bugs signalés par Ferdinand le même jour.
+
+**Description jamais affichée sur le détail logement** : bug préexistant
+depuis le tout premier commit du projet, pas une régression — vérifié
+via `git log -p` sur tout l'historique du fichier
+`logement_detail_screen.dart`, `l['description']` n'y est référencé nulle
+part alors que la table `logements` a bien cette colonne (sélectionnée
+via `select('*')`) et que l'écran équivalent `article_detail_screen.dart`
+l'affiche correctement depuis longtemps. Ajouté une section "Description"
+identique (visuellement et dans la logique de repli "Aucune description
+disponible.") juste après les infos rapides, avant "Équipements".
+
+**Timeout GPS à la publication** ("Signal GPS trop faible... près d'une
+fenêtre") : le message existe depuis le 17/07 (ajouté volontairement
+pour remplacer une attente indéfinie sans retour), donc pas non plus une
+régression de code récente — `Geolocator`, sa version (11.1.0, inchangée
+depuis) et les permissions Android n'ont pas bougé. La cause la plus
+probable est côté device (position "approximative" au lieu de "précise"
+dans les réglages Android, ou signal GPS matériel faible), hors de
+portée d'un correctif code seul. Deux mitigations appliquées côté code
+en attendant : précision demandée abaissée de `best` (fix GPS serré,
+~0-3m, très lent en intérieur) à `high` (~10m, satisfaite bien plus
+vite), timeout porté à 20s, et repli sur `getLastKnownPosition()` avant
+d'abandonner si le fix frais échoue. Factorisé dans une fonction
+partagée `_obtenirPositionAvecRepli()` (`publier_screen.dart`), utilisée
+par les formulaires logement et hébergement (les deux dupliquaient le
+même code). **Si le problème persiste après ce correctif, vérifier
+Réglages → Apps → Mboa → Autorisations → Position → "Position précise"
+activée** sur le téléphone concerné.
+
+**Vérifié** : `flutter analyze` sur les deux fichiers puis sur
+l'ensemble du projet — 169 issues, 0 erreur, 0 warning (identique à la
+baseline post-5vicies, aucune régression). Non testé sur device réel au
+moment de la rédaction (même blocage de connexion USB que la section
+précédente).
+
+---
+
 ## 6. Infrastructure technique
 
 ### Supabase (projet `vodmsndqahmxdsqpayrd`)
@@ -1788,6 +1828,7 @@ gestion multi-établissements par compte (un hôtelier = une identité
 | Compteur `vues` jamais incrémenté (toutes plateformes) | Colonne affichée sur le web depuis l'origine mais aucun code, sur aucune plateforme, ne l'incrémentait réellement — figée à 0 ; trouvé et corrigé le 1er août 2026 (section 5septendecies) |
 | Article publié sous la mauvaise ville | `ville` dérivée silencieusement de l'état de navigation (cookie/SharedPreferences), pas d'un choix explicite du vendeur, et non corrigeable après coup ; corrigé le 1er août 2026 en passant à une sélection multi-ville explicite (section 5novodecies) |
 | Bouton "Ajouter un lieu ici" invisible pour un admin réel | Mobile, `map_screen.dart` — même pattern que ci-dessus, oublié lors du balayage du 27/07 : `_isAdmin` testait `role == 'admin'` littéralement alors que la policy RLS de `lieux_publics`, elle, était déjà correcte (`is_admin()`) ; signalé par Ferdinand le 5 août 2026, corrigé le jour même |
+| Description jamais affichée sur le détail logement | Mobile, `logement_detail_screen.dart` — bug préexistant depuis le premier commit, jamais construit (contrairement à `article_detail_screen.dart`) ; signalé par Ferdinand le 7 août 2026, corrigé le jour même (section 5unvicies) |
 
 ---
 
