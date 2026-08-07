@@ -1774,6 +1774,16 @@ baseline post-5vicies, aucune régression). Non testé sur device réel au
 moment de la rédaction (même blocage de connexion USB que la section
 précédente).
 
+**Correctif oublié côté web** : premier correctif poussé mobile
+uniquement — Ferdinand a signalé continuer à ne pas voir la description
+quelques minutes après, ce qui a permis de découvrir que le même bug
+existait aussi sur `mboa-web/src/app/logements/[id]/page.tsx` (jamais
+affichée non plus, même écart avec `marketplace/[id]/page.tsx` qui l'a
+toujours fait). Corrigé à l'identique, `npm run build` propre. Déployé
+automatiquement sur Vercel au push (pas de build APK requis pour cette
+partie, contrairement au correctif mobile qui attend toujours un test
+device réel).
+
 ---
 
 ## 6. Infrastructure technique
