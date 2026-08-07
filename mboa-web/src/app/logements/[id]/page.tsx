@@ -154,6 +154,15 @@ export default async function LogementDetailPage({
         </div>
 
         <div className="mt-7">
+          <h2 className="text-base font-bold text-mboa-text">Description</h2>
+          <div className="mt-2.5 rounded-mboa-md bg-mboa-card p-3.5 shadow-sm">
+            <p className="whitespace-pre-line text-sm leading-relaxed text-mboa-text">
+              {logement.description || "Aucune description disponible."}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-7">
           <h2 className="text-base font-bold text-mboa-text">Équipements</h2>
           {logement.equipements.length === 0 ? (
             <p className="mt-2 text-sm text-mboa-text-muted">Non renseignés</p>
